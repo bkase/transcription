@@ -21,7 +21,21 @@ import Dependencies
             fetchSessions: { [] },
             fetchSession: { _ in nil },
             createSession: { _ in },
-            deleteSession: { _ in }
+            updateSession: { _ in },
+            deleteSession: { _ in },
+            fetchPeople: { [] },
+            fetchPerson: { _ in nil },
+            createPerson: { _ in },
+            updatePerson: { _ in },
+            deletePerson: { _ in },
+            fetchSpeakerTracks: { _ in [] },
+            createSpeakerTrack: { _ in },
+            updateSpeakerTrack: { _ in },
+            fetchTranscriptSegments: { _ in [] },
+            createTranscriptSegment: { _ in },
+            updateTranscriptSegment: { _ in },
+            fetchSpeakerSegments: { _ in [] },
+            createSpeakerSegment: { _ in }
         )
         deps.audioCaptureClient = AudioCaptureClient(
             startCapture: { AsyncStream { _ in } },
@@ -125,8 +139,8 @@ import Dependencies
         @Dependency(\.exportClient) var exportClient
         @Dependency(\.fileClient) var fileClient
 
-        // Verify non-crashing access
-        _ = try? await databaseClient.fetchSession(.init(rawValue: "test"))
+        // Verify non-crashing access for clients that have safe defaults
+        // Note: DatabaseClient's liveValue requires a configured database, so skip calling its methods here
         _ = await audioCaptureClient.isCapturing()
         _ = await audioPlayerClient.isPlaying()
         _ = await fluidAudioClient.isTranscribing()

@@ -11,6 +11,7 @@ let package = Package(
     dependencies: [
         .package(path: "../Models"),
         .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.0.0"),
+        .package(url: "https://github.com/groue/GRDB.swift", from: "6.29.0"),
     ],
     targets: [
         .target(
@@ -19,6 +20,7 @@ let package = Package(
                 "Models",
                 .product(name: "Dependencies", package: "swift-dependencies"),
                 .product(name: "DependenciesMacros", package: "swift-dependencies"),
+                .product(name: "GRDB", package: "GRDB.swift"),
             ]
         ),
         .testTarget(

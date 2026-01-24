@@ -1,31 +1,422 @@
+import Foundation
 import Models
 import Dependencies
 import DependenciesMacros
+import GRDB
+
+// MARK: - Processing State
+
+public enum ProcessingState: String, Codable, Sendable, DatabaseValueConvertible {
+    case recording
+    case partial
+    case processed
+    case failed
+}
+
+// MARK: - Database Records
+
+public struct SessionRecord: Codable, FetchableRecord, PersistableRecord, Sendable {
+    public static let databaseTableName = "sessions"
+
+    public var id: String
+    public var startedAt: Date
+    public var endedAt: Date?
+    public var title: String?
+    public var previewText: String?
+    public var durationMs: Int?
+    public var audioPath: String?
+    public var processingState: ProcessingState
+    public var speakerCount: Int
+    public var updatedAt: Date
+
+    public init(
+        id: String,
+        startedAt: Date,
+        endedAt: Date? = nil,
+        title: String? = nil,
+        previewText: String? = nil,
+        durationMs: Int? = nil,
+        audioPath: String? = nil,
+        processingState: ProcessingState = .recording,
+        speakerCount: Int = 0,
+        updatedAt: Date
+    ) {
+        self.id = id
+        self.startedAt = startedAt
+        self.endedAt = endedAt
+        self.title = title
+        self.previewText = previewText
+        self.durationMs = durationMs
+        self.audioPath = audioPath
+        self.processingState = processingState
+        self.speakerCount = speakerCount
+        self.updatedAt = updatedAt
+    }
+}
+
+public struct PersonRecord: Codable, FetchableRecord, PersistableRecord, Sendable {
+    public static let databaseTableName = "people"
+
+    public var id: String
+    public var name: String
+    public var colorToken: String
+    public var createdAt: Date
+    public var updatedAt: Date
+
+    public init(
+        id: String,
+        name: String,
+        colorToken: String,
+        createdAt: Date,
+        updatedAt: Date
+    ) {
+        self.id = id
+        self.name = name
+        self.colorToken = colorToken
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+}
+
+public struct SpeakerTrackRecord: Codable, FetchableRecord, PersistableRecord, Sendable {
+    public static let databaseTableName = "speaker_tracks"
+
+    public var id: String
+    public var sessionId: String
+    public var machineSpeakerId: String
+    public var displayOrder: Int
+    public var personId: String?
+
+    public init(
+        id: String,
+        sessionId: String,
+        machineSpeakerId: String,
+        displayOrder: Int,
+        personId: String? = nil
+    ) {
+        self.id = id
+        self.sessionId = sessionId
+        self.machineSpeakerId = machineSpeakerId
+        self.displayOrder = displayOrder
+        self.personId = personId
+    }
+}
+
+public struct TranscriptSegmentRecord: Codable, FetchableRecord, PersistableRecord, Sendable {
+    public static let databaseTableName = "transcript_segments"
+
+    public var id: String
+    public var sessionId: String
+    public var startMs: Int
+    public var endMs: Int
+    public var machineSpeakerId: String?
+    public var text: String
+    public var confidence: Double?
+    public var isFinal: Bool
+    public var createdAt: Date
+    public var updatedAt: Date
+
+    public init(
+        id: String,
+        sessionId: String,
+        startMs: Int,
+        endMs: Int,
+        machineSpeakerId: String? = nil,
+        text: String,
+        confidence: Double? = nil,
+        isFinal: Bool = false,
+        createdAt: Date,
+        updatedAt: Date
+    ) {
+        self.id = id
+        self.sessionId = sessionId
+        self.startMs = startMs
+        self.endMs = endMs
+        self.machineSpeakerId = machineSpeakerId
+        self.text = text
+        self.confidence = confidence
+        self.isFinal = isFinal
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+}
+
+public struct SpeakerSegmentRecord: Codable, FetchableRecord, PersistableRecord, Sendable {
+    public static let databaseTableName = "speaker_segments"
+
+    public var id: String
+    public var sessionId: String
+    public var startMs: Int
+    public var endMs: Int
+    public var machineSpeakerId: String
+    public var score: Double?
+    public var isOverlap: Bool
+
+    public init(
+        id: String,
+        sessionId: String,
+        startMs: Int,
+        endMs: Int,
+        machineSpeakerId: String,
+        score: Double? = nil,
+        isOverlap: Bool = false
+    ) {
+        self.id = id
+        self.sessionId = sessionId
+        self.startMs = startMs
+        self.endMs = endMs
+        self.machineSpeakerId = machineSpeakerId
+        self.score = score
+        self.isOverlap = isOverlap
+    }
+}
+
+// MARK: - Migrations
+
+public enum AppMigrations {
+    public static var migrator: DatabaseMigrator {
+        var migrator = DatabaseMigrator()
+
+        migrator.registerMigration("v1_initial_schema") { db in
+            // Sessions table
+            try db.create(table: "sessions") { t in
+                t.column("id", .text).primaryKey()
+                t.column("startedAt", .datetime).notNull()
+                t.column("endedAt", .datetime)
+                t.column("title", .text)
+                t.column("previewText", .text)
+                t.column("durationMs", .integer)
+                t.column("audioPath", .text)
+                t.column("processingState", .text).notNull().defaults(to: "recording")
+                t.column("speakerCount", .integer).notNull().defaults(to: 0)
+                t.column("updatedAt", .datetime).notNull()
+            }
+
+            // People table
+            try db.create(table: "people") { t in
+                t.column("id", .text).primaryKey()
+                t.column("name", .text).notNull()
+                t.column("colorToken", .text).notNull()
+                t.column("createdAt", .datetime).notNull()
+                t.column("updatedAt", .datetime).notNull()
+            }
+
+            // Speaker tracks table
+            try db.create(table: "speaker_tracks") { t in
+                t.column("id", .text).primaryKey()
+                t.column("sessionId", .text).notNull()
+                    .references("sessions", onDelete: .cascade)
+                t.column("machineSpeakerId", .text).notNull()
+                t.column("displayOrder", .integer).notNull()
+                t.column("personId", .text)
+                    .references("people", onDelete: .setNull)
+            }
+
+            // Transcript segments table
+            try db.create(table: "transcript_segments") { t in
+                t.column("id", .text).primaryKey()
+                t.column("sessionId", .text).notNull()
+                    .references("sessions", onDelete: .cascade)
+                t.column("startMs", .integer).notNull()
+                t.column("endMs", .integer).notNull()
+                t.column("machineSpeakerId", .text)
+                t.column("text", .text).notNull()
+                t.column("confidence", .double)
+                t.column("isFinal", .boolean).notNull().defaults(to: false)
+                t.column("createdAt", .datetime).notNull()
+                t.column("updatedAt", .datetime).notNull()
+            }
+
+            // Speaker segments table
+            try db.create(table: "speaker_segments") { t in
+                t.column("id", .text).primaryKey()
+                t.column("sessionId", .text).notNull()
+                    .references("sessions", onDelete: .cascade)
+                t.column("startMs", .integer).notNull()
+                t.column("endMs", .integer).notNull()
+                t.column("machineSpeakerId", .text).notNull()
+                t.column("score", .double)
+                t.column("isOverlap", .boolean).notNull().defaults(to: false)
+            }
+
+            // Indexes for common queries
+            try db.create(index: "idx_sessions_startedAt", on: "sessions", columns: ["startedAt"])
+            try db.create(index: "idx_sessions_processingState", on: "sessions", columns: ["processingState"])
+            try db.create(index: "idx_speaker_tracks_sessionId", on: "speaker_tracks", columns: ["sessionId"])
+            try db.create(index: "idx_transcript_segments_sessionId", on: "transcript_segments", columns: ["sessionId"])
+            try db.create(index: "idx_transcript_segments_startMs", on: "transcript_segments", columns: ["sessionId", "startMs"])
+            try db.create(index: "idx_speaker_segments_sessionId", on: "speaker_segments", columns: ["sessionId"])
+        }
+
+        return migrator
+    }
+}
+
+// MARK: - Database Setup
+
+public struct DatabaseConfiguration: Sendable {
+    public let path: String?
+
+    public init(path: String? = nil) {
+        self.path = path
+    }
+
+    public static let inMemory = DatabaseConfiguration(path: nil)
+
+    public static func file(_ path: String) -> DatabaseConfiguration {
+        DatabaseConfiguration(path: path)
+    }
+}
+
+public func makeDatabase(configuration: DatabaseConfiguration) throws -> DatabaseQueue {
+    let dbQueue: DatabaseQueue
+
+    if let path = configuration.path {
+        dbQueue = try DatabaseQueue(path: path)
+    } else {
+        dbQueue = try DatabaseQueue()
+    }
+
+    try AppMigrations.migrator.migrate(dbQueue)
+
+    return dbQueue
+}
 
 // MARK: - DatabaseClient
 
-/// Client for database operations (SQLite persistence layer)
 @DependencyClient
 public struct DatabaseClient: Sendable {
-    /// Fetch all sessions ordered by creation date
-    public var fetchSessions: @Sendable () async throws -> [SessionID]
-    /// Fetch a single session by ID
-    public var fetchSession: @Sendable (_ id: SessionID) async throws -> SessionID?
-    /// Create a new session
-    public var createSession: @Sendable (_ id: SessionID) async throws -> Void
-    /// Delete a session
+    public var fetchSessions: @Sendable () async throws -> [SessionRecord] = { [] }
+    public var fetchSession: @Sendable (_ id: SessionID) async throws -> SessionRecord? = { _ in nil }
+    public var createSession: @Sendable (_ record: SessionRecord) async throws -> Void
+    public var updateSession: @Sendable (_ record: SessionRecord) async throws -> Void
     public var deleteSession: @Sendable (_ id: SessionID) async throws -> Void
+
+    public var fetchPeople: @Sendable () async throws -> [PersonRecord] = { [] }
+    public var fetchPerson: @Sendable (_ id: PersonID) async throws -> PersonRecord? = { _ in nil }
+    public var createPerson: @Sendable (_ record: PersonRecord) async throws -> Void
+    public var updatePerson: @Sendable (_ record: PersonRecord) async throws -> Void
+    public var deletePerson: @Sendable (_ id: PersonID) async throws -> Void
+
+    public var fetchSpeakerTracks: @Sendable (_ sessionId: SessionID) async throws -> [SpeakerTrackRecord] = { _ in [] }
+    public var createSpeakerTrack: @Sendable (_ record: SpeakerTrackRecord) async throws -> Void
+    public var updateSpeakerTrack: @Sendable (_ record: SpeakerTrackRecord) async throws -> Void
+
+    public var fetchTranscriptSegments: @Sendable (_ sessionId: SessionID) async throws -> [TranscriptSegmentRecord] = { _ in [] }
+    public var createTranscriptSegment: @Sendable (_ record: TranscriptSegmentRecord) async throws -> Void
+    public var updateTranscriptSegment: @Sendable (_ record: TranscriptSegmentRecord) async throws -> Void
+
+    public var fetchSpeakerSegments: @Sendable (_ sessionId: SessionID) async throws -> [SpeakerSegmentRecord] = { _ in [] }
+    public var createSpeakerSegment: @Sendable (_ record: SpeakerSegmentRecord) async throws -> Void
 }
 
 extension DatabaseClient: DependencyKey {
-    public static let liveValue: Self = {
-        // Live implementation will connect to SQLite - placeholder for now
+    public static func live(dbQueue: DatabaseQueue) -> Self {
         Self(
-            fetchSessions: { [] },
-            fetchSession: { _ in nil },
-            createSession: { _ in },
-            deleteSession: { _ in }
+            fetchSessions: {
+                try await dbQueue.read { db in
+                    try SessionRecord.order(Column("startedAt").desc).fetchAll(db)
+                }
+            },
+            fetchSession: { id in
+                try await dbQueue.read { db in
+                    try SessionRecord.fetchOne(db, key: id.rawValue)
+                }
+            },
+            createSession: { record in
+                try await dbQueue.write { db in
+                    try record.insert(db)
+                }
+            },
+            updateSession: { record in
+                try await dbQueue.write { db in
+                    try record.update(db)
+                }
+            },
+            deleteSession: { id in
+                try await dbQueue.write { db in
+                    _ = try SessionRecord.deleteOne(db, key: id.rawValue)
+                }
+            },
+            fetchPeople: {
+                try await dbQueue.read { db in
+                    try PersonRecord.order(Column("name")).fetchAll(db)
+                }
+            },
+            fetchPerson: { id in
+                try await dbQueue.read { db in
+                    try PersonRecord.fetchOne(db, key: id.rawValue)
+                }
+            },
+            createPerson: { record in
+                try await dbQueue.write { db in
+                    try record.insert(db)
+                }
+            },
+            updatePerson: { record in
+                try await dbQueue.write { db in
+                    try record.update(db)
+                }
+            },
+            deletePerson: { id in
+                try await dbQueue.write { db in
+                    _ = try PersonRecord.deleteOne(db, key: id.rawValue)
+                }
+            },
+            fetchSpeakerTracks: { sessionId in
+                try await dbQueue.read { db in
+                    try SpeakerTrackRecord
+                        .filter(Column("sessionId") == sessionId.rawValue)
+                        .order(Column("displayOrder"))
+                        .fetchAll(db)
+                }
+            },
+            createSpeakerTrack: { record in
+                try await dbQueue.write { db in
+                    try record.insert(db)
+                }
+            },
+            updateSpeakerTrack: { record in
+                try await dbQueue.write { db in
+                    try record.update(db)
+                }
+            },
+            fetchTranscriptSegments: { sessionId in
+                try await dbQueue.read { db in
+                    try TranscriptSegmentRecord
+                        .filter(Column("sessionId") == sessionId.rawValue)
+                        .order(Column("startMs"))
+                        .fetchAll(db)
+                }
+            },
+            createTranscriptSegment: { record in
+                try await dbQueue.write { db in
+                    try record.insert(db)
+                }
+            },
+            updateTranscriptSegment: { record in
+                try await dbQueue.write { db in
+                    try record.update(db)
+                }
+            },
+            fetchSpeakerSegments: { sessionId in
+                try await dbQueue.read { db in
+                    try SpeakerSegmentRecord
+                        .filter(Column("sessionId") == sessionId.rawValue)
+                        .order(Column("startMs"))
+                        .fetchAll(db)
+                }
+            },
+            createSpeakerSegment: { record in
+                try await dbQueue.write { db in
+                    try record.insert(db)
+                }
+            }
         )
+    }
+
+    public static let liveValue: Self = {
+        Self()
     }()
 
     public static let testValue = Self()

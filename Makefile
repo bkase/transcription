@@ -36,6 +36,8 @@ test: gen
 	swift test
 	@echo "Running Models package tests..."
 	cd Packages/Core/Models && swift test
+	@echo "Running Persistence package tests..."
+	cd Packages/Core/Persistence && swift test
 	@echo "Running XCode tests..."
 	xcodebuild -project xcodegen/Vapor.xcodeproj -scheme Vapor \
 		-destination "id=A76B56DB-DEA2-4933-8C81-7A0EF009AC11" \
