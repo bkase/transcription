@@ -43,6 +43,7 @@ test: gen
 		-destination "id=A76B56DB-DEA2-4933-8C81-7A0EF009AC11" \
 		-skipMacroValidation -skipPackagePluginValidation \
 		-only-testing:VaporTests \
+		-only-testing:SnapshotTests \
 		test | grep -E "(passed|failed|error:)" || true
 	@echo "Tests complete."
 
