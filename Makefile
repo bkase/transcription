@@ -54,6 +54,7 @@ test: gen
 		-skipMacroValidation -skipPackagePluginValidation \
 		-only-testing:VaporTests \
 		-only-testing:SnapshotTests \
+		-only-testing:E2ETests \
 		test | grep -E "(passed|failed|error:)" || true
 	@echo "Tests complete."
 
