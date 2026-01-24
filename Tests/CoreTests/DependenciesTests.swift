@@ -58,7 +58,7 @@ import Dependencies
             isTranscribing: { false }
         )
         deps.recordingProcessorClient = RecordingProcessorClient(
-            startRecording: { AsyncStream { _ in } },
+            startRecording: { _ in AsyncStream { _ in } },
             stopRecording: { },
             isRecording: { false },
             currentSessionID: { nil }

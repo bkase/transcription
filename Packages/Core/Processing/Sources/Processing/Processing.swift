@@ -83,7 +83,9 @@ public enum RecordingProcessorEvent: Sendable, Equatable {
 @DependencyClient
 public struct RecordingProcessorClient: Sendable {
     /// Start a new recording session
-    public var startRecording: @Sendable () async throws -> AsyncStream<RecordingProcessorEvent>
+    /// - Parameter audioDirectory: Directory where audio files should be saved
+    /// - Returns: Stream of recording processor events
+    public var startRecording: @Sendable (_ audioDirectory: URL) async throws -> AsyncStream<RecordingProcessorEvent>
     /// Stop the current recording session
     public var stopRecording: @Sendable () async -> Void
     /// Check if currently recording
@@ -93,15 +95,27 @@ public struct RecordingProcessorClient: Sendable {
 }
 
 extension RecordingProcessorClient: DependencyKey {
-    public static let liveValue: Self = {
-        // Live implementation will orchestrate audio capture and ML - placeholder for now
-        Self(
-            startRecording: { AsyncStream { _ in } },
-            stopRecording: { },
-            isRecording: { false },
-            currentSessionID: { nil }
+    /// Creates a new client instance wrapping a new RecordingProcessor.
+    /// Call this within a dependency injection context to use injected dependencies.
+    public static func live() -> Self {
+        let processor = RecordingProcessor()
+        return Self(
+            startRecording: { audioDirectory in
+                try await processor.startRecording(audioDirectory: audioDirectory)
+            },
+            stopRecording: {
+                await processor.stopRecording()
+            },
+            isRecording: {
+                await processor.getIsRecording()
+            },
+            currentSessionID: {
+                await processor.getCurrentSessionID()
+            }
         )
-    }()
+    }
+
+    public static let liveValue: Self = live()
 
     public static let testValue = Self()
 }
