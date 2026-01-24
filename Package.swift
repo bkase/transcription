@@ -7,6 +7,7 @@ let package = Package(
     platforms: [.iOS(.v17), .macOS(.v14)],
     products: [],
     dependencies: [
+        .package(path: "Packages/Core/Models"),
         .package(path: "Packages/Core/Persistence"),
         .package(path: "Packages/Core/Audio"),
         .package(path: "Packages/Core/Processing"),
@@ -28,6 +29,16 @@ let package = Package(
                 .product(name: "Dependencies", package: "swift-dependencies"),
             ],
             path: "Tests/CoreTests"
+        ),
+        .testTarget(
+            name: "CoreProcessingTests",
+            dependencies: [
+                "Models",
+                "Processing",
+                "Audio",
+                .product(name: "Dependencies", package: "swift-dependencies"),
+            ],
+            path: "Tests/CoreProcessingTests"
         ),
     ]
 )
