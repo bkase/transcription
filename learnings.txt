@@ -387,3 +387,13 @@
 - Delete flow: direct async call -> personDeleted/deleteFailed (no intermediate state needed)
 - Use `$0.uuid = .constant(UUID())` and `$0.date = .constant(Date())` in test dependencies for deterministic IDs/dates
 - Context menu on SwiftUI views provides edit/delete actions without swipe gestures
+
+## TCA pause/resume patterns
+- Add pause/resume to processor client alongside start/stop for recording lifecycle control
+- Actor state: isPaused flag alongside isRecording for tracking pause state
+- Processor emits didPause/didResume events to notify feature of state changes
+- Feature state mirrors processor: isPaused flag, pauseRecording/resumeRecording actions
+- Timer ticks should check `!isPaused` guard to stop counting when paused
+- TestStore tests: timer events are still received during pause but state doesn't change
+- When testing processor events, emit them directly without calling pauseRecording action (action triggers processor, processor emits events)
+- Accessibility identifiers on components (like RecordButton) may already exist - avoid adding duplicate identifiers that override the component's built-in identifiers
