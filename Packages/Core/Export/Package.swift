@@ -11,11 +11,17 @@ let package = Package(
     dependencies: [
         .package(path: "../Models"),
         .package(path: "../Persistence"),
+        .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.0.0"),
     ],
     targets: [
         .target(
             name: "Export",
-            dependencies: ["Models", "Persistence"]
+            dependencies: [
+                "Models",
+                "Persistence",
+                .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "DependenciesMacros", package: "swift-dependencies"),
+            ]
         ),
         .testTarget(
             name: "ExportTests",

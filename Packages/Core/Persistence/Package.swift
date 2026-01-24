@@ -10,11 +10,16 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../Models"),
+        .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.0.0"),
     ],
     targets: [
         .target(
             name: "Persistence",
-            dependencies: ["Models"]
+            dependencies: [
+                "Models",
+                .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "DependenciesMacros", package: "swift-dependencies"),
+            ]
         ),
         .testTarget(
             name: "PersistenceTests",

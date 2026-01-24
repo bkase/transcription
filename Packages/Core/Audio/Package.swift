@@ -18,6 +18,7 @@ let package = Package(
             dependencies: [
                 "Models",
                 .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "DependenciesMacros", package: "swift-dependencies"),
             ]
         ),
         .testTarget(

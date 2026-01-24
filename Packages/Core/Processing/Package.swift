@@ -22,6 +22,7 @@ let package = Package(
                 "Audio",
                 "Persistence",
                 .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "DependenciesMacros", package: "swift-dependencies"),
             ]
         ),
         .testTarget(
