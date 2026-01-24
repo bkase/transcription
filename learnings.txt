@@ -357,3 +357,22 @@
 - Diarization models: `speaker-diarization-coreml`
 - First run downloads ~23 files for ASR, ~13 for diarization
 - Model compilation happens on first load (cached after)
+
+## Preview variants for snapshot testing modes
+- Use enum (e.g., DisplayMode) in preview structs for different visual states (empty, search, grouped)
+- Multiple initializers: one for grouped data with sections, one for display mode enum
+- Search results mode shows RESULTS header; empty state shows centered message
+- SnapshotTesting records missing snapshots automatically (fails first run, passes second)
+
+## TCA Feature implementation checklist
+- When adding new TCA features that use `@Dependency`, ensure the feature's XcodeGen target has `swift-dependencies` product
+- Records used in TCA state must conform to `Equatable` for synthesized conformance
+- Follow TimelineFeature pattern: `onAppear` triggers `loadX`, which sets loading state, async fetch, then `loaded/failed` response
+- Local search filtering can use computed property (`filteredPeople`) without needing async DB call
+- Add new feature package tests to Makefile in the `test:` target
+
+## PeopleView patterns
+- Create both interactive View (Store-based) and Preview variant (static data) for deterministic snapshots
+- SearchFieldPreview accepts placeholder parameter - pass it explicitly for context-specific placeholders
+- Snapshot regeneration: delete snapshots then run tests with SNAPSHOT_RECORD=1; tests fail first run (recording), pass second run
+- When cleaning DerivedData, also regenerate project (`make gen`) before running tests
