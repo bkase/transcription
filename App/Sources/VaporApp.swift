@@ -1,9 +1,11 @@
 import SwiftUI
 import ComposableArchitecture
 import TimelineFeature
+import RecordingFeature
 import Dependencies
 import Audio
 import Processing
+import Persistence
 
 @main
 struct VaporApp: App {
@@ -17,12 +19,18 @@ struct VaporApp: App {
             }
 
         case .uiTesting:
+            // Create in-memory database for testing
+            let dbQueue = try! makeDatabase(configuration: .inMemory)
+            let databaseClient = DatabaseClient.live(dbQueue: dbQueue)
+
             // Inject mock dependencies for deterministic E2E tests
             return withDependencies {
-                // Use generated audio capture for deterministic audio
-                $0.audioCaptureClient = .generated(config: .silent(durationSeconds: 10))
+                // Use generated audio capture for deterministic audio (short duration for faster tests)
+                $0.audioCaptureClient = .generated(config: .silent(durationSeconds: 2))
                 // Use mock transcription client with scripted segments
                 $0.fluidAudioClient = MockFluidAudioClient.twoSpeakerConversation
+                // Use in-memory database
+                $0.databaseClient = databaseClient
             } operation: {
                 Store(initialState: AppFeature.State()) {
                     AppFeature()
@@ -39,7 +47,11 @@ struct VaporApp: App {
 }
 
 struct AppView: View {
-    let store: StoreOf<AppFeature>
+    @Bindable var store: StoreOf<AppFeature>
+
+    init(store: StoreOf<AppFeature>) {
+        self.store = store
+    }
 
     var body: some View {
         WithPerceptionTracking {
@@ -56,22 +68,13 @@ struct AppView: View {
             .onAppear {
                 store.send(.onAppear)
             }
-        }
-    }
-}
-
-struct TimelineView: View {
-    let store: StoreOf<TimelineFeature>
-
-    var body: some View {
-        NavigationStack {
-            VStack {
-                Text("Timeline")
+            .fullScreenCover(
+                item: $store.scope(state: \.recording, action: \.recording)
+            ) { recordingStore in
+                RecordingView(store: recordingStore) {
+                    store.send(.dismissRecording)
+                }
             }
-            .navigationTitle("Timeline")
-        }
-        .onAppear {
-            store.send(.onAppear)
         }
     }
 }

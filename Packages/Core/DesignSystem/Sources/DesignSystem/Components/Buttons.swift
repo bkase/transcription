@@ -92,6 +92,8 @@ public struct RecordButton: View {
             }
         }
         .buttonStyle(PlainButtonStyle())
+        .accessibilityIdentifier(isRecording ? "stopRecordingButton" : "startRecordingButton")
+        .accessibilityLabel(isRecording ? "Stop Recording" : "Start Recording")
         .onChange(of: isRecording) { _, newValue in
             if newValue {
                 startBreathingAnimation()
@@ -196,6 +198,8 @@ public struct NavButton: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
+        .accessibilityIdentifier("backButton")
+        .accessibilityLabel(label)
     }
 }
 

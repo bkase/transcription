@@ -24,21 +24,23 @@ final class E2EHarnessTests: XCTestCase {
         // Launch the app with uiTesting flag
         app.launch()
 
-        // Verify the app launches and shows the Timeline tab
-        // The Timeline tab should be visible as it's the default
-        let timelineNavTitle = app.navigationBars["Timeline"]
-        XCTAssertTrue(
-            timelineNavTitle.waitForExistence(timeout: 5),
-            "Timeline navigation bar should appear - app should launch successfully with mock dependencies"
-        )
-
         // Verify the tab bar exists with Timeline selected
         let tabBar = app.tabBars.firstMatch
-        XCTAssertTrue(tabBar.exists, "Tab bar should exist")
+        XCTAssertTrue(
+            tabBar.waitForExistence(timeout: 5),
+            "Tab bar should appear - app should launch successfully with mock dependencies"
+        )
 
         // The Timeline tab should be selected by default
         let timelineTab = app.tabBars.buttons["Timeline"]
         XCTAssertTrue(timelineTab.exists, "Timeline tab should exist")
         XCTAssertTrue(timelineTab.isSelected, "Timeline tab should be selected by default")
+
+        // Verify the record button exists on the timeline (confirms Timeline view loaded)
+        let recordButton = app.buttons["startRecordingButton"]
+        XCTAssertTrue(
+            recordButton.waitForExistence(timeout: 5),
+            "Record button should appear on Timeline screen"
+        )
     }
 }

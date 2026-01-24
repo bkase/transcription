@@ -75,6 +75,8 @@ public struct SessionCard: View {
         }
         .padding(.vertical, 20)
         .padding(.horizontal, 16)
+        .accessibilityIdentifier("sessionCard")
+        .accessibilityLabel("\(title), \(time)")
         .background(
             Group {
                 if showMetadata {

@@ -25,16 +25,16 @@ configFiles:
   Release: configs/Release.xcconfig
 
 packages:
-  # Point-Free
+  # Point-Free - pinned to compatible versions
   swift-composable-architecture:
     url: https://github.com/pointfreeco/swift-composable-architecture
-    from: "1.0.0"
+    from: "1.23.0"
   swift-tagged:
     url: https://github.com/pointfreeco/swift-tagged
     from: "0.10.0"
   swift-dependencies:
     url: https://github.com/pointfreeco/swift-dependencies
-    from: "1.0.0"
+    from: "1.10.0"
   swift-identified-collections:
     url: https://github.com/pointfreeco/swift-identified-collections
     from: "1.0.0"
@@ -52,10 +52,10 @@ packages:
     from: "0.4.0"
   swift-case-paths:
     url: https://github.com/pointfreeco/swift-case-paths
-    from: "1.0.0"
+    from: "1.7.0"
   swift-perception:
     url: https://github.com/pointfreeco/swift-perception
-    from: "1.0.0"
+    from: "2.0.0"
   # Database
   GRDB.swift:
     url: https://github.com/groue/GRDB.swift
