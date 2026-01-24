@@ -149,12 +149,13 @@ public struct TimelineView: View {
     }
 
     private func sessionCard(for session: SessionRecord) -> some View {
-        SessionCard(
-            title: session.title ?? "Untitled",
-            time: formatTime(session.startedAt),
-            previewText: session.previewText ?? "",
-            speakerCount: session.speakerCount > 0 ? session.speakerCount : nil,
-            duration: session.durationMs.map { formatDuration($0) }
+        let viewModel = SessionCardViewModel.from(session: session)
+        return SessionCard(
+            title: viewModel.title,
+            time: viewModel.time,
+            previewText: viewModel.previewText,
+            speakerCount: viewModel.speakerCount,
+            duration: viewModel.duration
         )
     }
 
@@ -171,26 +172,6 @@ public struct TimelineView: View {
         .padding(.bottom, VaporSpacing.lg)
     }
 
-    // MARK: - Helpers
-
-    private func formatTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
-        return formatter.string(from: date)
-    }
-
-    private func formatDuration(_ milliseconds: Int) -> String {
-        let totalSeconds = milliseconds / 1000
-        let minutes = totalSeconds / 60
-        let seconds = totalSeconds % 60
-        let hours = minutes / 60
-
-        if hours > 0 {
-            return String(format: "%d:%02d:%02d", hours, minutes % 60, seconds)
-        } else {
-            return String(format: "%d:%02d", minutes, seconds)
-        }
-    }
 }
 
 // MARK: - Timeline View Preview (for snapshots)
