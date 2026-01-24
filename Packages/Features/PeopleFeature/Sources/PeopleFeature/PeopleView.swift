@@ -17,7 +17,7 @@ public struct PeopleView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            // Header with avatar
+            // Header with avatar and add button
             headerSection
 
             // Search row
@@ -35,6 +35,12 @@ public struct PeopleView: View {
         .onAppear {
             store.send(.onAppear)
         }
+        .sheet(isPresented: Binding(
+            get: { store.isShowingAddPersonSheet },
+            set: { if !$0 { store.send(.dismissSheet) } }
+        )) {
+            PersonFormSheet(store: store)
+        }
     }
 
     // MARK: - Header Section
@@ -43,7 +49,14 @@ public struct PeopleView: View {
         HStack {
             PageHeader(kicker: "Directory", title: "People")
             Spacer()
-            Avatar(size: .medium)
+            Button {
+                store.send(.addPersonTapped)
+            } label: {
+                Image(systemName: "plus.circle.fill")
+                    .font(.system(size: 28))
+                    .foregroundColor(VaporColor.deep)
+            }
+            .accessibilityIdentifier("addPersonButton")
         }
         .padding(.top, 56)
         .padding(.horizontal, VaporSpacing.lg)
@@ -75,6 +88,19 @@ public struct PeopleView: View {
         LazyVStack(spacing: VaporSpacing.sm) {
             ForEach(store.filteredPeople, id: \.id) { person in
                 personCard(for: person)
+                    .contextMenu {
+                        Button {
+                            store.send(.editPersonTapped(person))
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
+                        }
+
+                        Button(role: .destructive) {
+                            store.send(.deletePersonTapped(PersonID(rawValue: person.id)))
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
                     .onTapGesture {
                         store.send(.personTapped(PersonID(rawValue: person.id)))
                     }
@@ -88,6 +114,14 @@ public struct PeopleView: View {
                 Text("No people yet")
                     .vaporTextStyle(.body)
                     .foregroundColor(VaporColor.textSecondary)
+
+                Button {
+                    store.send(.addPersonTapped)
+                } label: {
+                    Text("Add a person")
+                        .vaporTextStyle(.body)
+                        .foregroundColor(VaporColor.deep)
+                }
             } else {
                 Text("No results found")
                     .vaporTextStyle(.body)
@@ -106,6 +140,89 @@ public struct PeopleView: View {
             conversationCount: 0,
             color: speakerColor
         )
+    }
+}
+
+// MARK: - Person Form Sheet
+
+struct PersonFormSheet: View {
+    @Bindable var store: StoreOf<PeopleFeature>
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: VaporSpacing.lg) {
+                // Name field
+                VStack(alignment: .leading, spacing: VaporSpacing.xs) {
+                    Text("Name")
+                        .vaporTextStyle(.caption)
+                        .foregroundColor(VaporColor.textSecondary)
+
+                    TextField("Enter name", text: $store.formName.sending(\.formNameChanged))
+                        .textFieldStyle(.roundedBorder)
+                        .accessibilityIdentifier("personNameField")
+                }
+
+                // Color picker
+                VStack(alignment: .leading, spacing: VaporSpacing.xs) {
+                    Text("Color")
+                        .vaporTextStyle(.caption)
+                        .foregroundColor(VaporColor.textSecondary)
+
+                    HStack(spacing: VaporSpacing.sm) {
+                        ForEach(SpeakerColor.allCases, id: \.rawValue) { color in
+                            colorButton(for: color)
+                        }
+                    }
+                }
+
+                // Error display
+                if let error = store.error {
+                    Text(error)
+                        .vaporTextStyle(.caption)
+                        .foregroundColor(.red)
+                }
+
+                Spacer()
+            }
+            .padding(VaporSpacing.lg)
+            .background(VaporColor.mist)
+            .navigationTitle(store.isEditing ? "Edit Person" : "Add Person")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        store.send(.dismissSheet)
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        store.send(.savePerson)
+                    }
+                    .disabled(store.formName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || store.isSaving)
+                    .accessibilityIdentifier("savePersonButton")
+                }
+            }
+        }
+    }
+
+    private func colorButton(for color: SpeakerColor) -> some View {
+        let isSelected = store.formColorToken == color.rawValue
+        return Button {
+            store.send(.formColorChanged(color.rawValue))
+        } label: {
+            Circle()
+                .fill(color.color)
+                .frame(width: 40, height: 40)
+                .overlay {
+                    if isSelected {
+                        Circle()
+                            .stroke(VaporColor.textPrimary, lineWidth: 3)
+                    }
+                }
+        }
+        .accessibilityIdentifier("color_\(color.rawValue)")
     }
 }
 
