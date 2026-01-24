@@ -343,3 +343,17 @@
 - Parent reducer returns `.none` for child actions - handled by `.ifLet` scope
 - XcodeGen project.yml and SPM Package.swift both need child feature dependencies
 - Tests for parent must update expected state to include child state initialization
+
+## Swift Testing slow tests with environment variable
+- Use `RUN_SLOW_TESTS=1` env var to conditionally run slow tests
+- Helper: `private func shouldRunSlowTests() -> Bool { ProcessInfo.processInfo.environment["RUN_SLOW_TESTS"] == "1" }`
+- Tests with `guard shouldRunSlowTests() else { return }` skip fast in normal runs
+- Makefile: `RUN_SLOW_TESTS=1 swift test --filter TestName` to run slow tests
+- Swift Testing `.disabled()` trait cannot be overridden at runtime - use env var pattern instead
+
+## FluidAudio ML model paths
+- Models download to `~/Library/Application Support/FluidAudio/Models/`
+- ASR models: `parakeet-tdt-0.6b-v3-coreml` (ASR v3)
+- Diarization models: `speaker-diarization-coreml`
+- First run downloads ~23 files for ASR, ~13 for diarization
+- Model compilation happens on first load (cached after)
