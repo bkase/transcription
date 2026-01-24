@@ -1,0 +1,335 @@
+name: Vapor
+options:
+  bundleIdPrefix: com.vapor
+  deploymentTarget:
+    iOS: "17.0"
+  xcodeVersion: "15.0"
+  minimumXcodeGenVersion: "2.38.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    ENABLE_USER_SCRIPT_SANDBOXING: false
+  configs:
+    Debug:
+      SWIFT_OPTIMIZATION_LEVEL: "-Onone"
+    Release:
+      SWIFT_OPTIMIZATION_LEVEL: "-O"
+
+configFiles:
+  Debug: configs/Debug.xcconfig
+  Release: configs/Release.xcconfig
+
+packages:
+  # Point-Free
+  swift-composable-architecture:
+    url: https://github.com/pointfreeco/swift-composable-architecture
+    from: "1.0.0"
+  swift-tagged:
+    url: https://github.com/pointfreeco/swift-tagged
+    from: "0.10.0"
+  swift-dependencies:
+    url: https://github.com/pointfreeco/swift-dependencies
+    from: "1.0.0"
+  swift-identified-collections:
+    url: https://github.com/pointfreeco/swift-identified-collections
+    from: "1.0.0"
+  swift-clocks:
+    url: https://github.com/pointfreeco/swift-clocks
+    from: "1.0.0"
+  swift-url-routing:
+    url: https://github.com/pointfreeco/swift-url-routing
+    from: "0.6.0"
+  swift-snapshot-testing:
+    url: https://github.com/pointfreeco/swift-snapshot-testing
+    from: "1.15.0"
+  swift-gen:
+    url: https://github.com/pointfreeco/swift-gen
+    from: "0.4.0"
+
+targets:
+  Vapor:
+    type: application
+    platform: iOS
+    sources:
+      - path: ../App/Sources
+    dependencies:
+      - package: swift-composable-architecture
+        product: ComposableArchitecture
+      - package: swift-tagged
+        product: Tagged
+      - package: swift-dependencies
+        product: Dependencies
+      - package: swift-identified-collections
+        product: IdentifiedCollections
+      - package: swift-clocks
+        product: Clocks
+      - package: swift-url-routing
+        product: URLRouting
+      - target: Models
+      - target: Persistence
+      - target: Audio
+      - target: Processing
+      - target: Export
+      - target: Observability
+      - target: Routing
+      - target: DesignSystem
+      - target: TimelineFeature
+      - target: RecordingFeature
+      - target: SessionDetailFeature
+      - target: PeopleFeature
+      - target: SpeakerPickerFeature
+      - target: AudioPlayerFeature
+    settings:
+      base:
+        INFOPLIST_FILE: ../App/Sources/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.vapor.app
+        PRODUCT_NAME: Vapor
+
+  # Core packages
+  Models:
+    type: framework
+    platform: iOS
+    sources:
+      - path: ../Packages/Core/Models/Sources/Models
+    dependencies:
+      - package: swift-tagged
+        product: Tagged
+    settings:
+      base:
+        PRODUCT_NAME: Models
+        PRODUCT_MODULE_NAME: Models
+
+  Persistence:
+    type: framework
+    platform: iOS
+    sources:
+      - path: ../Packages/Core/Persistence/Sources/Persistence
+    dependencies:
+      - target: Models
+    settings:
+      base:
+        PRODUCT_NAME: Persistence
+        PRODUCT_MODULE_NAME: Persistence
+
+  Audio:
+    type: framework
+    platform: iOS
+    sources:
+      - path: ../Packages/Core/Audio/Sources/Audio
+    dependencies:
+      - target: Models
+      - package: swift-dependencies
+        product: Dependencies
+    settings:
+      base:
+        PRODUCT_NAME: Audio
+        PRODUCT_MODULE_NAME: Audio
+
+  Processing:
+    type: framework
+    platform: iOS
+    sources:
+      - path: ../Packages/Core/Processing/Sources/Processing
+    dependencies:
+      - target: Models
+      - target: Audio
+      - target: Persistence
+      - package: swift-dependencies
+        product: Dependencies
+    settings:
+      base:
+        PRODUCT_NAME: Processing
+        PRODUCT_MODULE_NAME: Processing
+
+  Export:
+    type: framework
+    platform: iOS
+    sources:
+      - path: ../Packages/Core/Export/Sources/Export
+    dependencies:
+      - target: Models
+      - target: Persistence
+    settings:
+      base:
+        PRODUCT_NAME: Export
+        PRODUCT_MODULE_NAME: Export
+
+  Observability:
+    type: framework
+    platform: iOS
+    sources:
+      - path: ../Packages/Core/Observability/Sources/Observability
+    settings:
+      base:
+        PRODUCT_NAME: Observability
+        PRODUCT_MODULE_NAME: Observability
+
+  Routing:
+    type: framework
+    platform: iOS
+    sources:
+      - path: ../Packages/Core/Routing/Sources/Routing
+    dependencies:
+      - target: Models
+      - package: swift-url-routing
+        product: URLRouting
+    settings:
+      base:
+        PRODUCT_NAME: Routing
+        PRODUCT_MODULE_NAME: Routing
+
+  DesignSystem:
+    type: framework
+    platform: iOS
+    sources:
+      - path: ../Packages/Core/DesignSystem/Sources/DesignSystem
+    settings:
+      base:
+        PRODUCT_NAME: DesignSystem
+        PRODUCT_MODULE_NAME: DesignSystem
+
+  # Feature packages
+  TimelineFeature:
+    type: framework
+    platform: iOS
+    sources:
+      - path: ../Packages/Features/TimelineFeature/Sources/TimelineFeature
+    dependencies:
+      - target: Models
+      - target: Persistence
+      - target: DesignSystem
+      - package: swift-composable-architecture
+        product: ComposableArchitecture
+    settings:
+      base:
+        PRODUCT_NAME: TimelineFeature
+        PRODUCT_MODULE_NAME: TimelineFeature
+
+  RecordingFeature:
+    type: framework
+    platform: iOS
+    sources:
+      - path: ../Packages/Features/RecordingFeature/Sources/RecordingFeature
+    dependencies:
+      - target: Models
+      - target: Persistence
+      - target: Audio
+      - target: Processing
+      - target: DesignSystem
+      - package: swift-composable-architecture
+        product: ComposableArchitecture
+    settings:
+      base:
+        PRODUCT_NAME: RecordingFeature
+        PRODUCT_MODULE_NAME: RecordingFeature
+
+  SessionDetailFeature:
+    type: framework
+    platform: iOS
+    sources:
+      - path: ../Packages/Features/SessionDetailFeature/Sources/SessionDetailFeature
+    dependencies:
+      - target: Models
+      - target: Persistence
+      - target: DesignSystem
+      - package: swift-composable-architecture
+        product: ComposableArchitecture
+    settings:
+      base:
+        PRODUCT_NAME: SessionDetailFeature
+        PRODUCT_MODULE_NAME: SessionDetailFeature
+
+  PeopleFeature:
+    type: framework
+    platform: iOS
+    sources:
+      - path: ../Packages/Features/PeopleFeature/Sources/PeopleFeature
+    dependencies:
+      - target: Models
+      - target: Persistence
+      - target: DesignSystem
+      - package: swift-composable-architecture
+        product: ComposableArchitecture
+    settings:
+      base:
+        PRODUCT_NAME: PeopleFeature
+        PRODUCT_MODULE_NAME: PeopleFeature
+
+  SpeakerPickerFeature:
+    type: framework
+    platform: iOS
+    sources:
+      - path: ../Packages/Features/SpeakerPickerFeature/Sources/SpeakerPickerFeature
+    dependencies:
+      - target: Models
+      - target: Persistence
+      - target: DesignSystem
+      - package: swift-composable-architecture
+        product: ComposableArchitecture
+    settings:
+      base:
+        PRODUCT_NAME: SpeakerPickerFeature
+        PRODUCT_MODULE_NAME: SpeakerPickerFeature
+
+  AudioPlayerFeature:
+    type: framework
+    platform: iOS
+    sources:
+      - path: ../Packages/Features/AudioPlayerFeature/Sources/AudioPlayerFeature
+    dependencies:
+      - target: Models
+      - target: Audio
+      - target: DesignSystem
+      - package: swift-composable-architecture
+        product: ComposableArchitecture
+    settings:
+      base:
+        PRODUCT_NAME: AudioPlayerFeature
+        PRODUCT_MODULE_NAME: AudioPlayerFeature
+
+  # Test targets
+  VaporTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: ../App/Tests/VaporTests
+    dependencies:
+      - target: Vapor
+      - package: swift-snapshot-testing
+        product: SnapshotTesting
+    settings:
+      base:
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Vapor.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Vapor"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+  ToolsTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: ../App/Tests/ToolsTests
+    dependencies:
+      - target: Vapor
+    settings:
+      base:
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Vapor.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Vapor"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+schemes:
+  Vapor:
+    build:
+      targets:
+        Vapor: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - VaporTests
+        - ToolsTests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
