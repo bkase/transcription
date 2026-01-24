@@ -302,3 +302,12 @@
 - Dominant speaker = speaker with longest total duration across all segments in a chunk
 - Display orders assigned in discovery order (first speaker seen = 1, second = 2, etc.)
 - Use `max(0, endTime - startTime)` to clamp negative durations to zero
+
+## FluidAudio VAD integration
+- VadManager from FluidAudio provides streaming VAD with `processStreamingChunk` method
+- VAD events: `.speechStart` and `.speechEnd` with optional timestamp
+- VadConfig options: defaultThreshold, minSpeechDuration, minSilenceDuration, maxSpeechDuration, speechPadding
+- VadSegmentationConfig.default for offline segmentation; use `segmentSpeech(samples, config:)` for batch
+- Streaming requires state management: `makeStreamState()` creates initial state, pass between calls
+- For testability, create VadChunkingPolicy that processes VAD events without FluidAudio dependency
+- Chunk boundaries should respect: min/max duration, padding (extend boundaries), and overlap prevention
