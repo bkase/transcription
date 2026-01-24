@@ -376,3 +376,14 @@
 - SearchFieldPreview accepts placeholder parameter - pass it explicitly for context-specific placeholders
 - Snapshot regeneration: delete snapshots then run tests with SNAPSHOT_RECORD=1; tests fail first run (recording), pass second run
 - When cleaning DerivedData, also regenerate project (`make gen`) before running tests
+
+## TCA CRUD patterns for features
+- Add form state properties directly to feature State: formName, formColorToken, isSaving, editingPerson, isShowingAddPersonSheet
+- Use computed property `isEditing` to distinguish edit vs create mode
+- Sheet binding: Use `Binding(get: { store.prop }, set: { if !$0 { store.send(.dismiss) } })` for dismissal
+- Sort local list after create/update with `people.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }`
+- Validation in reducer: check trimmed name before creating/updating, set error state if invalid
+- Save flow: set isSaving=true -> async DB call -> personSaved/saveFailed response
+- Delete flow: direct async call -> personDeleted/deleteFailed (no intermediate state needed)
+- Use `$0.uuid = .constant(UUID())` and `$0.date = .constant(Date())` in test dependencies for deterministic IDs/dates
+- Context menu on SwiftUI views provides edit/delete actions without swipe gestures
