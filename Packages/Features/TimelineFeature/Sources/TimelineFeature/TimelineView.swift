@@ -219,12 +219,37 @@ public struct TimelineViewPreview: View {
         }
     }
 
+    /// Display mode for the timeline preview
+    public enum DisplayMode {
+        /// Normal grouped timeline view
+        case grouped
+        /// Empty state with no sessions
+        case empty
+        /// Search results mode
+        case searchResults(results: [SessionData])
+    }
+
     private let sections: [SectionData]
     private let searchText: String
+    private let displayMode: DisplayMode
 
     public init(sections: [SectionData], searchText: String = "") {
         self.sections = sections
         self.searchText = searchText
+        self.displayMode = .grouped
+    }
+
+    public init(displayMode: DisplayMode, searchText: String = "") {
+        self.displayMode = displayMode
+        self.searchText = searchText
+        switch displayMode {
+        case .grouped:
+            self.sections = []
+        case .empty:
+            self.sections = []
+        case .searchResults:
+            self.sections = []
+        }
     }
 
     public var body: some View {
@@ -246,29 +271,10 @@ public struct TimelineViewPreview: View {
 
                 // Content
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: VaporSpacing.xl + VaporSpacing.sm) {
-                        ForEach(sections) { section in
-                            VStack(alignment: .leading, spacing: VaporSpacing.md) {
-                                DateHeader(section.header)
-
-                                VStack(spacing: VaporSpacing.sm) {
-                                    ForEach(section.sessions) { session in
-                                        SessionCard(
-                                            title: session.title,
-                                            time: session.time,
-                                            previewText: session.previewText,
-                                            speakerCount: session.speakerCount,
-                                            duration: session.duration,
-                                            showMetadata: session.showMetadata
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .padding(.top, VaporSpacing.lg)
-                    .padding(.horizontal, VaporSpacing.lg)
-                    .padding(.bottom, 120)
+                    contentView
+                        .padding(.top, VaporSpacing.lg)
+                        .padding(.horizontal, VaporSpacing.lg)
+                        .padding(.bottom, 120)
                 }
             }
 
@@ -281,6 +287,91 @@ public struct TimelineViewPreview: View {
             .padding(.bottom, VaporSpacing.lg)
         }
         .background(VaporColor.mist)
+    }
+
+    @ViewBuilder
+    private var contentView: some View {
+        switch displayMode {
+        case .grouped:
+            groupedContent
+        case .empty:
+            emptyStateContent
+        case .searchResults(let results):
+            searchResultsContent(results: results)
+        }
+    }
+
+    private var groupedContent: some View {
+        LazyVStack(alignment: .leading, spacing: VaporSpacing.xl + VaporSpacing.sm) {
+            ForEach(sections) { section in
+                VStack(alignment: .leading, spacing: VaporSpacing.md) {
+                    DateHeader(section.header)
+
+                    VStack(spacing: VaporSpacing.sm) {
+                        ForEach(section.sessions) { session in
+                            SessionCard(
+                                title: session.title,
+                                time: session.time,
+                                previewText: session.previewText,
+                                speakerCount: session.speakerCount,
+                                duration: session.duration,
+                                showMetadata: session.showMetadata
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var emptyStateContent: some View {
+        VStack(spacing: VaporSpacing.lg) {
+            Spacer()
+                .frame(height: VaporSpacing.xl * 4)
+
+            Text("No recordings yet")
+                .vaporTextStyle(.title)
+                .foregroundColor(VaporColor.textSecondary)
+
+            Text("Tap the record button to start capturing")
+                .vaporTextStyle(.body)
+                .foregroundColor(VaporColor.textTertiary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func searchResultsContent(results: [SessionData]) -> some View {
+        LazyVStack(alignment: .leading, spacing: VaporSpacing.md) {
+            if results.isEmpty {
+                emptySearchResultsContent
+            } else {
+                DateHeader("RESULTS")
+
+                VStack(spacing: VaporSpacing.sm) {
+                    ForEach(results) { session in
+                        SessionCard(
+                            title: session.title,
+                            time: session.time,
+                            previewText: session.previewText,
+                            speakerCount: session.speakerCount,
+                            duration: session.duration,
+                            showMetadata: session.showMetadata
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private var emptySearchResultsContent: some View {
+        VStack(spacing: VaporSpacing.md) {
+            Text("No results found")
+                .vaporTextStyle(.body)
+                .foregroundColor(VaporColor.textSecondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, VaporSpacing.xl)
     }
 }
 

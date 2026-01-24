@@ -82,4 +82,32 @@ struct TimelineViewSnapshotTests {
 
         SnapshotHarness.assertSnapshot(of: view, named: "timeline_hover_state")
     }
+
+    @Test func testTimelineEmpty() {
+        // Empty state: no recordings yet
+        let view = TimelineViewPreview(displayMode: .empty)
+
+        SnapshotHarness.assertSnapshot(of: view, named: "timeline_empty")
+    }
+
+    @Test func testTimelineSearchResults() {
+        // Search results: matching sessions displayed under RESULTS header
+        let view = TimelineViewPreview(
+            displayMode: .searchResults(results: [
+                .init(
+                    title: "Morning Reflection",
+                    time: "7:30 AM",
+                    previewText: "The light in the studio was particularly interesting this morning..."
+                ),
+                .init(
+                    title: "Evening Thoughts",
+                    time: "6:45 PM",
+                    previewText: "Reflecting on the day's progress and tomorrow's goals..."
+                )
+            ]),
+            searchText: "morning"
+        )
+
+        SnapshotHarness.assertSnapshot(of: view, named: "timeline_search_results")
+    }
 }
