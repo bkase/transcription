@@ -215,15 +215,15 @@ public actor LiveFluidAudioClientActor {
     }
 
     private func findDominantSpeaker(in result: DiarizationResult) -> String? {
-        // Find the speaker with the longest total duration
-        var speakerDurations: [String: Float] = [:]
-
-        for segment in result.segments {
-            let duration = segment.durationSeconds
-            speakerDurations[segment.speakerId, default: 0] += duration
+        // Convert FluidAudio segments to our testable struct
+        let segments = result.segments.map { segment in
+            DiarizationMapping.SpeakerSegment(
+                speakerId: segment.speakerId,
+                startTimeSeconds: segment.startTimeSeconds,
+                endTimeSeconds: segment.endTimeSeconds
+            )
         }
-
-        return speakerDurations.max(by: { $0.value < $1.value })?.key
+        return DiarizationMapping.findDominantSpeaker(in: segments)
     }
 }
 
