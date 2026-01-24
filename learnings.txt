@@ -311,3 +311,11 @@
 - Streaming requires state management: `makeStreamState()` creates initial state, pass between calls
 - For testability, create VadChunkingPolicy that processes VAD events without FluidAudio dependency
 - Chunk boundaries should respect: min/max duration, padding (extend boundaries), and overlap prevention
+
+## DocGen schema parsing
+- GRDB migrations use fluent API: `db.create(table:)` with `t.column()` for columns
+- Column definitions can span multiple lines (e.g., `.references()` on next line)
+- Multi-line parsing: track column start with `t.column(`, accumulate until next `t.column` or `}`
+- FTS5 tables: `CREATE VIRTUAL TABLE ... USING fts5(col, colUNINDEXED)` in SQL strings
+- Triggers follow pattern: `CREATE TRIGGER name AFTER INSERT/UPDATE/DELETE ON table`
+- Generate markdown tables with column metadata: type, constraints, defaults, references
