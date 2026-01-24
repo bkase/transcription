@@ -47,14 +47,7 @@ public struct FluidAudioClient: Sendable {
 }
 
 extension FluidAudioClient: DependencyKey {
-    public static let liveValue: Self = {
-        // Live implementation will use FluidAudio SDK - placeholder for now
-        Self(
-            startTranscription: { _ in AsyncStream { _ in } },
-            stopTranscription: { },
-            isTranscribing: { false }
-        )
-    }()
+    public static let liveValue: Self = LiveFluidAudioClient.client()
 
     public static let testValue = Self()
 }

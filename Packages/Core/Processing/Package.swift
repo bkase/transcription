@@ -13,6 +13,7 @@ let package = Package(
         .package(path: "../Audio"),
         .package(path: "../Persistence"),
         .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.0.0"),
+        .package(url: "https://github.com/FluidInference/FluidAudio", from: "0.10.0"),
     ],
     targets: [
         .target(
@@ -23,6 +24,7 @@ let package = Package(
                 "Persistence",
                 .product(name: "Dependencies", package: "swift-dependencies"),
                 .product(name: "DependenciesMacros", package: "swift-dependencies"),
+                .product(name: "FluidAudio", package: "FluidAudio"),
             ]
         ),
         .testTarget(

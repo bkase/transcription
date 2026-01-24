@@ -60,6 +60,10 @@ packages:
   GRDB.swift:
     url: https://github.com/groue/GRDB.swift
     from: "6.29.0"
+  # ML - FluidAudio SDK
+  FluidAudio:
+    url: https://github.com/FluidInference/FluidAudio
+    from: "0.10.0"
 
 targets:
   Vapor:
@@ -169,6 +173,8 @@ targets:
         product: Dependencies
       - package: swift-dependencies
         product: DependenciesMacros
+      - package: FluidAudio
+        product: FluidAudio
     settings:
       base:
         PRODUCT_NAME: Processing
