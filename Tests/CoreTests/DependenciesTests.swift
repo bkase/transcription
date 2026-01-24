@@ -61,7 +61,10 @@ import Dependencies
         deps.recordingProcessorClient = RecordingProcessorClient(
             startRecording: { _ in AsyncStream { _ in } },
             stopRecording: { },
+            pauseRecording: { },
+            resumeRecording: { },
             isRecording: { false },
+            isPaused: { false },
             currentSessionID: { nil }
         )
         deps.exportClient = ExportClient(

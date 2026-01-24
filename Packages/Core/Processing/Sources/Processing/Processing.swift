@@ -66,6 +66,8 @@ public enum RecordingProcessorEvent: Sendable, Equatable {
     case didStart(SessionID)
     case listeningChanged(Bool)
     case didAppendSegment(TranscriptSegmentID)
+    case didPause
+    case didResume
     case didFinish(SessionID)
     case didFail(String)
 }
@@ -81,8 +83,14 @@ public struct RecordingProcessorClient: Sendable {
     public var startRecording: @Sendable (_ audioDirectory: URL) async throws -> AsyncStream<RecordingProcessorEvent>
     /// Stop the current recording session
     public var stopRecording: @Sendable () async -> Void
+    /// Pause the current recording session
+    public var pauseRecording: @Sendable () async -> Void
+    /// Resume the current recording session
+    public var resumeRecording: @Sendable () async -> Void
     /// Check if currently recording
     public var isRecording: @Sendable () async -> Bool = { false }
+    /// Check if currently paused
+    public var isPaused: @Sendable () async -> Bool = { false }
     /// Get the current session ID if recording
     public var currentSessionID: @Sendable () async -> SessionID? = { nil }
 }
@@ -99,8 +107,17 @@ extension RecordingProcessorClient: DependencyKey {
             stopRecording: {
                 await processor.stopRecording()
             },
+            pauseRecording: {
+                await processor.pauseRecording()
+            },
+            resumeRecording: {
+                await processor.resumeRecording()
+            },
             isRecording: {
                 await processor.getIsRecording()
+            },
+            isPaused: {
+                await processor.getIsPaused()
             },
             currentSessionID: {
                 await processor.getCurrentSessionID()
@@ -133,6 +150,7 @@ public actor RecordingProcessor {
 
     private var currentSessionID: SessionID?
     private var isRecording: Bool = false
+    private var isPaused: Bool = false
     private var seenSpeakers: Set<String> = []
     private var eventContinuation: AsyncStream<RecordingProcessorEvent>.Continuation?
 
@@ -211,6 +229,7 @@ public actor RecordingProcessor {
         guard isRecording else { return }
 
         isRecording = false
+        isPaused = false
 
         // Stop capture and transcription
         await audioCaptureClient.stopCapture()
@@ -232,9 +251,45 @@ public actor RecordingProcessor {
         eventContinuation = nil
     }
 
+    /// Pause the current recording session
+    public func pauseRecording() async {
+        guard isRecording, !isPaused else { return }
+
+        isPaused = true
+
+        // Pause audio capture (stops listening but keeps session active)
+        await audioCaptureClient.stopCapture()
+
+        // Emit events
+        eventContinuation?.yield(.listeningChanged(false))
+        eventContinuation?.yield(.didPause)
+    }
+
+    /// Resume the current recording session
+    public func resumeRecording() async {
+        guard isRecording, isPaused else { return }
+
+        isPaused = false
+
+        // Resume audio capture
+        // Note: We restart capture but the file writer and ML pipeline are still running
+        do {
+            _ = try await audioCaptureClient.startCapture()
+            eventContinuation?.yield(.listeningChanged(true))
+            eventContinuation?.yield(.didResume)
+        } catch {
+            eventContinuation?.yield(.didFail("Failed to resume recording: \(error.localizedDescription)"))
+        }
+    }
+
     /// Check if currently recording
     public func getIsRecording() -> Bool {
         isRecording
+    }
+
+    /// Check if currently paused
+    public func getIsPaused() -> Bool {
+        isPaused
     }
 
     /// Get the current session ID

@@ -51,6 +51,8 @@ public struct RecordingFeature {
     public struct State: Equatable {
         /// Whether recording is active
         public var isRecording: Bool = false
+        /// Whether recording is paused
+        public var isPaused: Bool = false
         /// Whether the microphone is listening (may be false during initialization)
         public var isListening: Bool = false
         /// Elapsed recording time in seconds
@@ -66,6 +68,7 @@ public struct RecordingFeature {
 
         public init(
             isRecording: Bool = false,
+            isPaused: Bool = false,
             isListening: Bool = false,
             elapsedSeconds: Int = 0,
             sessionID: SessionID? = nil,
@@ -74,6 +77,7 @@ public struct RecordingFeature {
             liveSegments: [LiveSegment] = []
         ) {
             self.isRecording = isRecording
+            self.isPaused = isPaused
             self.isListening = isListening
             self.elapsedSeconds = elapsedSeconds
             self.sessionID = sessionID
@@ -88,6 +92,10 @@ public struct RecordingFeature {
         case startRecording(audioDirectory: URL)
         /// Stop the current recording
         case stopRecording
+        /// Pause the current recording
+        case pauseRecording
+        /// Resume the current recording
+        case resumeRecording
         /// Timer tick - increment elapsed time
         case timerTicked
         /// Received processor event
@@ -141,8 +149,22 @@ public struct RecordingFeature {
                     }
                 )
 
+            case .pauseRecording:
+                guard state.isRecording, !state.isPaused else { return .none }
+
+                return .run { _ in
+                    await recordingProcessorClient.pauseRecording()
+                }
+
+            case .resumeRecording:
+                guard state.isRecording, state.isPaused else { return .none }
+
+                return .run { _ in
+                    await recordingProcessorClient.resumeRecording()
+                }
+
             case .timerTicked:
-                guard state.isRecording else { return .none }
+                guard state.isRecording, !state.isPaused else { return .none }
                 state.elapsedSeconds += 1
                 return .none
 
@@ -180,8 +202,17 @@ public struct RecordingFeature {
                         await send(.segmentsLoaded(segments))
                     }
 
+                case .didPause:
+                    state.isPaused = true
+                    return .none
+
+                case .didResume:
+                    state.isPaused = false
+                    return .none
+
                 case .didFinish:
                     state.isRecording = false
+                    state.isPaused = false
                     state.isListening = false
                     state.sessionID = nil
                     state.liveSegments = []
@@ -194,6 +225,7 @@ public struct RecordingFeature {
                 case let .didFail(errorMessage):
                     state.error = errorMessage
                     state.isRecording = false
+                    state.isPaused = false
                     state.isListening = false
                     state.liveSegments = []
                     return .merge(

@@ -69,6 +69,17 @@ public struct RecordingView: View {
         } else if !store.liveSegments.isEmpty {
             // Live transcript segments
             liveTranscriptView
+        } else if store.isPaused {
+            // Paused state
+            VStack {
+                Spacer()
+                Text("Paused")
+                    .font(.system(size: 24, weight: .thin))
+                    .tracking(1)
+                    .foregroundColor(VaporColor.textTertiary)
+                    .accessibilityIdentifier("pausedIndicator")
+                Spacer()
+            }
         } else if store.isListening {
             // Listening but no segments yet
             VStack {
@@ -157,10 +168,19 @@ public struct RecordingView: View {
 
     private var controlsBar: some View {
         HStack {
-            // Pause button (left)
-            IconButton(systemName: "pause", style: .transparent, iconColor: VaporColor.sky) {
-                // Pause action - not implemented yet
+            // Pause/Resume button (left)
+            IconButton(
+                systemName: store.isPaused ? "play.fill" : "pause",
+                style: .transparent,
+                iconColor: VaporColor.sky
+            ) {
+                if store.isPaused {
+                    store.send(.resumeRecording)
+                } else {
+                    store.send(.pauseRecording)
+                }
             }
+            .accessibilityIdentifier(store.isPaused ? "resumeButton" : "pauseButton")
 
             Spacer()
 
@@ -216,21 +236,25 @@ public struct RecordingViewPreview: View {
     public enum ContentState: Equatable {
         case listening
         case starting
+        case paused
         case error(String)
         case liveSegments([LiveSegmentData])
     }
 
     private let elapsedTime: String
     private let isRecording: Bool
+    private let isPaused: Bool
     private let contentState: ContentState
 
     public init(
         elapsedTime: String = "00:00",
         isRecording: Bool = true,
+        isPaused: Bool = false,
         contentState: ContentState = .listening
     ) {
         self.elapsedTime = elapsedTime
         self.isRecording = isRecording
+        self.isPaused = isPaused
         self.contentState = contentState
     }
 
@@ -271,6 +295,16 @@ public struct RecordingViewPreview: View {
                     Spacer()
                 }
 
+            case .paused:
+                VStack {
+                    Spacer()
+                    Text("Paused")
+                        .font(.system(size: 24, weight: .thin))
+                        .tracking(1)
+                        .foregroundColor(VaporColor.textTertiary)
+                    Spacer()
+                }
+
             case .error(let message):
                 VStack {
                     Spacer()
@@ -303,13 +337,13 @@ public struct RecordingViewPreview: View {
 
             // Controls bar (non-interactive)
             HStack {
-                // Pause button
+                // Pause/Resume button
                 ZStack {
                     Circle()
                         .fill(Color.clear)
                         .frame(width: 40, height: 40)
 
-                    Image(systemName: "pause")
+                    Image(systemName: isPaused ? "play.fill" : "pause")
                         .font(.system(size: 24, weight: .light))
                         .foregroundColor(VaporColor.sky)
                 }
