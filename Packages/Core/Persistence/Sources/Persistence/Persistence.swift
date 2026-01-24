@@ -413,6 +413,7 @@ public struct DatabaseClient: Sendable {
 
     // Search
     public var searchSessions: @Sendable (_ query: String) async throws -> [SessionSearchResult] = { _ in [] }
+    public var searchSessionsWithDetails: @Sendable (_ query: String) async throws -> [SessionRecord] = { _ in [] }
     public var fetchSessionsGroupedByDate: @Sendable (_ referenceDate: Date) async throws -> [SessionGroup] = { _ in [] }
 }
 
@@ -537,6 +538,21 @@ extension DatabaseClient: DependencyKey {
                             rank: Double(row["matchCount"] as Int64)
                         )
                     }
+                }
+            },
+            searchSessionsWithDetails: { query in
+                try await dbQueue.read { db in
+                    // FTS5 search with full session details
+                    // Join with sessions table to get all fields, ordered by match count
+                    let sql = """
+                        SELECT sessions.*, COUNT(*) as matchCount
+                        FROM transcript_fts
+                        INNER JOIN sessions ON sessions.id = transcript_fts.sessionId
+                        WHERE transcript_fts MATCH ?
+                        GROUP BY transcript_fts.sessionId
+                        ORDER BY matchCount DESC, sessions.startedAt DESC
+                        """
+                    return try SessionRecord.fetchAll(db, sql: sql, arguments: [query])
                 }
             },
             fetchSessionsGroupedByDate: { referenceDate in

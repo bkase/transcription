@@ -68,12 +68,50 @@ public struct TimelineView: View {
 
     // MARK: - Sessions Content
 
+    @ViewBuilder
     private var sessionsContent: some View {
+        if store.isSearching {
+            searchResultsContent
+        } else {
+            groupedSessionsContent
+        }
+    }
+
+    private var groupedSessionsContent: some View {
         LazyVStack(alignment: .leading, spacing: VaporSpacing.xl + VaporSpacing.sm) {
             ForEach(store.sessionGroups, id: \.bucket) { group in
                 sessionSection(for: group)
             }
         }
+    }
+
+    private var searchResultsContent: some View {
+        LazyVStack(alignment: .leading, spacing: VaporSpacing.md) {
+            if store.searchResults.isEmpty {
+                emptySearchState
+            } else {
+                DateHeader("RESULTS")
+
+                VStack(spacing: VaporSpacing.sm) {
+                    ForEach(store.searchResults, id: \.id) { session in
+                        sessionCard(for: session)
+                            .onTapGesture {
+                                store.send(.sessionTapped(SessionID(rawValue: session.id)))
+                            }
+                    }
+                }
+            }
+        }
+    }
+
+    private var emptySearchState: some View {
+        VStack(spacing: VaporSpacing.md) {
+            Text("No results found")
+                .vaporTextStyle(.body)
+                .foregroundColor(VaporColor.textSecondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, VaporSpacing.xl)
     }
 
     private func sessionSection(for group: SessionGroup) -> some View {

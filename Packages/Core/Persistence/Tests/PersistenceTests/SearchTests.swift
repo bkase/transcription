@@ -97,6 +97,146 @@ import Models
     #expect(results[1].sessionId.rawValue == "session-1")
 }
 
+@Test func testSearchSessionsWithDetailsReturnsFullRecords() async throws {
+    // Test that searchSessionsWithDetails returns full SessionRecord objects
+    let dbQueue = try makeDatabase(configuration: .inMemory)
+    let client = DatabaseClient.live(dbQueue: dbQueue)
+
+    let now = Date()
+
+    // Create sessions with full details
+    try await client.createSession(SessionRecord(
+        id: "session-1",
+        startedAt: now,
+        title: "Swift Programming",
+        previewText: "Discussion about Swift",
+        durationMs: 60000,
+        processingState: .processed,
+        speakerCount: 2,
+        updatedAt: now
+    ))
+    try await client.createSession(SessionRecord(
+        id: "session-2",
+        startedAt: now.addingTimeInterval(-3600),
+        title: "Python Basics",
+        previewText: "Introduction to Python",
+        durationMs: 45000,
+        processingState: .processed,
+        speakerCount: 1,
+        updatedAt: now
+    ))
+
+    // Add transcript segments
+    try await client.createTranscriptSegment(TranscriptSegmentRecord(
+        id: "seg-1",
+        sessionId: "session-1",
+        startMs: 0,
+        endMs: 5000,
+        text: "Let's talk about swift programming.",
+        isFinal: true,
+        createdAt: now,
+        updatedAt: now
+    ))
+    try await client.createTranscriptSegment(TranscriptSegmentRecord(
+        id: "seg-2",
+        sessionId: "session-2",
+        startMs: 0,
+        endMs: 5000,
+        text: "Python is a versatile language.",
+        isFinal: true,
+        createdAt: now,
+        updatedAt: now
+    ))
+
+    // Search for "swift" - should return full session record
+    let results = try await client.searchSessionsWithDetails("swift")
+
+    #expect(results.count == 1)
+
+    let session = results[0]
+    #expect(session.id == "session-1")
+    #expect(session.title == "Swift Programming")
+    #expect(session.previewText == "Discussion about Swift")
+    #expect(session.durationMs == 60000)
+    #expect(session.speakerCount == 2)
+    #expect(session.processingState == .processed)
+}
+
+@Test func testSearchSessionsWithDetailsPreservesRanking() async throws {
+    // Test that results are ordered by match count (relevance)
+    let dbQueue = try makeDatabase(configuration: .inMemory)
+    let client = DatabaseClient.live(dbQueue: dbQueue)
+
+    let now = Date()
+
+    // Create sessions
+    try await client.createSession(SessionRecord(
+        id: "session-few-matches",
+        startedAt: now,
+        title: "Few Mentions",
+        processingState: .processed,
+        updatedAt: now
+    ))
+    try await client.createSession(SessionRecord(
+        id: "session-many-matches",
+        startedAt: now.addingTimeInterval(-3600),
+        title: "Many Mentions",
+        processingState: .processed,
+        updatedAt: now
+    ))
+
+    // Session with few matches
+    try await client.createTranscriptSegment(TranscriptSegmentRecord(
+        id: "seg-1",
+        sessionId: "session-few-matches",
+        startMs: 0,
+        endMs: 5000,
+        text: "One mention of swift here.",
+        isFinal: true,
+        createdAt: now,
+        updatedAt: now
+    ))
+
+    // Session with many matches (more segments with "swift")
+    try await client.createTranscriptSegment(TranscriptSegmentRecord(
+        id: "seg-2a",
+        sessionId: "session-many-matches",
+        startMs: 0,
+        endMs: 5000,
+        text: "Swift is great!",
+        isFinal: true,
+        createdAt: now,
+        updatedAt: now
+    ))
+    try await client.createTranscriptSegment(TranscriptSegmentRecord(
+        id: "seg-2b",
+        sessionId: "session-many-matches",
+        startMs: 5000,
+        endMs: 10000,
+        text: "More swift content here.",
+        isFinal: true,
+        createdAt: now,
+        updatedAt: now
+    ))
+    try await client.createTranscriptSegment(TranscriptSegmentRecord(
+        id: "seg-2c",
+        sessionId: "session-many-matches",
+        startMs: 10000,
+        endMs: 15000,
+        text: "Swift swift swift!",
+        isFinal: true,
+        createdAt: now,
+        updatedAt: now
+    ))
+
+    // Search should return many-matches first (higher relevance)
+    let results = try await client.searchSessionsWithDetails("swift")
+
+    #expect(results.count == 2)
+    #expect(results[0].id == "session-many-matches")
+    #expect(results[1].id == "session-few-matches")
+}
+
 @Test func testFtsSearchReturnsEmptyForNoMatches() async throws {
     let dbQueue = try makeDatabase(configuration: .inMemory)
     let client = DatabaseClient.live(dbQueue: dbQueue)

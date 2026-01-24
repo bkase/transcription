@@ -37,6 +37,7 @@ import Dependencies
             fetchSpeakerSegments: { _ in [] },
             createSpeakerSegment: { _ in },
             searchSessions: { _ in [] },
+            searchSessionsWithDetails: { _ in [] },
             fetchSessionsGroupedByDate: { _ in [] }
         )
         deps.audioCaptureClient = AudioCaptureClient(

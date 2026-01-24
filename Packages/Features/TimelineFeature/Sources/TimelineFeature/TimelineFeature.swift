@@ -16,7 +16,7 @@ public struct TimelineFeature {
     public struct State: Equatable {
         public var searchQuery: String = ""
         public var sessionGroups: [SessionGroup] = []
-        public var searchResults: [SessionSearchResult] = []
+        public var searchResults: [SessionRecord] = []
         public var isLoading: Bool = false
         public var error: String?
 
@@ -28,7 +28,7 @@ public struct TimelineFeature {
         public init(
             searchQuery: String = "",
             sessionGroups: [SessionGroup] = [],
-            searchResults: [SessionSearchResult] = [],
+            searchResults: [SessionRecord] = [],
             isLoading: Bool = false,
             error: String? = nil
         ) {
@@ -46,7 +46,7 @@ public struct TimelineFeature {
         case loadSessions
         case sessionsLoaded([SessionGroup])
         case sessionsFailed(String)
-        case searchPerformed([SessionSearchResult])
+        case searchPerformed([SessionRecord])
         case sessionTapped(SessionID)
         case newRecordingTapped
     }
@@ -69,9 +69,9 @@ public struct TimelineFeature {
                     return .send(.loadSessions)
                 }
 
-                // Perform FTS search
+                // Perform FTS search with full session details
                 return .run { send in
-                    let results = try await databaseClient.searchSessions(query)
+                    let results = try await databaseClient.searchSessionsWithDetails(query)
                     await send(.searchPerformed(results))
                 } catch: { error, send in
                     await send(.sessionsFailed(error.localizedDescription))

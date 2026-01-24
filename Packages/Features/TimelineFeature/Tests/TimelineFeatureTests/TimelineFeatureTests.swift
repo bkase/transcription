@@ -59,15 +59,37 @@ struct TimelineFeatureTests {
     func testSearchUpdatesQuery() async {
         let mockDate = Date(timeIntervalSince1970: 1000000)
         let mockSearchResults = [
-            SessionSearchResult(sessionId: SessionID("session-1"), rank: 5.0),
-            SessionSearchResult(sessionId: SessionID("session-2"), rank: 3.0)
+            SessionRecord(
+                id: "session-1",
+                startedAt: mockDate,
+                endedAt: nil,
+                title: "Swift Talk",
+                previewText: "Discussing swift programming",
+                durationMs: 30000,
+                audioPath: nil,
+                processingState: .processed,
+                speakerCount: 1,
+                updatedAt: mockDate
+            ),
+            SessionRecord(
+                id: "session-2",
+                startedAt: mockDate.addingTimeInterval(-3600),
+                endedAt: nil,
+                title: "More Swift",
+                previewText: "Swift is great",
+                durationMs: 45000,
+                audioPath: nil,
+                processingState: .processed,
+                speakerCount: 2,
+                updatedAt: mockDate
+            )
         ]
 
         let store = TestStore(initialState: TimelineFeature.State()) {
             TimelineFeature()
         } withDependencies: {
             $0.date = .constant(mockDate)
-            $0.databaseClient.searchSessions = { query in
+            $0.databaseClient.searchSessionsWithDetails = { query in
                 #expect(query == "hello")
                 return mockSearchResults
             }
@@ -85,19 +107,117 @@ struct TimelineFeatureTests {
         }
     }
 
+    // MARK: - testSearchFiltersSessions
+
+    @Test
+    func testSearchFiltersSessions() async {
+        // This test verifies that FTS search filters sessions to only show matches.
+        // When a user types "swift", only sessions with "swift" in transcripts are shown.
+        let mockDate = Date(timeIntervalSince1970: 1000000)
+
+        // Full timeline has 3 sessions
+        let allSessions = [
+            SessionRecord(
+                id: "session-swift-1",
+                startedAt: mockDate,
+                title: "Swift Discussion",
+                previewText: "Learning swift programming",
+                processingState: .processed,
+                speakerCount: 2,
+                updatedAt: mockDate
+            ),
+            SessionRecord(
+                id: "session-python",
+                startedAt: mockDate.addingTimeInterval(-3600),
+                title: "Python Tutorial",
+                previewText: "Python basics",
+                processingState: .processed,
+                speakerCount: 1,
+                updatedAt: mockDate
+            ),
+            SessionRecord(
+                id: "session-swift-2",
+                startedAt: mockDate.addingTimeInterval(-7200),
+                title: "More Swift",
+                previewText: "Swift advanced topics",
+                processingState: .processed,
+                speakerCount: 1,
+                updatedAt: mockDate
+            )
+        ]
+
+        let allGroups = [
+            SessionGroup(bucket: .today, sessions: allSessions)
+        ]
+
+        // Search for "swift" returns only matching sessions (filtered)
+        let swiftSearchResults = [
+            allSessions[0], // session-swift-1
+            allSessions[2]  // session-swift-2
+        ]
+
+        let store = TestStore(
+            initialState: TimelineFeature.State(sessionGroups: allGroups)
+        ) {
+            TimelineFeature()
+        } withDependencies: {
+            $0.date = .constant(mockDate)
+            $0.databaseClient.searchSessionsWithDetails = { query in
+                #expect(query == "swift")
+                // Return only sessions that match "swift"
+                return swiftSearchResults
+            }
+            $0.databaseClient.fetchSessionsGroupedByDate = { _ in allGroups }
+        }
+
+        // Verify initial state has all sessions
+        #expect(store.state.sessionGroups.flatMap(\.sessions).count == 3)
+        #expect(!store.state.isSearching)
+
+        // User searches for "swift"
+        await store.send(.searchQueryChanged("swift")) {
+            $0.searchQuery = "swift"
+        }
+
+        // Search returns filtered results
+        await store.receive(\.searchPerformed) {
+            $0.searchResults = swiftSearchResults
+        }
+
+        // Verify search state - only 2 sessions in results
+        #expect(store.state.isSearching)
+        #expect(store.state.searchResults.count == 2)
+        #expect(store.state.searchResults.allSatisfy { $0.id.contains("swift") })
+
+        // Session groups are still available but view would display searchResults
+        #expect(store.state.sessionGroups.flatMap(\.sessions).count == 3)
+    }
+
     // MARK: - testSearchClearReloadsSessions
 
     @Test
     func testSearchClearReloadsSessions() async {
         let mockDate = Date(timeIntervalSince1970: 1000000)
         let mockGroups: [SessionGroup] = []
+        let existingSearchResults = [
+            SessionRecord(
+                id: "session-1",
+                startedAt: mockDate,
+                endedAt: nil,
+                title: "Test Session",
+                previewText: "Test content",
+                durationMs: 60000,
+                audioPath: nil,
+                processingState: .processed,
+                speakerCount: 1,
+                updatedAt: mockDate
+            )
+        ]
 
         let store = TestStore(
             initialState: TimelineFeature.State(
                 searchQuery: "existing",
-                searchResults: [
-                    SessionSearchResult(sessionId: SessionID("session-1"), rank: 1.0)
-                ]
+                searchResults: existingSearchResults
             )
         ) {
             TimelineFeature()
