@@ -266,6 +266,10 @@ targets:
         product: ComposableArchitecture
       - package: swift-case-paths
         product: CasePaths
+      - package: swift-dependencies
+        product: Dependencies
+      - package: swift-clocks
+        product: Clocks
     settings:
       base:
         PRODUCT_NAME: RecordingFeature
