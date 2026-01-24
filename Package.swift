@@ -36,6 +36,7 @@ let package = Package(
                 "Models",
                 "Processing",
                 "Audio",
+                "Persistence",
                 .product(name: "Dependencies", package: "swift-dependencies"),
             ],
             path: "Tests/CoreProcessingTests"
