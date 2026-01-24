@@ -54,7 +54,7 @@ public struct SessionRecord: Codable, FetchableRecord, PersistableRecord, Sendab
     }
 }
 
-public struct PersonRecord: Codable, FetchableRecord, PersistableRecord, Sendable {
+public struct PersonRecord: Codable, FetchableRecord, PersistableRecord, Sendable, Equatable {
     public static let databaseTableName = "people"
 
     public var id: String

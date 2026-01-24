@@ -324,6 +324,8 @@ targets:
         product: ComposableArchitecture
       - package: swift-case-paths
         product: CasePaths
+      - package: swift-dependencies
+        product: Dependencies
     settings:
       base:
         PRODUCT_NAME: PeopleFeature
