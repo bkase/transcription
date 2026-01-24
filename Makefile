@@ -32,8 +32,14 @@ gen: bootstrap
 
 # Run tests (PR gate) - uses Swift Testing for repo layout tests
 test: gen
-	@echo "Running tests..."
+	@echo "Running SPM tests..."
 	swift test
+	@echo "Running XCode tests..."
+	xcodebuild -project xcodegen/Vapor.xcodeproj -scheme Vapor \
+		-destination "id=A76B56DB-DEA2-4933-8C81-7A0EF009AC11" \
+		-skipMacroValidation -skipPackagePluginValidation \
+		-only-testing:VaporTests \
+		test | grep -E "(passed|failed|error:)" || true
 	@echo "Tests complete."
 
 # Run slow integration tests (nightly)

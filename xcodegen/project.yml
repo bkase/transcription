@@ -10,6 +10,10 @@ settings:
   base:
     SWIFT_VERSION: "5.10"
     ENABLE_USER_SCRIPT_SANDBOXING: false
+    GENERATE_INFOPLIST_FILE: true
+    ALWAYS_SEARCH_USER_PATHS: false
+    ONLY_ACTIVE_ARCH: true
+    SWIFT_EXPLICIT_MODULES: false
   configs:
     Debug:
       SWIFT_OPTIMIZATION_LEVEL: "-Onone"
@@ -46,6 +50,9 @@ packages:
   swift-gen:
     url: https://github.com/pointfreeco/swift-gen
     from: "0.4.0"
+  swift-case-paths:
+    url: https://github.com/pointfreeco/swift-case-paths
+    from: "1.0.0"
 
 targets:
   Vapor:
@@ -66,6 +73,8 @@ targets:
         product: Clocks
       - package: swift-url-routing
         product: URLRouting
+      - package: swift-case-paths
+        product: CasePaths
       - target: Models
       - target: Persistence
       - target: Audio
@@ -107,6 +116,12 @@ targets:
       - path: ../Packages/Core/Persistence/Sources/Persistence
     dependencies:
       - target: Models
+      - package: swift-tagged
+        product: Tagged
+      - package: swift-dependencies
+        product: Dependencies
+      - package: swift-dependencies
+        product: DependenciesMacros
     settings:
       base:
         PRODUCT_NAME: Persistence
@@ -119,8 +134,12 @@ targets:
       - path: ../Packages/Core/Audio/Sources/Audio
     dependencies:
       - target: Models
+      - package: swift-tagged
+        product: Tagged
       - package: swift-dependencies
         product: Dependencies
+      - package: swift-dependencies
+        product: DependenciesMacros
     settings:
       base:
         PRODUCT_NAME: Audio
@@ -135,8 +154,12 @@ targets:
       - target: Models
       - target: Audio
       - target: Persistence
+      - package: swift-tagged
+        product: Tagged
       - package: swift-dependencies
         product: Dependencies
+      - package: swift-dependencies
+        product: DependenciesMacros
     settings:
       base:
         PRODUCT_NAME: Processing
@@ -150,6 +173,12 @@ targets:
     dependencies:
       - target: Models
       - target: Persistence
+      - package: swift-tagged
+        product: Tagged
+      - package: swift-dependencies
+        product: Dependencies
+      - package: swift-dependencies
+        product: DependenciesMacros
     settings:
       base:
         PRODUCT_NAME: Export
@@ -172,6 +201,8 @@ targets:
       - path: ../Packages/Core/Routing/Sources/Routing
     dependencies:
       - target: Models
+      - package: swift-tagged
+        product: Tagged
       - package: swift-url-routing
         product: URLRouting
     settings:
@@ -199,8 +230,12 @@ targets:
       - target: Models
       - target: Persistence
       - target: DesignSystem
+      - package: swift-tagged
+        product: Tagged
       - package: swift-composable-architecture
         product: ComposableArchitecture
+      - package: swift-case-paths
+        product: CasePaths
     settings:
       base:
         PRODUCT_NAME: TimelineFeature
@@ -217,8 +252,12 @@ targets:
       - target: Audio
       - target: Processing
       - target: DesignSystem
+      - package: swift-tagged
+        product: Tagged
       - package: swift-composable-architecture
         product: ComposableArchitecture
+      - package: swift-case-paths
+        product: CasePaths
     settings:
       base:
         PRODUCT_NAME: RecordingFeature
@@ -233,8 +272,12 @@ targets:
       - target: Models
       - target: Persistence
       - target: DesignSystem
+      - package: swift-tagged
+        product: Tagged
       - package: swift-composable-architecture
         product: ComposableArchitecture
+      - package: swift-case-paths
+        product: CasePaths
     settings:
       base:
         PRODUCT_NAME: SessionDetailFeature
@@ -249,8 +292,12 @@ targets:
       - target: Models
       - target: Persistence
       - target: DesignSystem
+      - package: swift-tagged
+        product: Tagged
       - package: swift-composable-architecture
         product: ComposableArchitecture
+      - package: swift-case-paths
+        product: CasePaths
     settings:
       base:
         PRODUCT_NAME: PeopleFeature
@@ -265,8 +312,12 @@ targets:
       - target: Models
       - target: Persistence
       - target: DesignSystem
+      - package: swift-tagged
+        product: Tagged
       - package: swift-composable-architecture
         product: ComposableArchitecture
+      - package: swift-case-paths
+        product: CasePaths
     settings:
       base:
         PRODUCT_NAME: SpeakerPickerFeature
@@ -281,8 +332,12 @@ targets:
       - target: Models
       - target: Audio
       - target: DesignSystem
+      - package: swift-tagged
+        product: Tagged
       - package: swift-composable-architecture
         product: ComposableArchitecture
+      - package: swift-case-paths
+        product: CasePaths
     settings:
       base:
         PRODUCT_NAME: AudioPlayerFeature
@@ -298,8 +353,12 @@ targets:
       - target: Vapor
       - package: swift-snapshot-testing
         product: SnapshotTesting
+      - package: swift-composable-architecture
+        product: ComposableArchitecture
     settings:
       base:
+        PRODUCT_NAME: VaporTests
+        PRODUCT_MODULE_NAME: VaporTests
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Vapor.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Vapor"
         BUNDLE_LOADER: "$(TEST_HOST)"
 
@@ -312,6 +371,8 @@ targets:
       - target: Vapor
     settings:
       base:
+        PRODUCT_NAME: ToolsTests
+        PRODUCT_MODULE_NAME: ToolsTests
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Vapor.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Vapor"
         BUNDLE_LOADER: "$(TEST_HOST)"
 
