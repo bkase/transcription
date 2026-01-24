@@ -12,6 +12,7 @@ let package = Package(
         .package(path: "../../Core/Models"),
         .package(path: "../../Core/Persistence"),
         .package(path: "../../Core/DesignSystem"),
+        .package(path: "../AudioPlayerFeature"),
         .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.0.0"),
         .package(url: "https://github.com/pointfreeco/swift-tagged", from: "0.10.0"),
     ],
@@ -22,6 +23,7 @@ let package = Package(
                 "Models",
                 "Persistence",
                 "DesignSystem",
+                "AudioPlayerFeature",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
                 .product(name: "Tagged", package: "swift-tagged"),
             ]
@@ -30,6 +32,7 @@ let package = Package(
             name: "SessionDetailFeatureTests",
             dependencies: [
                 "SessionDetailFeature",
+                "AudioPlayerFeature",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ]
         ),

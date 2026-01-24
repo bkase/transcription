@@ -3,6 +3,7 @@ import Foundation
 import ComposableArchitecture
 import Models
 import Persistence
+import AudioPlayerFeature
 @testable import SessionDetailFeature
 
 @MainActor
@@ -165,6 +166,11 @@ struct SessionDetailFeatureTests {
             $0.session = mockSession
             $0.segments = expectedSegments
             $0.speakerTracks = expectedTracks
+            // Audio player initialized from session's audioPath and durationMs
+            $0.audioPlayer = AudioPlayerFeature.State(
+                audioURL: URL(fileURLWithPath: "/audio/session-123.caf"),
+                duration: 300.0  // 300000ms = 300s
+            )
         }
 
         // Verify final state

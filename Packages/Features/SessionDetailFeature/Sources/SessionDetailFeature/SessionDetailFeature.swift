@@ -4,6 +4,7 @@ import Foundation
 import Models
 import Persistence
 import DesignSystem
+import AudioPlayerFeature
 import Tagged
 
 /// A transcript segment for display in session detail view
@@ -60,6 +61,7 @@ public struct SessionDetailFeature {
         public var speakerTracks: [DetailSpeakerTrack] = []
         public var isLoading: Bool = false
         public var error: String?
+        public var audioPlayer: AudioPlayerFeature.State?
 
         public init(
             sessionID: SessionID,
@@ -67,7 +69,8 @@ public struct SessionDetailFeature {
             segments: [DetailSegment] = [],
             speakerTracks: [DetailSpeakerTrack] = [],
             isLoading: Bool = false,
-            error: String? = nil
+            error: String? = nil,
+            audioPlayer: AudioPlayerFeature.State? = nil
         ) {
             self.sessionID = sessionID
             self.session = session
@@ -75,6 +78,7 @@ public struct SessionDetailFeature {
             self.speakerTracks = speakerTracks
             self.isLoading = isLoading
             self.error = error
+            self.audioPlayer = audioPlayer
         }
     }
 
@@ -84,6 +88,7 @@ public struct SessionDetailFeature {
         case sessionLoaded(SessionRecord?, [DetailSegment], [DetailSpeakerTrack])
         case loadFailed(String)
         case backTapped
+        case audioPlayer(AudioPlayerFeature.Action)
     }
 
     public var body: some ReducerOf<Self> {
@@ -144,6 +149,16 @@ public struct SessionDetailFeature {
                 state.session = session
                 state.segments = segments
                 state.speakerTracks = tracks
+
+                // Initialize audio player if session has audio
+                if let audioPath = session?.audioPath {
+                    let audioURL = URL(fileURLWithPath: audioPath)
+                    let durationSeconds = session?.durationMs.map { TimeInterval($0) / 1000.0 } ?? 0
+                    state.audioPlayer = AudioPlayerFeature.State(
+                        audioURL: audioURL,
+                        duration: durationSeconds
+                    )
+                }
                 return .none
 
             case let .loadFailed(errorMessage):
@@ -154,7 +169,14 @@ public struct SessionDetailFeature {
             case .backTapped:
                 // Navigation intent - handled by parent
                 return .none
+
+            case .audioPlayer:
+                // Handled by child reducer
+                return .none
             }
+        }
+        .ifLet(\.audioPlayer, action: \.audioPlayer) {
+            AudioPlayerFeature()
         }
     }
 }

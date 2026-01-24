@@ -1,6 +1,7 @@
 import ComposableArchitecture
 import DesignSystem
 import Models
+import AudioPlayerFeature
 import SwiftUI
 
 // MARK: - Session Detail View
@@ -48,7 +49,7 @@ public struct SessionDetailView: View {
             }
 
             // Floating audio player
-            if store.session?.audioPath != nil {
+            if store.audioPlayer != nil {
                 audioPlayerSection
             }
         }
@@ -176,17 +177,20 @@ public struct SessionDetailView: View {
 
     // MARK: - Audio Player Section
 
+    @ViewBuilder
     private var audioPlayerSection: some View {
-        AudioPlayer(
-            title: "Playing Audio",
-            currentTime: "0:00",
-            progress: 0.0,
-            playState: .paused
-        ) {
-            // Play/pause action - to be wired to AudioPlayerFeature
+        if let audioPlayerState = store.audioPlayer {
+            AudioPlayer(
+                title: store.session?.title ?? "Playing Audio",
+                currentTime: AudioPlayerFeature.formatTime(audioPlayerState.currentTime),
+                progress: audioPlayerState.progress,
+                playState: audioPlayerState.isPlaying ? .playing : .paused
+            ) {
+                store.send(.audioPlayer(.playPauseTapped))
+            }
+            .padding(.horizontal, VaporSpacing.lg)
+            .padding(.bottom, VaporSpacing.lg)
         }
-        .padding(.horizontal, VaporSpacing.lg)
-        .padding(.bottom, VaporSpacing.lg)
     }
 
     // MARK: - Helpers

@@ -293,6 +293,7 @@ targets:
       - target: Models
       - target: Persistence
       - target: DesignSystem
+      - target: AudioPlayerFeature
       - package: swift-tagged
         product: Tagged
       - package: swift-composable-architecture
@@ -301,6 +302,8 @@ targets:
         product: CasePaths
       - package: swift-dependencies
         product: Dependencies
+      - package: swift-perception
+        product: Perception
     settings:
       base:
         PRODUCT_NAME: SessionDetailFeature
@@ -365,6 +368,8 @@ targets:
         product: Dependencies
       - package: swift-perception
         product: Perception
+      - package: swift-clocks
+        product: Clocks
     settings:
       base:
         PRODUCT_NAME: AudioPlayerFeature
