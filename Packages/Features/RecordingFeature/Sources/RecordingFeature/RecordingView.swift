@@ -129,13 +129,27 @@ public struct RecordingView: View {
 
 // MARK: - Recording View Preview (for snapshots)
 
+/// Data for a live transcript segment in preview.
+public struct LiveSegmentData: Equatable {
+    public let speaker: SpeakerType
+    public let timestamp: String
+    public let text: String
+
+    public init(speaker: SpeakerType, timestamp: String, text: String) {
+        self.speaker = speaker
+        self.timestamp = timestamp
+        self.text = text
+    }
+}
+
 /// Non-interactive preview variant for snapshot testing.
 /// Uses static data instead of Store for deterministic snapshots.
 public struct RecordingViewPreview: View {
-    public enum ContentState {
+    public enum ContentState: Equatable {
         case listening
         case starting
         case error(String)
+        case liveSegments([LiveSegmentData])
     }
 
     private let elapsedTime: String
@@ -168,31 +182,55 @@ public struct RecordingViewPreview: View {
             RecordingHeaderPreview(elapsedTime: elapsedTime)
 
             // Content area
-            VStack {
-                Spacer()
-
-                switch contentState {
-                case .listening:
+            switch contentState {
+            case .listening:
+                VStack {
+                    Spacer()
                     Text("Listening...")
                         .font(.system(size: 24, weight: .thin))
                         .tracking(1)
                         .foregroundColor(VaporColor.textTertiary)
+                    Spacer()
+                }
 
-                case .starting:
+            case .starting:
+                VStack {
+                    Spacer()
                     Text("Starting...")
                         .font(.system(size: 24, weight: .thin))
                         .tracking(1)
                         .foregroundColor(VaporColor.textTertiary)
+                    Spacer()
+                }
 
-                case .error(let message):
+            case .error(let message):
+                VStack {
+                    Spacer()
                     Text(message)
                         .font(.system(size: 16, weight: .regular))
                         .foregroundColor(VaporColor.recording)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, VaporSpacing.xl)
+                    Spacer()
                 }
 
-                Spacer()
+            case .liveSegments(let segments):
+                ScrollView {
+                    VStack(alignment: .leading, spacing: VaporSpacing.lg) {
+                        ForEach(Array(segments.enumerated()), id: \.offset) { _, segment in
+                            TranscriptSegmentPreview(
+                                speaker: segment.speaker,
+                                timestamp: segment.timestamp,
+                                text: segment.text
+                            )
+                        }
+
+                        // Show listening indicator at the end
+                        TranscriptLiveIndicator()
+                    }
+                    .padding(.horizontal, VaporSpacing.lg)
+                    .padding(.top, VaporSpacing.md)
+                }
             }
 
             // Controls bar (non-interactive)

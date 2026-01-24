@@ -53,6 +53,9 @@ packages:
   swift-case-paths:
     url: https://github.com/pointfreeco/swift-case-paths
     from: "1.0.0"
+  swift-perception:
+    url: https://github.com/pointfreeco/swift-perception
+    from: "1.0.0"
   # Database
   GRDB.swift:
     url: https://github.com/groue/GRDB.swift
@@ -350,6 +353,10 @@ targets:
         product: ComposableArchitecture
       - package: swift-case-paths
         product: CasePaths
+      - package: swift-dependencies
+        product: Dependencies
+      - package: swift-perception
+        product: Perception
     settings:
       base:
         PRODUCT_NAME: AudioPlayerFeature
