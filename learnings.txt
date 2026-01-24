@@ -1,0 +1,304 @@
+## XcodeGen with SPM packages
+- When using XcodeGen with SPM dependencies, specify `product:` alongside `package:`
+- Product names differ from package names (e.g., swift-composable-architecture -> ComposableArchitecture)
+- Framework targets need PRODUCT_NAME and PRODUCT_MODULE_NAME settings to avoid empty module names
+- SPM dependencies need to be resolved before building: `xcodebuild -resolvePackageDependencies`
+
+## Swift Testing
+- Swift Testing with `@Test` works out of the box with `swift test`
+- Simpler than XCUITest for repo structure validation tests
+- Root Package.swift can define test targets that run via SPM
+
+## Pre-commit hooks
+- Git hooks live in `.git/hooks/` (not tracked in git)
+- Must be executable (`chmod +x`)
+- Exit code determines if commit proceeds
+
+## Beads workflow
+- `br ready --json` shows actionable issues
+- `br update <id> --status=in_progress` to claim
+- `br close <id> --reason="..."` when done
+- `br sync --flush-only` exports to JSONL
+
+## Package.resolved with XcodeGen
+- Store Package.resolved outside the generated .xcodeproj (e.g., xcodegen/Package.resolved)
+- Copy it into the generated project after xcodegen runs
+- The generated .xcodeproj is gitignored so internal Package.resolved isn't tracked
+
+## Swift Testing module scope
+- Private/internal helper functions in same module are visible across test files
+- Avoid defining same helper function in multiple test files (redeclaration error)
+- Create a shared TestHelpers.swift for common utilities
+
+## Point-Free swift-dependencies
+- `@DependencyClient` macro generates struct-based dependency interfaces
+- Non-throwing closures need explicit default values: `= { false }`
+- Throwing closures get auto-generated "unimplemented" stubs that fail tests
+- Add `DependenciesMacros` product for the `@DependencyClient` macro
+- `testValue = Self()` creates unimplemented stubs - tests must override for noop behavior
+- Register with `DependencyKey` protocol for `liveValue`, `testValue`, `previewValue`
+- Extend `DependencyValues` to add `@Dependency(\.myClient)` accessor
+
+## XcodeGen transitive dependencies
+- SPM packages in XcodeGen don't auto-resolve transitive dependencies for linking
+- If target A depends on Models and Models depends on Tagged, target A needs explicit Tagged dependency
+- TCA features need explicit CasePaths dependency for @Reducer macro-generated code
+- DependenciesMacros needed for any target using @DependencyClient macro
+- Set GENERATE_INFOPLIST_FILE: true and ALWAYS_SEARCH_USER_PATHS: false in base settings
+- Use SWIFT_EXPLICIT_MODULES: false and ONLY_ACTIVE_ARCH: true to avoid parallel build issues
+
+## TCA TestStore
+- TCA's TestStore requires @MainActor on test structs
+- Use Swift Testing with `@Test` for TCA tests in iOS targets
+- TestStore tests run via xcodebuild (not swift test for iOS targets)
+- Makefile test target should include `-only-testing:TestTargetName` for xcode tests
+
+## Swift regex literals
+- Regex literals `/pattern/` can conflict with Swift's macro/number parsing
+- Use `#[0-9A-Fa-f]` inside regex causes compile errors (looks like integer literal)
+- Prefer helper functions with `allSatisfy` for simple validation instead of regex
+
+## SPM package tests in monorepo
+- Root Package.swift `swift test` doesn't run tests from local package dependencies
+- Add separate test commands to Makefile: `cd Packages/Core/Models && swift test`
+- Each local SPM package has its own test target that must be run independently
+
+## GRDB.swift for SQLite persistence
+- Use GRDB package from `https://github.com/groue/GRDB.swift` (not a Point-Free package)
+- Records implement `FetchableRecord`, `PersistableRecord`, `Codable`, `Sendable`
+- `DatabaseMigrator` handles schema migrations; registered migrations are idempotent
+- `DatabaseQueue` is the main entry point; use `.inMemory` for tests
+- Swift `Date` requires `import Foundation` (not auto-imported with GRDB)
+- `DatabaseClient.live(dbQueue:)` factory creates a live client instance from a DatabaseQueue
+- Use `dbQueue.read { db in }` for queries and `dbQueue.write { db in }` for mutations (async-safe)
+- GRDB `order(Column("x"))` for sorting, `filter(Column("x") == y)` for filtering
+- Foreign key cascades work automatically when defined in migrations (ON DELETE CASCADE)
+
+## SnapshotTesting with Swift Testing
+- swift-snapshot-testing works with Swift Testing `@Test` macro (not just XCTest)
+- Use `withSnapshotTesting(record: .all)` or `.missing` to control record mode
+- Environment variable `SNAPSHOT_RECORD=1` can control record mode externally
+- `SwiftUISnapshotLayout.device(config: .iPhone13Pro)` for consistent device sizing
+- Separate test target for snapshots keeps concerns isolated
+
+## AVAudioEngine mocking for tests
+- Create protocols (AudioEngineProtocol, AudioInputNodeProtocol) to abstract AVFoundation classes
+- Use `@retroactive @unchecked Sendable` conformance for AVFoundation types
+- Property name conflicts in extensions can cause infinite recursion (e.g., `inputNode` → use `audioInputNode`)
+- AsyncStream.makeStream(bufferingPolicy: .unbounded) for immediate continuation access
+- Keep stream references alive in tests - dropped streams may trigger termination handlers
+- Sync tests work with `throws`, async tests with `async throws` - closures on @DependencyClient are async
+
+## Audio file writing with ExtAudioFile
+- Use ExtAudioFile API (not AVAudioFile) for lower-level control over audio file writing
+- AudioStreamBasicDescription requires kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked for Float32 PCM
+- ExtAudioFileCreateWithURL needs file type ID: kAudioFileCAFType or kAudioFileWAVEType based on extension
+- ExtAudioFileRef needs wrapper class for actor isolation (class ExtendedAudioFile: @unchecked Sendable)
+- Use actors for thread-safe audio file writing state management
+- For mock dependency clients in tests with Sendable closures, use actors to avoid Swift 6 warnings
+- Linear interpolation resampling: outputIndex * inputRate/outputRate gives source sample position
+
+## Mock client patterns with actors
+- Use actors for mock client state to ensure thread-safe access
+- Capture local copies of script data before async operations to avoid actor hop warnings
+- Use `[weak self]` in Task closures with actor isolation to avoid memory leaks
+- Complex `.map { }` expressions with many initializer parameters can cause compiler timeout
+- Prefer explicit `for` loops over `.map` when creating many objects with complex initializers
+
+## Root Package.swift test targets
+- Test targets in root Package.swift need explicit dependencies on Models, even when Processing imports it
+- Swift doesn't re-export transitive module dependencies - tests must import directly
+- Adding `import Models` requires the Models package in test target dependencies
+
+## RecordingProcessor actor patterns
+- Use AsyncStream.makeStream() for event emission in actors
+- Fork audio streams for parallel consumption (file writing + ML) using Task
+- Store continuation in actor state to emit events from any method
+- Handle segment updates: try create first, fall back to update for partials
+- finalize on stop: compute preview text, duration, speaker count from DB queries
+
+## Tools workspace testing
+- Test tool executables by running `swift run <tool> --help` and checking output
+- Use Process() to invoke swift build/run from tests
+- Create directories for tool outputs before running `make gen` (Generated/, docs/schema/)
+- Makefile can chain tools: build → run TokenGen → run DocGen → xcodegen
+
+## SwiftUI animation timing curves
+- `UnitCurve` in SwiftUI doesn't have a public initializer for custom control points
+- Use `Animation.timingCurve(x1, y1, x2, y2, duration:)` for custom bezier curves
+- Create wrapper struct (VaporCurve) to store control points and provide `.animation(duration:)` method
+- Avoid naming conflicts in enums (e.g., `breathe` duration vs `breathe` curve → use suffixes)
+
+## Shell script testing
+- Scripts should delegate to Makefile targets for consistency (gen.sh → make gen)
+- Test scripts by reading content and verifying expected calls, not executing them
+- Check executable bit with FileManager.attributesOfItem and .posixPermissions
+
+## SnapshotTesting with Swift Testing and MainActor
+- Snapshot tests on SwiftUI views require `@MainActor` on the test struct
+- Without @MainActor, UI operations fail with "Call must be made on main thread" exception
+- Use `SNAPSHOT_RECORD=1` env var for initial recording, then run without for verification
+- Font weight warnings in simulator are expected for ultra-light/thin weights but don't affect tests
+
+## SwiftUI button components
+- Use `ButtonStyle(PlainButtonStyle())` to remove default button styling in custom button components
+- SwiftUI animations with `repeatForever(autoreverses: true)` for breathing effects
+- Use `.onChange(of:)` to start/stop animations based on state changes
+- SF Symbols system names for common icons (pause, play.fill, chevron.left, ellipsis, mic)
+- Combine `.shadow()` with `.overlay()` for complex button chrome (border + shadow)
+
+## SwiftUI input components for snapshot testing
+- Create separate "Preview" variants (e.g., SearchFieldPreview) for non-interactive snapshot testing
+- Preview variants use static props instead of @Binding for deterministic snapshots
+- Use `.ultraThinMaterial` for frosted glass effect backgrounds in SwiftUI
+- Combine `.background()` with separate `.overlay()` for border stroke styling
+
+## DesignSystem component patterns
+- Components follow naming: SessionCard, TranscriptSegment etc. with corresponding *Preview variants for snapshots
+- Use SpeakerType enum (user/guest/speaker) to differentiate transcript speaker colors
+- SessionCard supports default and hover states via `showMetadata` flag
+- Reuse existing badge components (SpeakerBadge, DurationBadge) inside card components
+- TranscriptLiveIndicator and TranscriptEndIndicator as separate components for transcript UI
+
+## Speaker component patterns
+- SpeakerColor enum wraps accent colors (sky, lavender, deep, dusk) with forIndex() cycling
+- SpeakerUnset uses border + icon chip style for unassigned speaker slots
+- SpeakerSet uses minimal dot + uppercase name for assigned speakers
+- PersonCard auto-generates initials from names (first + last initial)
+- SpeakerPickerModal uses generic content builder for flexible section composition
+- SpeakerPickerSectionLabel provides uppercase tracking section headers
+
+## SQLite FTS5 full-text search
+- FTS5 virtual tables: `CREATE VIRTUAL TABLE x USING fts5(col1, col2 UNINDEXED, ...)`
+- UNINDEXED columns stored but not searchable (useful for foreign keys like sessionId)
+- Use triggers (AFTER INSERT/UPDATE/DELETE) to keep FTS in sync with source table
+- Can't use external content table when column names differ (use regular FTS table + triggers)
+- bm25() function only works directly in FTS queries, not with GROUP BY aggregates
+- Alternative: count matches per session with `COUNT(*) ... GROUP BY sessionId ORDER BY matchCount DESC`
+- FTS5 MATCH syntax: `WHERE table MATCH 'query'`
+
+## Actors for deterministic test audio generation
+- Use actors (not classes with NSLock) for thread-safe async state management
+- NSLock is unavailable from async contexts in Swift 6 - avoid lock/unlock in async methods
+- Actor properties can be read directly within actor-isolated methods without locks
+- `[weak self]` in Task closures with actors prevents retain cycles
+- AsyncStream.makeStream() for immediate continuation access within actors
+
+## XCUITest with TCA and dependency injection
+- XcodeGen UI test targets use `type: bundle.ui-testing` (not `bundle.unit-test`)
+- Set `TEST_TARGET_NAME: Vapor` instead of `TEST_HOST` for UI tests (no bundle injection)
+- Use `AppEnvironment` with launch arguments (`-uiTesting`) for environment detection
+- `withDependencies { } operation: { }` wraps Store creation to inject mocks
+- XCUITest launches app as separate process - Store init determines dependencies
+- Launch args passed via `app.launchArguments = ["-uiTesting"]` in setUp()
+- Tab buttons verified with `app.tabBars.buttons["Timeline"].isSelected`
+- Navigation bars verified with `app.navigationBars["Title"].waitForExistence(timeout:)`
+
+## Dependency client wrapping actors
+- Create `live()` factory method alongside `liveValue` for test flexibility
+- `liveValue` can call `live()` to provide single shared instance for production
+- Tests call `live()` inside `withDependencies { } operation: { }` block for fresh isolated instance
+- Actors with @Dependency properties inherit dependencies from context when created
+- Client closures capture the actor and delegate to its methods
+
+## TCA TestStore with Swift Testing
+- TestStore closure `await store.send(.action) { }` requires state changes - omit closure if no state change expected
+- Use `store.receive(\.action) { }` with key path to action case for expected received actions
+- `@Dependency(\.date)` uses `DateGenerator` which provides `.now` accessor
+- Capture dependencies with `[date]` in closures to use them in async effects
+- `.run { send in }` for async effects; `catch: { error, send in }` for error handling
+
+## XcodeGen dependencies for TCA features
+- Features using `@Dependency` need explicit `swift-dependencies` package dependency in project.yml
+- Add `Dependencies` product to feature target dependencies when using `@Dependency` macro
+- Linker errors like "Undefined symbol: Dependencies.Dependency" indicate missing dependency
+
+## TCA RecordingFeature patterns
+- Use TestClock from swift-clocks for deterministic timer tests
+- AsyncStream with controllable continuation (`eventContinuation.yield()`) for testing processor events
+- When stopRecording cancels effects, don't cancel the event stream effect - let processor emit `.didFinish` naturally
+- XcodeGen features using `ContinuousClock` need `swift-clocks` Clocks product dependency
+
+## TCA Feature Views with DesignSystem
+- Create both interactive View (with Store) and Preview variant (static data) for snapshot testing
+- TimelineViewPreview takes static sections/sessions data instead of Store for deterministic snapshots
+- Use `@Bindable` for store in views that need to send state changes via `$store.property.sending(\.action)`
+- DateBucket from Persistence maps to DateHeader from DesignSystem (today, yesterday, etc.)
+- SessionRecord fields map to SessionCard props with helper functions for formatting
+- ZStack with alignment for FAB positioning at bottom of scrollable content
+
+## DesignSystem Color extension visibility
+- Color(hex:) initializer must be `public` to be used from feature modules outside DesignSystem
+- Internal initializers in DesignSystem are only accessible within that module
+- Make extension initializers public when they're needed by feature views
+
+## E2E pipeline testing with GeneratedAudioCapture
+- Use `AudioCaptureClient.generated(config:)` for deterministic audio in tests
+- AudioFileWriterClient `finishWriting` returns `Int` not `UInt64`
+- Verify mock script text against actual `MockFluidAudioScript` constants (twoSpeakerConversation, etc.)
+- Actor-based frame counters (`actor FrameCounter`) track async calls in test mocks
+
+## XcodeGen transitive dependencies with Perception
+- swift-perception package needs explicit declaration in project.yml packages section
+- AudioPlayerFeature (and similar TCA features) need `swift-dependencies` and `swift-perception` products
+- Linker error "Undefined symbol: PerceptionCore.Perceptible" means swift-perception dependency is missing
+- Clean DerivedData after adding package dependencies to resolve stale build artifacts
+
+## TCA Feature wiring to processor events with DB loading
+- RecordingFeature subscribes to processor AsyncStream events, loads segments from DB on `didAppendSegment`
+- Use `.run { send in }` effect to call DatabaseClient and emit `segmentsLoaded(segments)` action
+- Clear liveSegments array on `didFinish` and `didFail` to reset state
+- TestStore tests for segment loading need mock `databaseClient.fetchTranscriptSegments` dependency
+- Send processor events directly with `store.send(.processorEvent(...))` when testing without event stream setup
+
+## FTS search with full session records
+- `searchSessionsWithDetails` joins FTS results with sessions table for full SessionRecord objects
+- SQL: `SELECT sessions.*, COUNT(*) as matchCount FROM transcript_fts INNER JOIN sessions ON ... GROUP BY ... ORDER BY matchCount DESC`
+- GRDB's `SessionRecord.fetchAll(db, sql: sql, arguments:)` works with raw SQL that returns session columns
+- When changing return types in DatabaseClient (e.g., `[SessionSearchResult]` → `[SessionRecord]`), update all test files that construct the client
+
+## TCA conditional view content
+- Use `@ViewBuilder` and `if/else` for conditional view content based on state (e.g., `isSearching`)
+- `VaporTextStyle.body` for typography - use `.vaporTextStyle(.body)` modifier instead of `.font()`
+- Empty state views: center text with `.frame(maxWidth: .infinity)` and appropriate padding
+
+## TCA presentation (fullScreenCover) with @Presents
+- Use `@Presents` property wrapper in State for optional child feature state
+- `$store.scope(state: \.childFeature, action: \.childFeature)` creates binding for fullScreenCover item
+- Use `PresentationAction<ChildFeature.Action>` for presentation-wrapped actions
+- `.ifLet(\.$childFeature, action: \.childFeature) { ChildFeature() }` in reducer body to scope child reducer
+- Parent reducer intercepts child actions like `.childFeature(.presented(.someAction))` for coordination
+
+## XCUITest accessibility identifiers
+- Add `.accessibilityIdentifier("buttonName")` to interactive elements for XCUITest
+- Query elements with `app.buttons["accessibilityIdentifier"]`
+- Predicate queries: `app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'x'"))`
+- Use `waitForExistence(timeout:)` for async UI appearance, not sleeps
+- Tab bar buttons: `app.tabBars.buttons["TabName"].isSelected`
+
+## Package version constraints with TCA + swift-perception
+- TCA macros require swift-syntax 602.0.0+ for `GenericArgumentSyntax.Argument`
+- swift-perception versions < 2.0 constrain swift-syntax to < 602.0.0, causing build failures
+- Update project.yml `from:` constraints to require compatible versions (e.g., swift-perception from "2.0.0")
+- Clean DerivedData/SourcePackages when changing version constraints to avoid stale artifacts
+- Keep Package.resolved in sync with actually resolved versions for reproducible builds
+
+## FluidAudio SDK integration
+- FluidAudio package is at https://github.com/FluidInference/FluidAudio (v0.10.0, not 1.x yet)
+- AsrModels.downloadAndLoad(version: .v3) downloads and initializes ASR models
+- DiarizerModels.downloadIfNeeded() downloads diarization models if not cached
+- DiarizerManager.initialize(models:) takes consuming parameter (must be passed directly)
+- ASRConfig.default and DiarizerConfig.default for default ML configurations
+- AsrManager.transcribe([Float], source: .microphone) for transcription
+- DiarizerManager.performCompleteDiarization([Float], sampleRate:, atTime:) for speaker diarization
+- DiarizationResult.segments contains TimedSpeakerSegment with speakerId, startTimeSeconds, endTimeSeconds
+- Audio input must be 16kHz mono Float samples
+- Models are downloaded to ~/Library/Application Support/FluidAudio/Models/
+- Lazy initialization pattern: ensureInitialized() method in actor to initialize on first use
+
+## Testing FluidAudio integration logic
+- Extract testable utilities to separate files (e.g., DiarizationMapping.swift) to avoid FluidAudio SDK dependency in tests
+- Create plain Swift structs (SpeakerSegment) that mirror FluidAudio types for testing
+- Dominant speaker = speaker with longest total duration across all segments in a chunk
+- Display orders assigned in discovery order (first speaker seen = 1, second = 2, etc.)
+- Use `max(0, endTime - startTime)` to clamp negative durations to zero
