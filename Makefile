@@ -25,6 +25,9 @@ bootstrap:
 gen: bootstrap
 	@echo "Generating Xcode project..."
 	cd xcodegen && xcodegen generate
+	@echo "Preserving Package.resolved..."
+	@mkdir -p xcodegen/Vapor.xcodeproj/project.xcworkspace/xcshareddata/swiftpm
+	@cp xcodegen/Package.resolved xcodegen/Vapor.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 	@echo "Project generated at xcodegen/Vapor.xcodeproj"
 
 # Run tests (PR gate) - uses Swift Testing for repo layout tests

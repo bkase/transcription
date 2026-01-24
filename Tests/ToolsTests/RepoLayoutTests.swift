@@ -1,9 +1,7 @@
 import Testing
 import Foundation
 
-@Test func testExpectedDirectoriesExist() {
-    let fileManager = FileManager.default
-
+@Test func testExpectedDirectoriesExist() throws {
     let expectedDirectories = [
         // App structure
         "App/Sources",
@@ -44,25 +42,7 @@ import Foundation
         "scripts",
     ]
 
-    // Try to find the project root by looking for CLAUDE.md or .git
-    var projectRoot: URL?
-
-    // Start from current working directory and search upward
-    var searchDir = URL(fileURLWithPath: fileManager.currentDirectoryPath)
-    for _ in 0..<10 {
-        let claudeMD = searchDir.appendingPathComponent("CLAUDE.md")
-        let gitDir = searchDir.appendingPathComponent(".git")
-        if fileManager.fileExists(atPath: claudeMD.path) || isDirectory(atPath: gitDir.path) {
-            projectRoot = searchDir
-            break
-        }
-        searchDir = searchDir.deletingLastPathComponent()
-    }
-
-    guard let root = projectRoot else {
-        Issue.record("Could not find project root (looking for CLAUDE.md or .git)")
-        return
-    }
+    let root = try findProjectRoot()
 
     for dir in expectedDirectories {
         let fullPath = root.appendingPathComponent(dir)
@@ -71,9 +51,4 @@ import Foundation
             "Expected directory to exist: \(dir)"
         )
     }
-}
-
-func isDirectory(atPath path: String) -> Bool {
-    var isDir: ObjCBool = false
-    return FileManager.default.fileExists(atPath: path, isDirectory: &isDir) && isDir.boolValue
 }
