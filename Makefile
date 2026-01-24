@@ -23,6 +23,12 @@ bootstrap:
 
 # Generate Xcode project and tokens
 gen: bootstrap
+	@echo "Building tools..."
+	cd tools && swift build
+	@echo "Running TokenGen..."
+	cd tools && swift run TokenGen --input ../tokens.json --output ../Packages/Core/DesignSystem/Sources/DesignSystem/Generated/DesignTokens.swift
+	@echo "Running DocGen..."
+	cd tools && swift run DocGen --input ../Packages/Core/Persistence/Sources/Persistence --output ../docs/schema
 	@echo "Generating Xcode project..."
 	cd xcodegen && xcodegen generate
 	@echo "Preserving Package.resolved..."
