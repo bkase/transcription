@@ -68,8 +68,8 @@ test: gen
 
 # Run slow integration tests (nightly)
 test-slow: gen
-	@echo "Running slow integration tests..."
-	swift test
+	@echo "Running slow integration tests with FluidAudio ML models..."
+	RUN_SLOW_TESTS=1 swift test --filter FluidAudioIntegration
 	@echo "Slow tests complete."
 
 # Full CI pipeline
