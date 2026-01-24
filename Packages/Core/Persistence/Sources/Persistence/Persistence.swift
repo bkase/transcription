@@ -15,7 +15,7 @@ public enum ProcessingState: String, Codable, Sendable, DatabaseValueConvertible
 
 // MARK: - Database Records
 
-public struct SessionRecord: Codable, FetchableRecord, PersistableRecord, Sendable {
+public struct SessionRecord: Codable, FetchableRecord, PersistableRecord, Sendable, Equatable {
     public static let databaseTableName = "sessions"
 
     public var id: String
@@ -171,6 +171,73 @@ public struct SpeakerSegmentRecord: Codable, FetchableRecord, PersistableRecord,
     }
 }
 
+// MARK: - Search Result Types
+
+/// A search result containing a session ID and its relevance score
+public struct SessionSearchResult: Sendable, Equatable {
+    public let sessionId: SessionID
+    public let rank: Double
+
+    public init(sessionId: SessionID, rank: Double) {
+        self.sessionId = sessionId
+        self.rank = rank
+    }
+}
+
+/// Date bucket for grouping sessions in timeline
+public enum DateBucket: String, Sendable, Equatable, CaseIterable {
+    case today
+    case yesterday
+    case thisWeek
+    case lastWeek
+    case thisMonth
+    case older
+
+    /// Calculate the date bucket for a given date relative to a reference date
+    public static func bucket(for date: Date, relativeTo reference: Date, calendar: Calendar = .current) -> DateBucket {
+        // Today
+        if calendar.isDate(date, inSameDayAs: reference) {
+            return .today
+        }
+
+        // Yesterday
+        let startOfReferenceDay = calendar.startOfDay(for: reference)
+        if let yesterday = calendar.date(byAdding: .day, value: -1, to: startOfReferenceDay),
+           calendar.isDate(date, inSameDayAs: yesterday) {
+            return .yesterday
+        }
+
+        // This week (not today or yesterday)
+        if calendar.isDate(date, equalTo: reference, toGranularity: .weekOfYear) {
+            return .thisWeek
+        }
+
+        // Last week
+        if let lastWeekDate = calendar.date(byAdding: .weekOfYear, value: -1, to: reference),
+           calendar.isDate(date, equalTo: lastWeekDate, toGranularity: .weekOfYear) {
+            return .lastWeek
+        }
+
+        // This month (not in this or last week)
+        if calendar.isDate(date, equalTo: reference, toGranularity: .month) {
+            return .thisMonth
+        }
+
+        return .older
+    }
+}
+
+/// A group of sessions in a specific date bucket
+public struct SessionGroup: Sendable, Equatable {
+    public let bucket: DateBucket
+    public let sessions: [SessionRecord]
+
+    public init(bucket: DateBucket, sessions: [SessionRecord]) {
+        self.bucket = bucket
+        self.sessions = sessions
+    }
+}
+
 // MARK: - Migrations
 
 public enum AppMigrations {
@@ -248,6 +315,41 @@ public enum AppMigrations {
             try db.create(index: "idx_speaker_segments_sessionId", on: "speaker_segments", columns: ["sessionId"])
         }
 
+        migrator.registerMigration("v2_fts5_search") { db in
+            // Create FTS5 virtual table for transcript search
+            // NOT using external content table because the column mapping differs (segmentId vs id)
+            // We use triggers to keep it in sync manually
+            try db.execute(sql: """
+                CREATE VIRTUAL TABLE transcript_fts USING fts5(
+                    text,
+                    sessionId UNINDEXED,
+                    segmentId UNINDEXED
+                )
+                """)
+
+            // Triggers to keep FTS index in sync with transcript_segments
+            try db.execute(sql: """
+                CREATE TRIGGER transcript_fts_ai AFTER INSERT ON transcript_segments BEGIN
+                    INSERT INTO transcript_fts(text, sessionId, segmentId)
+                    VALUES (NEW.text, NEW.sessionId, NEW.id);
+                END
+                """)
+
+            try db.execute(sql: """
+                CREATE TRIGGER transcript_fts_ad AFTER DELETE ON transcript_segments BEGIN
+                    DELETE FROM transcript_fts WHERE segmentId = OLD.id;
+                END
+                """)
+
+            try db.execute(sql: """
+                CREATE TRIGGER transcript_fts_au AFTER UPDATE ON transcript_segments BEGIN
+                    DELETE FROM transcript_fts WHERE segmentId = OLD.id;
+                    INSERT INTO transcript_fts(text, sessionId, segmentId)
+                    VALUES (NEW.text, NEW.sessionId, NEW.id);
+                END
+                """)
+        }
+
         return migrator
     }
 }
@@ -308,6 +410,10 @@ public struct DatabaseClient: Sendable {
 
     public var fetchSpeakerSegments: @Sendable (_ sessionId: SessionID) async throws -> [SpeakerSegmentRecord] = { _ in [] }
     public var createSpeakerSegment: @Sendable (_ record: SpeakerSegmentRecord) async throws -> Void
+
+    // Search
+    public var searchSessions: @Sendable (_ query: String) async throws -> [SessionSearchResult] = { _ in [] }
+    public var fetchSessionsGroupedByDate: @Sendable (_ referenceDate: Date) async throws -> [SessionGroup] = { _ in [] }
 }
 
 extension DatabaseClient: DependencyKey {
@@ -410,6 +516,47 @@ extension DatabaseClient: DependencyKey {
             createSpeakerSegment: { record in
                 try await dbQueue.write { db in
                     try record.insert(db)
+                }
+            },
+            searchSessions: { query in
+                try await dbQueue.read { db in
+                    // FTS5 search returns ranked session IDs
+                    // Using rank column from FTS5 match (lower rank = more relevant)
+                    // We join with sessions to get proper ordering and aggregate matches per session
+                    let sql = """
+                        SELECT sessionId, COUNT(*) as matchCount
+                        FROM transcript_fts
+                        WHERE transcript_fts MATCH ?
+                        GROUP BY sessionId
+                        ORDER BY matchCount DESC
+                        """
+                    let rows = try Row.fetchAll(db, sql: sql, arguments: [query])
+                    return rows.map { row in
+                        SessionSearchResult(
+                            sessionId: SessionID(row["sessionId"] as String),
+                            rank: Double(row["matchCount"] as Int64)
+                        )
+                    }
+                }
+            },
+            fetchSessionsGroupedByDate: { referenceDate in
+                try await dbQueue.read { db in
+                    let sessions = try SessionRecord
+                        .order(Column("startedAt").desc)
+                        .fetchAll(db)
+
+                    // Group sessions by date bucket
+                    var groups: [DateBucket: [SessionRecord]] = [:]
+                    for session in sessions {
+                        let bucket = DateBucket.bucket(for: session.startedAt, relativeTo: referenceDate)
+                        groups[bucket, default: []].append(session)
+                    }
+
+                    // Return in order of DateBucket.allCases (today first, older last)
+                    return DateBucket.allCases.compactMap { bucket in
+                        guard let sessions = groups[bucket], !sessions.isEmpty else { return nil }
+                        return SessionGroup(bucket: bucket, sessions: sessions)
+                    }
                 }
             }
         )

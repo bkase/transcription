@@ -35,7 +35,9 @@ import Dependencies
             createTranscriptSegment: { _ in },
             updateTranscriptSegment: { _ in },
             fetchSpeakerSegments: { _ in [] },
-            createSpeakerSegment: { _ in }
+            createSpeakerSegment: { _ in },
+            searchSessions: { _ in [] },
+            fetchSessionsGroupedByDate: { _ in [] }
         )
         deps.audioCaptureClient = AudioCaptureClient(
             startCapture: { AsyncStream { _ in } },
