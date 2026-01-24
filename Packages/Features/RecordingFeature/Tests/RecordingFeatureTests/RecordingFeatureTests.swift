@@ -2,6 +2,7 @@ import Testing
 import Foundation
 import ComposableArchitecture
 import Models
+import Persistence
 @testable import RecordingFeature
 @testable import Processing
 
@@ -216,10 +217,10 @@ struct RecordingFeatureTests {
         await store.send(.stopRecording)
     }
 
-    // MARK: - testSegmentAppendDoesNotChangeState
+    // MARK: - testSegmentAppendLoadsFromDB
 
     @Test
-    func testSegmentAppendDoesNotChangeState() async {
+    func testSegmentAppendLoadsFromDB() async {
         let audioDirectory = FileManager.default.temporaryDirectory
         let mockSessionID = SessionID("test-session-seg")
         let mockSegmentID = TranscriptSegmentID("segment-001")
@@ -237,6 +238,22 @@ struct RecordingFeatureTests {
             $0.continuousClock = clock
             $0.recordingProcessorClient.startRecording = { _ in eventStream }
             $0.recordingProcessorClient.stopRecording = { }
+            $0.databaseClient.fetchTranscriptSegments = { _ in
+                [
+                    TranscriptSegmentRecord(
+                        id: mockSegmentID.rawValue,
+                        sessionId: mockSessionID.rawValue,
+                        startMs: 0,
+                        endMs: 1500,
+                        machineSpeakerId: "speaker_0",
+                        text: "Test segment text",
+                        confidence: 0.9,
+                        isFinal: true,
+                        createdAt: Date(),
+                        updatedAt: Date()
+                    )
+                ]
+            }
         }
 
         // Start recording
@@ -250,9 +267,23 @@ struct RecordingFeatureTests {
             $0.sessionID = mockSessionID
         }
 
-        // Segment append - no state change (segments read from DB)
+        // Segment append - triggers DB fetch and loads segments
         eventContinuation?.yield(.didAppendSegment(mockSegmentID))
         await store.receive(\.processorEvent)
+
+        // Should receive segmentsLoaded with segment from DB
+        await store.receive(\.segmentsLoaded) {
+            $0.liveSegments = [
+                LiveSegment(
+                    id: mockSegmentID,
+                    machineSpeakerId: "speaker_0",
+                    startMs: 0,
+                    endMs: 1500,
+                    text: "Test segment text",
+                    isFinal: true
+                )
+            ]
+        }
 
         // Clean up
         eventContinuation?.finish()

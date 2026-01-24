@@ -53,27 +53,41 @@ public struct RecordingView: View {
 
     // MARK: - Content Area
 
+    @ViewBuilder
     private var contentArea: some View {
-        VStack {
-            Spacer()
-
-            if store.isListening {
-                listeningIndicator
-            } else if store.isRecording {
-                // Recording in progress, waiting for audio...
-                Text("Starting...")
-                    .font(.system(size: 24, weight: .thin))
-                    .tracking(1)
-                    .foregroundColor(VaporColor.textTertiary)
-            } else if let error = store.error {
-                // Error state
+        if let error = store.error {
+            // Error state
+            VStack {
+                Spacer()
                 Text(error)
                     .font(.system(size: 16, weight: .regular))
                     .foregroundColor(VaporColor.recording)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, VaporSpacing.xl)
+                Spacer()
             }
-
+        } else if !store.liveSegments.isEmpty {
+            // Live transcript segments
+            liveTranscriptView
+        } else if store.isListening {
+            // Listening but no segments yet
+            VStack {
+                Spacer()
+                listeningIndicator
+                Spacer()
+            }
+        } else if store.isRecording {
+            // Recording in progress, waiting for audio...
+            VStack {
+                Spacer()
+                Text("Starting...")
+                    .font(.system(size: 24, weight: .thin))
+                    .tracking(1)
+                    .foregroundColor(VaporColor.textTertiary)
+                Spacer()
+            }
+        } else {
+            // Idle state
             Spacer()
         }
     }
@@ -83,6 +97,60 @@ public struct RecordingView: View {
             .font(.system(size: 24, weight: .thin))
             .tracking(1)
             .foregroundColor(VaporColor.textTertiary)
+    }
+
+    private var liveTranscriptView: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: VaporSpacing.lg) {
+                    ForEach(store.liveSegments, id: \.id) { segment in
+                        TranscriptSegment(
+                            speaker: speakerType(for: segment),
+                            timestamp: formatTimestamp(segment.startMs),
+                            text: segment.text
+                        )
+                        .id(segment.id)
+                    }
+
+                    // Show listening indicator at the end when recording
+                    if store.isListening {
+                        TranscriptLiveIndicator()
+                            .id("live-indicator")
+                    }
+                }
+                .padding(.horizontal, VaporSpacing.lg)
+                .padding(.top, VaporSpacing.md)
+            }
+            .onChange(of: store.liveSegments.count) { _, _ in
+                // Auto-scroll to bottom when new segments arrive
+                if let lastSegment = store.liveSegments.last {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        proxy.scrollTo(lastSegment.id, anchor: .bottom)
+                    }
+                }
+            }
+        }
+    }
+
+    private func speakerType(for segment: LiveSegment) -> SpeakerType {
+        // Map machine speaker ID to a SpeakerType
+        // For now, alternate between user and guest based on speaker ID
+        // In a full implementation, this would look up the assigned person
+        guard let speakerId = segment.machineSpeakerId else {
+            return .guest
+        }
+        // Simple hashing to assign colors consistently
+        let hash = speakerId.hashValue
+        let colors: [Color] = [VaporColor.sky, VaporColor.lavender, VaporColor.dusk, VaporColor.deep]
+        let color = colors[abs(hash) % colors.count]
+        return .speaker(name: "Speaker \(abs(hash) % 10)", color: color)
+    }
+
+    private func formatTimestamp(_ ms: Int) -> String {
+        let totalSeconds = ms / 1000
+        let minutes = totalSeconds / 60
+        let seconds = totalSeconds % 60
+        return String(format: "%02d:%02d", minutes, seconds)
     }
 
     // MARK: - Controls Bar
