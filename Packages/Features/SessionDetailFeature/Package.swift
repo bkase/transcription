@@ -13,6 +13,7 @@ let package = Package(
         .package(path: "../../Core/Persistence"),
         .package(path: "../../Core/DesignSystem"),
         .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.0.0"),
+        .package(url: "https://github.com/pointfreeco/swift-tagged", from: "0.10.0"),
     ],
     targets: [
         .target(
@@ -22,11 +23,15 @@ let package = Package(
                 "Persistence",
                 "DesignSystem",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+                .product(name: "Tagged", package: "swift-tagged"),
             ]
         ),
         .testTarget(
             name: "SessionDetailFeatureTests",
-            dependencies: ["SessionDetailFeature"]
+            dependencies: [
+                "SessionDetailFeature",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+            ]
         ),
     ]
 )

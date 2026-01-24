@@ -52,6 +52,8 @@ test: gen
 	cd Packages/Features/TimelineFeature && swift test
 	@echo "Running RecordingFeature package tests..."
 	cd Packages/Features/RecordingFeature && swift test
+	@echo "Running SessionDetailFeature package tests..."
+	cd Packages/Features/SessionDetailFeature && swift test
 	@echo "Running XCode tests..."
 	xcodebuild -project xcodegen/Vapor.xcodeproj -scheme Vapor \
 		-destination "id=A76B56DB-DEA2-4933-8C81-7A0EF009AC11" \
