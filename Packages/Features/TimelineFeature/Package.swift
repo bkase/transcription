@@ -26,7 +26,10 @@ let package = Package(
         ),
         .testTarget(
             name: "TimelineFeatureTests",
-            dependencies: ["TimelineFeature"]
+            dependencies: [
+                "TimelineFeature",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+            ]
         ),
     ]
 )

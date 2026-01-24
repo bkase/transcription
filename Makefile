@@ -48,6 +48,8 @@ test: gen
 	cd Packages/Core/Audio && swift test
 	@echo "Running Processing package tests..."
 	cd Packages/Core/Processing && swift test
+	@echo "Running TimelineFeature package tests..."
+	cd Packages/Features/TimelineFeature && swift test
 	@echo "Running XCode tests..."
 	xcodebuild -project xcodegen/Vapor.xcodeproj -scheme Vapor \
 		-destination "id=A76B56DB-DEA2-4933-8C81-7A0EF009AC11" \
