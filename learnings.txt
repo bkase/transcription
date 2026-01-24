@@ -319,3 +319,27 @@
 - FTS5 tables: `CREATE VIRTUAL TABLE ... USING fts5(col, colUNINDEXED)` in SQL strings
 - Triggers follow pattern: `CREATE TRIGGER name AFTER INSERT/UPDATE/DELETE ON table`
 - Generate markdown tables with column metadata: type, constraints, defaults, references
+
+## TCA Feature with parallel DB loading
+- Use `async let` for parallel database queries: `async let sessionTask = client.fetchSession(id)`
+- Map DB records to view models in reducer's `.run` effect before sending to state
+- Create lookup dictionaries for joins: `Dictionary(uniqueKeysWithValues: people.map { ($0.id, $0.name) })`
+- XcodeGen project.yml needs explicit `swift-dependencies` product for features using `@Dependency`
+- When testing error cases, mock all called methods even if they won't execute (avoid "unimplemented" failures)
+
+## TCA Feature View patterns
+- Create both interactive View (with Store) and Preview variant (static data) for deterministic snapshots
+- SessionDetailViewPreview takes static SegmentData instead of Store for snapshot testing
+- Use DesignSystem components (TranscriptSegment, AudioPlayer, NavButton) to compose feature views
+- SpeakerType maps to display: .user, .guest, or .speaker(name:, color:) with color from SpeakerColor.forIndex()
+- ZStack with alignment: .bottom for floating components like AudioPlayer over scrollable content
+- ForEach with Identifiable SegmentData struct for transcript list rendering
+
+## TCA Child Feature composition
+- Use `.ifLet(\.childState, action: \.childAction) { ChildFeature() }` to compose optional child features
+- Add child state as optional property in parent: `public var audioPlayer: AudioPlayerFeature.State?`
+- Add child action case in parent: `case audioPlayer(AudioPlayerFeature.Action)`
+- Initialize child state when loading data: set in `sessionLoaded` action handler
+- Parent reducer returns `.none` for child actions - handled by `.ifLet` scope
+- XcodeGen project.yml and SPM Package.swift both need child feature dependencies
+- Tests for parent must update expected state to include child state initialization
