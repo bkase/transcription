@@ -12,6 +12,7 @@ let package = Package(
         .package(path: "Packages/Core/Audio"),
         .package(path: "Packages/Core/Processing"),
         .package(path: "Packages/Core/Export"),
+        .package(path: "Packages/TestsSupport"),
         .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.0.0"),
     ],
     targets: [
@@ -26,6 +27,7 @@ let package = Package(
                 "Audio",
                 "Processing",
                 "Export",
+                "TestsSupport",
                 .product(name: "Dependencies", package: "swift-dependencies"),
             ],
             path: "Tests/CoreTests"

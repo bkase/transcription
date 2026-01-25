@@ -10,6 +10,9 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../Core/Models"),
+        .package(path: "../Core/Persistence"),
+        .package(path: "../Core/Audio"),
+        .package(path: "../Core/Processing"),
         .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", from: "1.15.0"),
         .package(url: "https://github.com/pointfreeco/swift-gen", from: "0.4.0"),
     ],
@@ -18,6 +21,9 @@ let package = Package(
             name: "TestsSupport",
             dependencies: [
                 "Models",
+                "Persistence",
+                "Audio",
+                "Processing",
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
                 .product(name: "Gen", package: "swift-gen"),
             ]

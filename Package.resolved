@@ -1,5 +1,5 @@
 {
-  "originHash" : "b36058911ef058aed775719049ea481bc8542ab13643684c306ad737f33c84e6",
+  "originHash" : "50eeda663c0845250ad4a70f8f620eb2960ca4522c3794a04c271780d79e1591",
   "pins" : [
     {
       "identity" : "combine-schedulers",
@@ -47,12 +47,39 @@
       }
     },
     {
+      "identity" : "swift-custom-dump",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/pointfreeco/swift-custom-dump",
+      "state" : {
+        "revision" : "93a8aa4937030b606de42f44b17870249f49af0b",
+        "version" : "1.3.4"
+      }
+    },
+    {
       "identity" : "swift-dependencies",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/pointfreeco/swift-dependencies",
       "state" : {
         "revision" : "411297072220a96f1501211afebd3715316907d2",
         "version" : "1.10.1"
+      }
+    },
+    {
+      "identity" : "swift-gen",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/pointfreeco/swift-gen",
+      "state" : {
+        "revision" : "f2e186a188cb7a4dfb0e122ede34b147e6c0ce17",
+        "version" : "0.5.0"
+      }
+    },
+    {
+      "identity" : "swift-snapshot-testing",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/pointfreeco/swift-snapshot-testing",
+      "state" : {
+        "revision" : "a8b7c5e0ed33d8ab8887d1654d9b59f2cbad529b",
+        "version" : "1.18.7"
       }
     },
     {
@@ -80,6 +107,15 @@
       "state" : {
         "revision" : "34e463e98ab8541c604af706c99bed7160f5ec70",
         "version" : "1.8.1"
+      }
+    },
+    {
+      "identity" : "zipfoundation",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/weichsel/ZIPFoundation",
+      "state" : {
+        "revision" : "22787ffb59de99e5dc1fbfe80b19c97a904ad48d",
+        "version" : "0.9.20"
       }
     }
   ],

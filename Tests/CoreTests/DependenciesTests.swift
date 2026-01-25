@@ -39,7 +39,9 @@ import Dependencies
             searchSessions: { _ in [] },
             searchSessionsWithDetails: { _ in [] },
             fetchSessionsGroupedByDate: { _ in [] },
-            fetchPersonConversationCounts: { [:] }
+            fetchPersonConversationCounts: { [:] },
+            fetchStaleRecordings: { [] },
+            reconcileStaleRecordings: { _, _ in 0 }
         )
         deps.audioCaptureClient = AudioCaptureClient(
             startCapture: { AsyncStream { _ in } },
