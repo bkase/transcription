@@ -58,6 +58,8 @@ test: gen
 	cd Packages/Features/AudioPlayerFeature && swift test
 	@echo "Running PeopleFeature package tests..."
 	cd Packages/Features/PeopleFeature && swift test
+	@echo "Running SpeakerPickerFeature package tests..."
+	cd Packages/Features/SpeakerPickerFeature && swift test
 	@echo "Running XCode tests..."
 	xcodebuild -project xcodegen/Vapor.xcodeproj -scheme Vapor \
 		-destination "id=A76B56DB-DEA2-4933-8C81-7A0EF009AC11" \
