@@ -399,3 +399,153 @@ extension DependencyValues {
         set { self[FileClient.self] = newValue }
     }
 }
+
+// MARK: - Markdown Writer
+
+/// Generates human-readable Markdown from an ExportTranscript
+public enum MarkdownWriter {
+    /// Generate Markdown representation of the transcript
+    public static func write(_ transcript: ExportTranscript) -> String {
+        var output = ""
+
+        // Title
+        let title = transcript.session.title ?? "Transcript"
+        output += "# \(title)\n\n"
+
+        // Session metadata
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .long
+        dateFormatter.timeStyle = .short
+        let formattedDate = dateFormatter.string(from: transcript.session.startedAt)
+        output += "**Date:** \(formattedDate)\n"
+
+        if let durationMs = transcript.session.durationMs {
+            let durationFormatted = formatDuration(milliseconds: durationMs)
+            output += "**Duration:** \(durationFormatted)\n"
+        }
+
+        if transcript.session.speakerCount > 0 {
+            output += "**Speakers:** \(transcript.session.speakerCount)\n"
+        }
+
+        output += "\n---\n\n"
+
+        // Build speaker lookup
+        let speakerLookup = buildSpeakerLookup(transcript)
+
+        // Transcript segments
+        for segment in transcript.segments {
+            let speakerName = resolveSpeakerName(segment.speakerId, lookup: speakerLookup)
+            let timestamp = formatTimestamp(milliseconds: segment.startMs)
+
+            output += "**\(speakerName)** (\(timestamp))\n"
+            output += "\(segment.text)\n\n"
+        }
+
+        return output
+    }
+
+    /// Build a lookup from machine speaker ID to display name
+    private static func buildSpeakerLookup(_ transcript: ExportTranscript) -> [String: String] {
+        var lookup: [String: String] = [:]
+        let peopleLookup = Dictionary(uniqueKeysWithValues: transcript.people.map { ($0.id, $0.name) })
+
+        for track in transcript.speakerTracks {
+            if let personId = track.personId, let name = peopleLookup[personId] {
+                lookup[track.speakerId] = name
+            } else {
+                lookup[track.speakerId] = "Speaker \(track.displayOrder)"
+            }
+        }
+
+        return lookup
+    }
+
+    /// Resolve speaker ID to display name
+    private static func resolveSpeakerName(_ speakerId: String?, lookup: [String: String]) -> String {
+        guard let id = speakerId else { return "Unknown" }
+        return lookup[id] ?? "Unknown"
+    }
+
+    /// Format milliseconds as HH:MM:SS or MM:SS
+    private static func formatDuration(milliseconds: Int) -> String {
+        let totalSeconds = milliseconds / 1000
+        let hours = totalSeconds / 3600
+        let minutes = (totalSeconds % 3600) / 60
+        let seconds = totalSeconds % 60
+
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, seconds)
+        } else {
+            return String(format: "%d:%02d", minutes, seconds)
+        }
+    }
+
+    /// Format milliseconds as MM:SS for timestamps
+    private static func formatTimestamp(milliseconds: Int) -> String {
+        let totalSeconds = milliseconds / 1000
+        let minutes = totalSeconds / 60
+        let seconds = totalSeconds % 60
+        return String(format: "%02d:%02d", minutes, seconds)
+    }
+}
+
+// MARK: - VTT Writer
+
+/// Generates WebVTT captions from an ExportTranscript
+public enum VttWriter {
+    /// Generate VTT representation of the transcript
+    public static func write(_ transcript: ExportTranscript) -> String {
+        var output = "WEBVTT\n\n"
+
+        // Build speaker lookup
+        let speakerLookup = buildSpeakerLookup(transcript)
+
+        // Write each segment as a cue
+        for (index, segment) in transcript.segments.enumerated() {
+            let cueNumber = index + 1
+            let startTime = formatVttTimestamp(milliseconds: segment.startMs)
+            let endTime = formatVttTimestamp(milliseconds: segment.endMs)
+            let speakerName = resolveSpeakerName(segment.speakerId, lookup: speakerLookup)
+
+            output += "\(cueNumber)\n"
+            output += "\(startTime) --> \(endTime)\n"
+            output += "<v \(speakerName)>\(segment.text)\n\n"
+        }
+
+        return output
+    }
+
+    /// Build a lookup from machine speaker ID to display name
+    private static func buildSpeakerLookup(_ transcript: ExportTranscript) -> [String: String] {
+        var lookup: [String: String] = [:]
+        let peopleLookup = Dictionary(uniqueKeysWithValues: transcript.people.map { ($0.id, $0.name) })
+
+        for track in transcript.speakerTracks {
+            if let personId = track.personId, let name = peopleLookup[personId] {
+                lookup[track.speakerId] = name
+            } else {
+                lookup[track.speakerId] = "Speaker \(track.displayOrder)"
+            }
+        }
+
+        return lookup
+    }
+
+    /// Resolve speaker ID to display name
+    private static func resolveSpeakerName(_ speakerId: String?, lookup: [String: String]) -> String {
+        guard let id = speakerId else { return "Unknown" }
+        return lookup[id] ?? "Unknown"
+    }
+
+    /// Format milliseconds as VTT timestamp (HH:MM:SS.mmm)
+    private static func formatVttTimestamp(milliseconds: Int) -> String {
+        let ms = milliseconds % 1000
+        let totalSeconds = milliseconds / 1000
+        let seconds = totalSeconds % 60
+        let minutes = (totalSeconds / 60) % 60
+        let hours = totalSeconds / 3600
+
+        return String(format: "%02d:%02d:%02d.%03d", hours, minutes, seconds, ms)
+    }
+}
