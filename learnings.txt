@@ -475,3 +475,11 @@
 - NSFileCoordinator with `.forUploading` creates nested folder structure - avoid for flat exports
 - FileManager.unzipItem(at:to:) from ZIPFoundation for extraction in tests
 - Bundle contents: transcript.json, transcript.md, transcript.vtt, metadata.json, optional audio.caf
+
+## LoggingClient patterns
+- Use @DependencyClient macro for structured logging clients
+- TraceID type wraps UUID string for trace context propagation
+- LogEntry struct holds level, message, traceId, sessionId, event, latencyMs, metadata
+- Use actor (TraceContext) for thread-safe trace state management in live client
+- Convenience methods (debug/info/warning/error) auto-inject current trace ID from context
+- Tests should use actors for mock state to satisfy Sendable closures in Swift 6
