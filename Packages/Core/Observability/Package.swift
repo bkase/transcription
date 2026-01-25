@@ -8,9 +8,17 @@ let package = Package(
     products: [
         .library(name: "Observability", targets: ["Observability"]),
     ],
-    dependencies: [],
+    dependencies: [
+        .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.0.0"),
+    ],
     targets: [
-        .target(name: "Observability"),
+        .target(
+            name: "Observability",
+            dependencies: [
+                .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "DependenciesMacros", package: "swift-dependencies"),
+            ]
+        ),
         .testTarget(
             name: "ObservabilityTests",
             dependencies: ["Observability"]

@@ -71,6 +71,7 @@ def run_spm_tests(env: dict[str, str]) -> TestResult:
     packages = [
         "Packages/Core/Models", "Packages/Core/Persistence", "Packages/Core/Audio",
         "Packages/Core/Export", "Packages/Core/Routing", "Packages/Core/DesignSystem",
+        "Packages/Core/Observability",
         "Packages/Features/TimelineFeature", "Packages/Features/RecordingFeature",
         "Packages/Features/SessionDetailFeature", "Packages/Features/AudioPlayerFeature",
         "Packages/Features/PeopleFeature", "Packages/Features/SpeakerPickerFeature",

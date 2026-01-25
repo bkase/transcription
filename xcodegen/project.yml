@@ -219,6 +219,11 @@ targets:
     platform: iOS
     sources:
       - path: ../Packages/Core/Observability/Sources/Observability
+    dependencies:
+      - package: swift-dependencies
+        product: Dependencies
+      - package: swift-dependencies
+        product: DependenciesMacros
     settings:
       base:
         PRODUCT_NAME: Observability

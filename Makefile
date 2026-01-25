@@ -57,7 +57,7 @@ test:
 	@uv run scripts/run-tests.py
 
 # Internal target for parallel package testing
-_test-packages: _test-models _test-persistence _test-audio _test-export _test-routing _test-designsystem \
+_test-packages: _test-models _test-persistence _test-audio _test-export _test-routing _test-designsystem _test-observability \
                 _test-timeline _test-recording _test-sessiondetail _test-audioplayer _test-people _test-speakerpicker
 
 _test-models:
@@ -77,6 +77,9 @@ _test-routing:
 
 _test-designsystem:
 	@cd Packages/Core/DesignSystem && swift test --quiet 2>&1 | tail -5
+
+_test-observability:
+	@cd Packages/Core/Observability && swift test --quiet 2>&1 | tail -5
 
 _test-timeline:
 	@cd Packages/Features/TimelineFeature && swift test --quiet 2>&1 | tail -5
