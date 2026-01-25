@@ -2,6 +2,8 @@ import SwiftUI
 import ComposableArchitecture
 import TimelineFeature
 import RecordingFeature
+import SessionDetailFeature
+import PeopleFeature
 import Dependencies
 import Audio
 import Processing
@@ -59,11 +61,30 @@ struct AppView: View {
                 get: { store.currentTab },
                 set: { store.send(.tabSelected($0)) }
             )) {
-                TimelineView(store: store.scope(state: \.timeline, action: \.timeline))
-                    .tabItem {
-                        Label("Timeline", systemImage: "list.bullet")
+                // Timeline tab with NavigationStack
+                NavigationStack(
+                    path: $store.scope(state: \.path, action: \.path)
+                ) {
+                    TimelineView(store: store.scope(state: \.timeline, action: \.timeline))
+                        .navigationBarHidden(true)
+                } destination: { store in
+                    switch store.case {
+                    case let .sessionDetail(sessionDetailStore):
+                        SessionDetailView(store: sessionDetailStore)
+                            .navigationBarHidden(true)
                     }
-                    .tag(AppFeature.Tab.timeline)
+                }
+                .tabItem {
+                    Label("Timeline", systemImage: "list.bullet")
+                }
+                .tag(AppFeature.Tab.timeline)
+
+                // People tab
+                PeopleView(store: store.scope(state: \.people, action: \.people))
+                    .tabItem {
+                        Label("People", systemImage: "person.2")
+                    }
+                    .tag(AppFeature.Tab.people)
             }
             .onAppear {
                 store.send(.onAppear)

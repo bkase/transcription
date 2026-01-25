@@ -4,6 +4,7 @@ import TimelineFeature
 import RecordingFeature
 import SessionDetailFeature
 import PeopleFeature
+import Models
 
 // MARK: - AppFeature
 
@@ -11,19 +12,32 @@ import PeopleFeature
 public struct AppFeature {
     public init() {}
 
+    // MARK: - Path (Navigation Stack)
+
+    @Reducer(state: .equatable, action: .equatable)
+    public enum Path {
+        case sessionDetail(SessionDetailFeature)
+    }
+
     @ObservableState
     public struct State: Equatable {
         public var currentTab: Tab = .timeline
+        public var path: StackState<Path.State> = StackState()
         public var timeline: TimelineFeature.State
+        public var people: PeopleFeature.State
         @Presents public var recording: RecordingFeature.State?
 
         public init(
             currentTab: Tab = .timeline,
+            path: StackState<Path.State> = StackState(),
             timeline: TimelineFeature.State = .init(),
+            people: PeopleFeature.State = .init(),
             recording: RecordingFeature.State? = nil
         ) {
             self.currentTab = currentTab
+            self.path = path
             self.timeline = timeline
+            self.people = people
             self.recording = recording
         }
     }
@@ -36,7 +50,9 @@ public struct AppFeature {
     public enum Action: Equatable {
         case onAppear
         case tabSelected(Tab)
+        case path(StackAction<Path.State, Path.Action>)
         case timeline(TimelineFeature.Action)
+        case people(PeopleFeature.Action)
         case recording(PresentationAction<RecordingFeature.Action>)
         case dismissRecording
     }
@@ -46,6 +62,10 @@ public struct AppFeature {
             TimelineFeature()
         }
 
+        Scope(state: \.people, action: \.people) {
+            PeopleFeature()
+        }
+
         Reduce { state, action in
             switch action {
             case .onAppear:
@@ -53,6 +73,24 @@ public struct AppFeature {
 
             case let .tabSelected(tab):
                 state.currentTab = tab
+                return .none
+
+            // MARK: - Navigation Stack Actions
+
+            case .path(.element(id: _, action: .sessionDetail(.backTapped))):
+                // Pop the navigation stack when back is tapped
+                _ = state.path.popLast()
+                return .none
+
+            case .path:
+                // Other path actions are handled by forEach below
+                return .none
+
+            // MARK: - Timeline Actions
+
+            case let .timeline(.sessionTapped(sessionID)):
+                // Push session detail onto navigation stack
+                state.path.append(.sessionDetail(SessionDetailFeature.State(sessionID: sessionID)))
                 return .none
 
             case .timeline(.newRecordingTapped):
@@ -67,6 +105,13 @@ public struct AppFeature {
 
             case .timeline:
                 return .none
+
+            // MARK: - People Actions
+
+            case .people:
+                return .none
+
+            // MARK: - Recording Actions
 
             case .recording(.presented(.processorEvent(.didFinish))):
                 // Recording finished - dismiss and reload timeline
@@ -99,6 +144,7 @@ public struct AppFeature {
                 return .send(.timeline(.loadSessions))
             }
         }
+        .forEach(\.path, action: \.path)
         .ifLet(\.$recording, action: \.recording) {
             RecordingFeature()
         }

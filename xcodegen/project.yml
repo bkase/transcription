@@ -394,10 +394,14 @@ targets:
       - path: ../App/Tests/VaporTests
     dependencies:
       - target: Vapor
+      - target: Models
+      - target: SessionDetailFeature
       - package: swift-snapshot-testing
         product: SnapshotTesting
       - package: swift-composable-architecture
         product: ComposableArchitecture
+      - package: swift-tagged
+        product: Tagged
     settings:
       base:
         PRODUCT_NAME: VaporTests

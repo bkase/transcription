@@ -1,5 +1,7 @@
 import Testing
 import ComposableArchitecture
+import Models
+import SessionDetailFeature
 @testable import Vapor
 
 @MainActor
@@ -38,5 +40,44 @@ struct AppFeatureTests {
         await store.send(.tabSelected(.timeline)) {
             $0.currentTab = .timeline
         }
+    }
+
+    // MARK: - Navigation Stack Tests
+
+    @Test
+    func testNavigateToSessionDetail() async {
+        let sessionID = SessionID(rawValue: "test-session-123")
+
+        let store = TestStore(initialState: AppFeature.State()) {
+            AppFeature()
+        }
+
+        // Initially, path should be empty
+        #expect(store.state.path.isEmpty)
+
+        // When a session is tapped in timeline, it should push session detail onto path
+        await store.send(.timeline(.sessionTapped(sessionID))) {
+            $0.path.append(.sessionDetail(SessionDetailFeature.State(sessionID: sessionID)))
+        }
+
+        // Verify path contains the session detail
+        #expect(store.state.path.count == 1)
+
+        // When back is tapped in session detail, path should pop
+        await store.send(.path(.element(id: 0, action: .sessionDetail(.backTapped)))) {
+            _ = $0.path.popLast()
+        }
+
+        // Path should be empty again
+        #expect(store.state.path.isEmpty)
+    }
+
+    @Test
+    func testPathStartsEmpty() async {
+        let store = TestStore(initialState: AppFeature.State()) {
+            AppFeature()
+        }
+
+        #expect(store.state.path.isEmpty)
     }
 }
