@@ -2,6 +2,7 @@ import Foundation
 import Models
 import Audio
 import Persistence
+import Observability
 import Dependencies
 import DependenciesMacros
 
@@ -401,4 +402,91 @@ public actor RecordingProcessor {
 public enum RecordingProcessorError: Error, Equatable, Sendable {
     case alreadyRecording
     case notRecording
+}
+
+// MARK: - RecoveryRoutine
+
+/// Result of running the recovery routine at app startup
+public struct RecoveryResult: Sendable, Equatable {
+    public let staleSessionIds: [SessionID]
+    public let reconciledCount: Int
+
+    public init(staleSessionIds: [SessionID], reconciledCount: Int) {
+        self.staleSessionIds = staleSessionIds
+        self.reconciledCount = reconciledCount
+    }
+
+    public static let empty = RecoveryResult(staleSessionIds: [], reconciledCount: 0)
+}
+
+/// Client for recovering from interrupted recordings on app startup
+@DependencyClient
+public struct RecoveryRoutineClient: Sendable {
+    /// Run the recovery routine to detect and reconcile stale recordings
+    public var run: @Sendable () async throws -> RecoveryResult = { .empty }
+}
+
+extension RecoveryRoutineClient: DependencyKey {
+    public static func live() -> Self {
+        @Dependency(\.databaseClient) var databaseClient
+        @Dependency(\.loggingClient) var loggingClient
+        @Dependency(\.date) var date
+
+        return Self(
+            run: {
+                // Start trace for recovery operation
+                let traceId = await loggingClient.startTrace()
+
+                await loggingClient.info(
+                    "Starting recovery routine",
+                    event: "recovery_start"
+                )
+
+                // Fetch stale recordings
+                let staleRecordings = try await databaseClient.fetchStaleRecordings()
+
+                if staleRecordings.isEmpty {
+                    await loggingClient.info(
+                        "No stale recordings found",
+                        event: "recovery_complete"
+                    )
+                    await loggingClient.endTrace()
+                    return .empty
+                }
+
+                let staleIds = staleRecordings.map { SessionID($0.id) }
+                let sessionIdsStr = staleIds.map(\.rawValue).joined(separator: ", ")
+
+                await loggingClient.warning(
+                    "Found \(staleRecordings.count) stale recording(s): \(sessionIdsStr)",
+                    event: "recovery_stale_found",
+                    metadata: ["count": "\(staleRecordings.count)"]
+                )
+
+                // Reconcile stale recordings
+                let now = date.now
+                let reconciledCount = try await databaseClient.reconcileStaleRecordings(staleIds, now)
+
+                await loggingClient.info(
+                    "Reconciled \(reconciledCount) stale recording(s) to partial state",
+                    event: "recovery_complete",
+                    metadata: ["reconciled": "\(reconciledCount)"]
+                )
+
+                await loggingClient.endTrace()
+
+                return RecoveryResult(staleSessionIds: staleIds, reconciledCount: reconciledCount)
+            }
+        )
+    }
+
+    public static let liveValue = live()
+    public static let testValue = Self()
+}
+
+extension DependencyValues {
+    public var recoveryRoutineClient: RecoveryRoutineClient {
+        get { self[RecoveryRoutineClient.self] }
+        set { self[RecoveryRoutineClient.self] = newValue }
+    }
 }

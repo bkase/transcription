@@ -1,7 +1,9 @@
 import Testing
 import ComposableArchitecture
+import Dependencies
 import Models
 import SessionDetailFeature
+import Processing
 @testable import Vapor
 
 @MainActor
@@ -10,6 +12,8 @@ struct AppFeatureTests {
     func testAppStartsOnTimeline() async {
         let store = TestStore(initialState: AppFeature.State()) {
             AppFeature()
+        } withDependencies: {
+            $0.recoveryRoutineClient.run = { .empty }
         }
 
         // Verify initial state is on timeline tab

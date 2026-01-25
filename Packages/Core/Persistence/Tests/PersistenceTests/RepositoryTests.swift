@@ -448,3 +448,153 @@ import Models
     #expect(sessions[1].id == "session-mid")
     #expect(sessions[2].id == "session-old")
 }
+
+// MARK: - Recovery Tests
+
+@Test func testFetchStaleRecordings() async throws {
+    let dbQueue = try makeDatabase(configuration: .inMemory)
+    let client = DatabaseClient.live(dbQueue: dbQueue)
+
+    let now = Date()
+
+    // Stale session (recording state, no endedAt)
+    try await client.createSession(SessionRecord(
+        id: "stale-1",
+        startedAt: now.addingTimeInterval(-3600),
+        endedAt: nil,
+        processingState: .recording,
+        updatedAt: now.addingTimeInterval(-3600)
+    ))
+    // Another stale session
+    try await client.createSession(SessionRecord(
+        id: "stale-2",
+        startedAt: now.addingTimeInterval(-7200),
+        endedAt: nil,
+        processingState: .recording,
+        updatedAt: now.addingTimeInterval(-7200)
+    ))
+    // Processed session (not stale)
+    try await client.createSession(SessionRecord(
+        id: "processed",
+        startedAt: now.addingTimeInterval(-86400),
+        endedAt: now.addingTimeInterval(-86400 + 3600),
+        processingState: .processed,
+        updatedAt: now.addingTimeInterval(-86400 + 3600)
+    ))
+    // Partial session (not stale)
+    try await client.createSession(SessionRecord(
+        id: "partial",
+        startedAt: now.addingTimeInterval(-1800),
+        endedAt: now.addingTimeInterval(-900),
+        processingState: .partial,
+        updatedAt: now.addingTimeInterval(-900)
+    ))
+    // Failed session (not stale)
+    try await client.createSession(SessionRecord(
+        id: "failed",
+        startedAt: now.addingTimeInterval(-600),
+        endedAt: now.addingTimeInterval(-300),
+        processingState: .failed,
+        updatedAt: now.addingTimeInterval(-300)
+    ))
+
+    let stale = try await client.fetchStaleRecordings()
+
+    // Only sessions in 'recording' state with no endedAt
+    #expect(stale.count == 2)
+
+    // Should be ordered by startedAt descending (newest first)
+    #expect(stale[0].id == "stale-1")
+    #expect(stale[1].id == "stale-2")
+
+    // Verify they are indeed stale
+    for session in stale {
+        #expect(session.processingState == .recording)
+        #expect(session.endedAt == nil)
+    }
+}
+
+@Test func testReconcileStaleRecordings() async throws {
+    let dbQueue = try makeDatabase(configuration: .inMemory)
+    let client = DatabaseClient.live(dbQueue: dbQueue)
+
+    let now = Date()
+
+    // Create stale sessions
+    try await client.createSession(SessionRecord(
+        id: "stale-1",
+        startedAt: now.addingTimeInterval(-3600),
+        endedAt: nil,
+        processingState: .recording,
+        updatedAt: now.addingTimeInterval(-3600)
+    ))
+    try await client.createSession(SessionRecord(
+        id: "stale-2",
+        startedAt: now.addingTimeInterval(-7200),
+        endedAt: nil,
+        processingState: .recording,
+        updatedAt: now.addingTimeInterval(-7200)
+    ))
+    // Already processed session (should not be affected)
+    try await client.createSession(SessionRecord(
+        id: "processed",
+        startedAt: now.addingTimeInterval(-86400),
+        endedAt: now.addingTimeInterval(-86400 + 3600),
+        processingState: .processed,
+        updatedAt: now.addingTimeInterval(-86400 + 3600)
+    ))
+
+    // Reconcile the stale recordings
+    let reconcileTime = now.addingTimeInterval(60)
+    let count = try await client.reconcileStaleRecordings(
+        [SessionID("stale-1"), SessionID("stale-2")],
+        reconcileTime
+    )
+
+    #expect(count == 2)
+
+    // Verify stale-1 was reconciled
+    let session1 = try await client.fetchSession(SessionID("stale-1"))
+    #expect(session1?.processingState == .partial)
+    #expect(session1?.endedAt != nil)
+    // endedAt should be approximately reconcileTime
+    if let endedAt = session1?.endedAt {
+        #expect(abs(endedAt.timeIntervalSince(reconcileTime)) < 1)
+    }
+
+    // Verify stale-2 was reconciled
+    let session2 = try await client.fetchSession(SessionID("stale-2"))
+    #expect(session2?.processingState == .partial)
+    #expect(session2?.endedAt != nil)
+
+    // Verify processed session was not affected
+    let processed = try await client.fetchSession(SessionID("processed"))
+    #expect(processed?.processingState == .processed)
+}
+
+@Test func testReconcileNonExistentSession() async throws {
+    let dbQueue = try makeDatabase(configuration: .inMemory)
+    let client = DatabaseClient.live(dbQueue: dbQueue)
+
+    let now = Date()
+
+    // Try to reconcile a session that doesn't exist
+    let count = try await client.reconcileStaleRecordings(
+        [SessionID("nonexistent")],
+        now
+    )
+
+    #expect(count == 0)
+}
+
+@Test func testReconcileEmptyList() async throws {
+    let dbQueue = try makeDatabase(configuration: .inMemory)
+    let client = DatabaseClient.live(dbQueue: dbQueue)
+
+    let now = Date()
+
+    // Reconcile empty list
+    let count = try await client.reconcileStaleRecordings([], now)
+
+    #expect(count == 0)
+}

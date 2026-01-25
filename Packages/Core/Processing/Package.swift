@@ -12,6 +12,7 @@ let package = Package(
         .package(path: "../Models"),
         .package(path: "../Audio"),
         .package(path: "../Persistence"),
+        .package(path: "../Observability"),
         .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.0.0"),
         .package(url: "https://github.com/FluidInference/FluidAudio", from: "0.10.0"),
     ],
@@ -22,6 +23,7 @@ let package = Package(
                 "Models",
                 "Audio",
                 "Persistence",
+                "Observability",
                 .product(name: "Dependencies", package: "swift-dependencies"),
                 .product(name: "DependenciesMacros", package: "swift-dependencies"),
                 .product(name: "FluidAudio", package: "FluidAudio"),
@@ -29,7 +31,11 @@ let package = Package(
         ),
         .testTarget(
             name: "ProcessingTests",
-            dependencies: ["Processing"]
+            dependencies: [
+                "Processing",
+                "Observability",
+                .product(name: "Dependencies", package: "swift-dependencies"),
+            ]
         ),
     ]
 )

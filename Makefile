@@ -57,7 +57,7 @@ test:
 	@uv run scripts/run-tests.py
 
 # Internal target for parallel package testing
-_test-packages: _test-models _test-persistence _test-audio _test-export _test-routing _test-designsystem _test-observability \
+_test-packages: _test-models _test-persistence _test-audio _test-processing _test-export _test-routing _test-designsystem _test-observability \
                 _test-timeline _test-recording _test-sessiondetail _test-audioplayer _test-people _test-speakerpicker
 
 _test-models:
@@ -68,6 +68,9 @@ _test-persistence:
 
 _test-audio:
 	@cd Packages/Core/Audio && swift test --quiet 2>&1 | tail -5
+
+_test-processing:
+	@cd Packages/Core/Processing && swift test --quiet 2>&1 | tail -5
 
 _test-export:
 	@cd Packages/Core/Export && swift test --quiet 2>&1 | tail -5

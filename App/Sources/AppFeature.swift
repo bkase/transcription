@@ -4,6 +4,7 @@ import TimelineFeature
 import RecordingFeature
 import SessionDetailFeature
 import PeopleFeature
+import Processing
 import Models
 
 // MARK: - AppFeature
@@ -57,6 +58,8 @@ public struct AppFeature {
         case dismissRecording
     }
 
+    @Dependency(\.recoveryRoutineClient) var recoveryRoutineClient
+
     public var body: some ReducerOf<Self> {
         Scope(state: \.timeline, action: \.timeline) {
             TimelineFeature()
@@ -69,7 +72,10 @@ public struct AppFeature {
         Reduce { state, action in
             switch action {
             case .onAppear:
-                return .none
+                // Run recovery routine to reconcile any interrupted recordings
+                return .run { _ in
+                    _ = try? await recoveryRoutineClient.run()
+                }
 
             case let .tabSelected(tab):
                 state.currentTab = tab

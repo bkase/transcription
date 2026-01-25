@@ -418,6 +418,11 @@ public struct DatabaseClient: Sendable {
 
     // Conversation counts (distinct sessions per person via speaker_tracks)
     public var fetchPersonConversationCounts: @Sendable () async throws -> [String: Int] = { [:] }
+
+    // Recovery: fetch sessions stuck in recording state (stale recordings)
+    public var fetchStaleRecordings: @Sendable () async throws -> [SessionRecord] = { [] }
+    // Recovery: mark stale recordings as partial with endedAt set
+    public var reconcileStaleRecordings: @Sendable (_ sessionIds: [SessionID], _ now: Date) async throws -> Int = { _, _ in 0 }
 }
 
 extension DatabaseClient: DependencyKey {
@@ -595,6 +600,45 @@ extension DatabaseClient: DependencyKey {
                         }
                     }
                     return counts
+                }
+            },
+            fetchStaleRecordings: {
+                try await dbQueue.read { db in
+                    // Find sessions that are in 'recording' state but have no endedAt
+                    // These are sessions that were interrupted (app crash, force close, etc.)
+                    try SessionRecord
+                        .filter(Column("processingState") == ProcessingState.recording.rawValue)
+                        .filter(Column("endedAt") == nil)
+                        .order(Column("startedAt").desc)
+                        .fetchAll(db)
+                }
+            },
+            reconcileStaleRecordings: { sessionIds, now in
+                guard !sessionIds.isEmpty else { return 0 }
+                return try await dbQueue.write { db in
+                    var count = 0
+                    for sessionId in sessionIds {
+                        // Update each stale session to partial state with endedAt set
+                        let updateSQL = """
+                            UPDATE sessions
+                            SET processingState = ?,
+                                endedAt = ?,
+                                updatedAt = ?
+                            WHERE id = ? AND processingState = ?
+                            """
+                        try db.execute(
+                            sql: updateSQL,
+                            arguments: [
+                                ProcessingState.partial.rawValue,
+                                now,
+                                now,
+                                sessionId.rawValue,
+                                ProcessingState.recording.rawValue
+                            ]
+                        )
+                        count += db.changesCount
+                    }
+                    return count
                 }
             }
         )

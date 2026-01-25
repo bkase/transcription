@@ -178,6 +178,7 @@ targets:
       - target: Models
       - target: Audio
       - target: Persistence
+      - target: Observability
       - package: swift-tagged
         product: Tagged
       - package: swift-dependencies
@@ -421,6 +422,7 @@ targets:
     dependencies:
       - target: Vapor
       - target: Models
+      - target: Processing
       - target: SessionDetailFeature
       - package: swift-snapshot-testing
         product: SnapshotTesting
@@ -428,6 +430,8 @@ targets:
         product: ComposableArchitecture
       - package: swift-tagged
         product: Tagged
+      - package: swift-dependencies
+        product: Dependencies
     settings:
       base:
         PRODUCT_NAME: VaporTests
