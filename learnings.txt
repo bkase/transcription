@@ -493,3 +493,12 @@
 - toAlertInfo() maps ErrorEnvelope to AlertInfo with appropriate title and button choices
 - Primary button preference order: retry > retryFinalize > openSettings > keepPartial > dismiss
 - Secondary button shows destructive actions (deleteSession) or cancel for multi-action errors
+
+## RecoveryRoutine patterns
+- RecoveryRoutineClient runs on app startup to detect stale recordings (processingState == .recording AND endedAt == nil)
+- Use DatabaseClient.fetchStaleRecordings() to query stale sessions, reconcileStaleRecordings() to update them
+- Stale sessions are marked as .partial state with endedAt set to recovery time
+- AppFeature.onAppear triggers recovery routine via `.run { _ in try? await recoveryRoutineClient.run() }`
+- RecoveryResult struct returns staleSessionIds and reconciledCount for logging
+- Tests need to mock recoveryRoutineClient.run in withDependencies block for AppFeature tests
+- Signal 11 crashes in SPM tests from stale macro build artifacts - skip if test results show all passed
