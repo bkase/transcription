@@ -88,6 +88,34 @@ struct RecordingProcessorWiringTests {
                     ]
                 }
             }
+            $0.databaseClient.fetchSpeakerTracks = { _ in
+                if fetchSegmentsCallCount == 1 {
+                    return [
+                        SpeakerTrackRecord(
+                            id: "track-1",
+                            sessionId: mockSessionID.rawValue,
+                            machineSpeakerId: "speaker_0",
+                            displayOrder: 1
+                        )
+                    ]
+                } else {
+                    return [
+                        SpeakerTrackRecord(
+                            id: "track-1",
+                            sessionId: mockSessionID.rawValue,
+                            machineSpeakerId: "speaker_0",
+                            displayOrder: 1
+                        ),
+                        SpeakerTrackRecord(
+                            id: "track-2",
+                            sessionId: mockSessionID.rawValue,
+                            machineSpeakerId: "speaker_1",
+                            displayOrder: 2
+                        )
+                    ]
+                }
+            }
+            $0.databaseClient.fetchPeople = { [] }
         }
 
         // Initially empty
@@ -116,7 +144,7 @@ struct RecordingProcessorWiringTests {
         eventContinuation?.yield(.didAppendSegment(mockSegmentID1))
         await store.receive(\.processorEvent)
 
-        // Should receive segmentsLoaded with one segment
+        // Should receive segmentsLoaded with one segment and one speaker track
         await store.receive(\.segmentsLoaded) {
             $0.liveSegments = [
                 LiveSegment(
@@ -126,6 +154,13 @@ struct RecordingProcessorWiringTests {
                     endMs: 2500,
                     text: "Hello, this is a test.",
                     isFinal: true
+                )
+            ]
+            $0.speakerTracks = [
+                LiveSpeakerTrack(
+                    machineSpeakerId: "speaker_0",
+                    displayOrder: 1,
+                    personName: nil
                 )
             ]
         }
@@ -138,7 +173,7 @@ struct RecordingProcessorWiringTests {
         eventContinuation?.yield(.didAppendSegment(mockSegmentID2))
         await store.receive(\.processorEvent)
 
-        // Should receive segmentsLoaded with two segments
+        // Should receive segmentsLoaded with two segments and two speaker tracks
         await store.receive(\.segmentsLoaded) {
             $0.liveSegments = [
                 LiveSegment(
@@ -158,6 +193,18 @@ struct RecordingProcessorWiringTests {
                     isFinal: false
                 )
             ]
+            $0.speakerTracks = [
+                LiveSpeakerTrack(
+                    machineSpeakerId: "speaker_0",
+                    displayOrder: 1,
+                    personName: nil
+                ),
+                LiveSpeakerTrack(
+                    machineSpeakerId: "speaker_1",
+                    displayOrder: 2,
+                    personName: nil
+                )
+            ]
         }
 
         // Verify two segments now
@@ -168,17 +215,19 @@ struct RecordingProcessorWiringTests {
         // Stop recording
         await store.send(.stopRecording)
 
-        // Processor emits didFinish - segments should be cleared
+        // Processor emits didFinish - segments and speaker tracks should be cleared
         eventContinuation?.yield(.didFinish(mockSessionID))
         await store.receive(\.processorEvent) {
             $0.isRecording = false
             $0.isListening = false
             $0.sessionID = nil
             $0.liveSegments = []
+            $0.speakerTracks = []
         }
 
-        // Verify segments are cleared after finish
+        // Verify segments and speaker tracks are cleared after finish
         #expect(store.state.liveSegments.isEmpty)
+        #expect(store.state.speakerTracks.isEmpty)
 
         // Verify database was queried twice (once per segment event)
         #expect(fetchSegmentsCallCount == 2)
@@ -254,6 +303,17 @@ struct RecordingProcessorWiringTests {
                     )
                 ]
             }
+            $0.databaseClient.fetchSpeakerTracks = { _ in
+                [
+                    SpeakerTrackRecord(
+                        id: "track-1",
+                        sessionId: mockSessionID.rawValue,
+                        machineSpeakerId: "speaker_0",
+                        displayOrder: 1
+                    )
+                ]
+            }
+            $0.databaseClient.fetchPeople = { [] }
         }
 
         // Start recording
@@ -281,9 +341,17 @@ struct RecordingProcessorWiringTests {
                     isFinal: true
                 )
             ]
+            $0.speakerTracks = [
+                LiveSpeakerTrack(
+                    machineSpeakerId: "speaker_0",
+                    displayOrder: 1,
+                    personName: nil
+                )
+            ]
         }
 
         #expect(store.state.liveSegments.count == 1)
+        #expect(store.state.speakerTracks.count == 1)
 
         // Now fail
         eventContinuation?.yield(.didFail("Storage error"))
@@ -292,10 +360,12 @@ struct RecordingProcessorWiringTests {
             $0.isRecording = false
             $0.isListening = false
             $0.liveSegments = []
+            $0.speakerTracks = []
         }
 
-        // Segments should be cleared
+        // Segments and speaker tracks should be cleared
         #expect(store.state.liveSegments.isEmpty)
+        #expect(store.state.speakerTracks.isEmpty)
 
         // Clean up
         eventContinuation?.finish()

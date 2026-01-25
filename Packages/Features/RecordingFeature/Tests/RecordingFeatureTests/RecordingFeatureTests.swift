@@ -254,6 +254,17 @@ struct RecordingFeatureTests {
                     )
                 ]
             }
+            $0.databaseClient.fetchSpeakerTracks = { _ in
+                [
+                    SpeakerTrackRecord(
+                        id: "track-1",
+                        sessionId: mockSessionID.rawValue,
+                        machineSpeakerId: "speaker_0",
+                        displayOrder: 1
+                    )
+                ]
+            }
+            $0.databaseClient.fetchPeople = { [] }
         }
 
         // Start recording
@@ -267,11 +278,11 @@ struct RecordingFeatureTests {
             $0.sessionID = mockSessionID
         }
 
-        // Segment append - triggers DB fetch and loads segments
+        // Segment append - triggers DB fetch and loads segments and speaker tracks
         eventContinuation?.yield(.didAppendSegment(mockSegmentID))
         await store.receive(\.processorEvent)
 
-        // Should receive segmentsLoaded with segment from DB
+        // Should receive segmentsLoaded with segment and speaker tracks from DB
         await store.receive(\.segmentsLoaded) {
             $0.liveSegments = [
                 LiveSegment(
@@ -281,6 +292,13 @@ struct RecordingFeatureTests {
                     endMs: 1500,
                     text: "Test segment text",
                     isFinal: true
+                )
+            ]
+            $0.speakerTracks = [
+                LiveSpeakerTrack(
+                    machineSpeakerId: "speaker_0",
+                    displayOrder: 1,
+                    personName: nil
                 )
             ]
         }

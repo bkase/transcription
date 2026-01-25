@@ -144,17 +144,7 @@ public struct RecordingView: View {
     }
 
     private func speakerType(for segment: LiveSegment) -> SpeakerType {
-        // Map machine speaker ID to a SpeakerType
-        // For now, alternate between user and guest based on speaker ID
-        // In a full implementation, this would look up the assigned person
-        guard let speakerId = segment.machineSpeakerId else {
-            return .guest
-        }
-        // Simple hashing to assign colors consistently
-        let hash = speakerId.hashValue
-        let colors: [Color] = [VaporColor.sky, VaporColor.lavender, VaporColor.dusk, VaporColor.deep]
-        let color = colors[abs(hash) % colors.count]
-        return .speaker(name: "Speaker \(abs(hash) % 10)", color: color)
+        RecordingSpeakerRendering.speakerType(for: segment, speakerTracks: store.speakerTracks)
     }
 
     private func formatTimestamp(_ ms: Int) -> String {

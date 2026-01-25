@@ -33,6 +33,23 @@ public struct LiveSegment: Equatable, Sendable {
     }
 }
 
+/// A speaker track with optional person assignment for live recording
+public struct LiveSpeakerTrack: Equatable, Sendable {
+    public let machineSpeakerId: String
+    public let displayOrder: Int
+    public let personName: String?
+
+    public init(
+        machineSpeakerId: String,
+        displayOrder: Int,
+        personName: String?
+    ) {
+        self.machineSpeakerId = machineSpeakerId
+        self.displayOrder = displayOrder
+        self.personName = personName
+    }
+}
+
 @Reducer
 public struct RecordingFeature {
     public init() {}
@@ -65,6 +82,8 @@ public struct RecordingFeature {
         public var audioDirectory: URL?
         /// Live transcript segments loaded from DB
         public var liveSegments: [LiveSegment] = []
+        /// Speaker tracks with person assignments
+        public var speakerTracks: [LiveSpeakerTrack] = []
 
         public init(
             isRecording: Bool = false,
@@ -74,7 +93,8 @@ public struct RecordingFeature {
             sessionID: SessionID? = nil,
             error: String? = nil,
             audioDirectory: URL? = nil,
-            liveSegments: [LiveSegment] = []
+            liveSegments: [LiveSegment] = [],
+            speakerTracks: [LiveSpeakerTrack] = []
         ) {
             self.isRecording = isRecording
             self.isPaused = isPaused
@@ -84,6 +104,7 @@ public struct RecordingFeature {
             self.error = error
             self.audioDirectory = audioDirectory
             self.liveSegments = liveSegments
+            self.speakerTracks = speakerTracks
         }
     }
 
@@ -104,8 +125,8 @@ public struct RecordingFeature {
         case recordingStarted(SessionID)
         /// Recording failed to start
         case recordingFailed(String)
-        /// Segments loaded from database
-        case segmentsLoaded([LiveSegment])
+        /// Segments and speaker tracks loaded from database
+        case segmentsLoaded([LiveSegment], [LiveSpeakerTrack])
         /// View appeared
         case onAppear
         /// View disappeared
@@ -185,10 +206,21 @@ public struct RecordingFeature {
                     return .none
 
                 case .didAppendSegment:
-                    // Load segments from DB when a new segment is appended
+                    // Load segments and speaker tracks from DB when a new segment is appended
                     guard let sessionID = state.sessionID else { return .none }
                     return .run { [sessionID, databaseClient] send in
-                        let records = try await databaseClient.fetchTranscriptSegments(sessionID)
+                        // Load segments, speaker tracks, and people in parallel
+                        async let segmentsTask = databaseClient.fetchTranscriptSegments(sessionID)
+                        async let tracksTask = databaseClient.fetchSpeakerTracks(sessionID)
+                        async let peopleTask = databaseClient.fetchPeople()
+
+                        let records = try await segmentsTask
+                        let trackRecords = try await tracksTask
+                        let people = try await peopleTask
+
+                        // Create a lookup for person names
+                        let personLookup = Dictionary(uniqueKeysWithValues: people.map { ($0.id, $0.name) })
+
                         let segments = records.map { record in
                             LiveSegment(
                                 id: TranscriptSegmentID(record.id),
@@ -199,7 +231,17 @@ public struct RecordingFeature {
                                 isFinal: record.isFinal
                             )
                         }
-                        await send(.segmentsLoaded(segments))
+
+                        // Map speaker tracks with person names
+                        let tracks = trackRecords.map { record in
+                            LiveSpeakerTrack(
+                                machineSpeakerId: record.machineSpeakerId,
+                                displayOrder: record.displayOrder,
+                                personName: record.personId.flatMap { personLookup[$0] }
+                            )
+                        }
+
+                        await send(.segmentsLoaded(segments, tracks))
                     }
 
                 case .didPause:
@@ -216,6 +258,7 @@ public struct RecordingFeature {
                     state.isListening = false
                     state.sessionID = nil
                     state.liveSegments = []
+                    state.speakerTracks = []
                     // Keep elapsedSeconds for display until view navigates away
                     return .merge(
                         .cancel(id: CancelID.timer),
@@ -228,6 +271,7 @@ public struct RecordingFeature {
                     state.isPaused = false
                     state.isListening = false
                     state.liveSegments = []
+                    state.speakerTracks = []
                     return .merge(
                         .cancel(id: CancelID.timer),
                         .cancel(id: CancelID.processorEvents)
@@ -243,8 +287,9 @@ public struct RecordingFeature {
                 state.error = errorMessage
                 return .none
 
-            case let .segmentsLoaded(segments):
+            case let .segmentsLoaded(segments, tracks):
                 state.liveSegments = segments
+                state.speakerTracks = tracks
                 return .none
 
             case .onAppear:

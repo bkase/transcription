@@ -438,3 +438,17 @@
 - XCUIElement count queries: `elements.count` after `elements.firstMatch.waitForExistence(timeout:)`
 - For text content verification: `app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'text'"))`
 - XCTestExpectation with DispatchQueue.main.asyncAfter for waiting on multiple elements to appear
+
+## Extracting View helpers for testability
+- Private SwiftUI View helper functions (e.g., formatters, mappers) can be extracted to public utility enums
+- Pattern: Create `enum TranscriptRendering` with static functions for formatting/mapping logic
+- View calls helpers: `TranscriptRendering.speakerType(for:speakerTracks:)` instead of inline logic
+- Tests can directly call the utility functions without needing TestStore or UI testing
+
+## TCA speaker track wiring patterns
+- Load speaker tracks alongside segments using `async let` for parallel fetches
+- Map SpeakerTrackRecord to feature-specific LiveSpeakerTrack struct with personName resolved
+- PersonLookup dictionary: `Dictionary(uniqueKeysWithValues: people.map { ($0.id, $0.name) })`
+- Clear speakerTracks state on didFinish/didFail like liveSegments
+- Create per-feature SpeakerRendering utility (RecordingSpeakerRendering) mirroring SessionDetail's TranscriptRendering
+- Update all feature tests to include fetchSpeakerTracks and fetchPeople mock dependencies
