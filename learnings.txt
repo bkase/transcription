@@ -430,3 +430,11 @@
 - Intercept child actions with `.path(.element(id: _, action: .childFeature(.someAction)))`
 - Use `.forEach(\.path, action: \.path)` in reducer body to scope child reducers
 - Test targets need explicit dependencies on feature modules and Tagged for SessionID types
+
+## XCUITest E2E patterns
+- Use `accessibilityIdentifier` on SwiftUI views for XCUITest element queries
+- Query elements with predicate: `app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'id'"))`
+- Use `waitForExistence(timeout:)` for async UI appearance - never use sleeps
+- XCUIElement count queries: `elements.count` after `elements.firstMatch.waitForExistence(timeout:)`
+- For text content verification: `app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'text'"))`
+- XCTestExpectation with DispatchQueue.main.asyncAfter for waiting on multiple elements to appear
