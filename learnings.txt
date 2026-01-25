@@ -405,3 +405,10 @@
 - `SpeakerColor.forIndex(people.count)` assigns next color to new person automatically
 - confirmSelection fetches current record, updates it, then emits confirmed action for parent
 - Swift 6: move mock test data outside @MainActor struct as file-level `private let` to avoid isolation warnings
+
+## DatabaseClient computed aggregates
+- Use SQL `COUNT(DISTINCT sessionId)` for counting unique sessions per person via speaker_tracks
+- Return counts as `[String: Int]` dictionary for flexible lookup in features
+- `async let` parallel queries: `async let countsTask = databaseClient.fetchPersonConversationCounts()` with `try await (a, b)`
+- When adding fields to `@DependencyClient`, clean all package `.build` directories to avoid signal 11 crashes from stale artifacts
+- Tests using live database client call `DatabaseClient.live(dbQueue:)` with in-memory DB for integration testing
