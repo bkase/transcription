@@ -14,6 +14,7 @@ let package = Package(
         .package(path: "Packages/Core/Export"),
         .package(path: "Packages/TestsSupport"),
         .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.0.0"),
+        .package(url: "https://github.com/pointfreeco/swift-clocks", from: "1.0.0"),
     ],
     targets: [
         .testTarget(
@@ -29,6 +30,7 @@ let package = Package(
                 "Export",
                 "TestsSupport",
                 .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "Clocks", package: "swift-clocks"),
             ],
             path: "Tests/CoreTests"
         ),
