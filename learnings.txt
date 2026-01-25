@@ -452,3 +452,18 @@
 - Clear speakerTracks state on didFinish/didFail like liveSegments
 - Create per-feature SpeakerRendering utility (RecordingSpeakerRendering) mirroring SessionDetail's TranscriptRendering
 - Update all feature tests to include fetchSpeakerTracks and fetchPeople mock dependencies
+
+## Export schema patterns
+- Export models (ExportTranscript, ExportSession, ExportSegment, etc.) are separate from DB records for stable versioning
+- Include schemaVersion field for forward/backward compatibility in export formats
+- ExportAssembler helper centralizes DB record → export model conversion
+- Filter referenced entities only (e.g., only include people referenced by speaker tracks)
+- JSONEncoder.exportEncoder / JSONDecoder.exportDecoder configured for ISO 8601 dates and pretty printing
+- Add new package tests to Makefile test target to ensure they run in `make test`
+
+## Export format writers
+- MarkdownWriter and VttWriter are enums with static `write(_ transcript: ExportTranscript) -> String` methods
+- VTT format: WEBVTT header, cue numbers, HH:MM:SS.mmm timestamps, `<v SpeakerName>` voice tags
+- Speaker lookup: build dictionary from speakerTracks mapping machine ID to person name or "Speaker N"
+- For golden tests with multi-line expected strings, use raw single-line string with explicit `\n` to avoid whitespace issues
+- DateFormatter output is locale-dependent - use substring assertions for timestamp tests, not exact match

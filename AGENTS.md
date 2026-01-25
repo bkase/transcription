@@ -1,9 +1,14 @@
-## Agent 2 Simulator Configuration
+## Agent 1 Simulator Configuration
 
 ```
-UDID:        DB91C221-C523-4279-A7A8-53929942B22B
-Name:        Agent-2-iPhone
-DerivedData: /Users/bkase/DerivedData/agent-2
+UDID:        A76B56DB-DEA2-4933-8C81-7A0EF009AC11
+Name:        Agent-1-iPhone
+DerivedData: /Users/bkase/DerivedData/agent-1
+
+Parallel Testing Clones:
+  Clone 1:   D2360961-2626-4107-8DEC-27CFB0A62A5B  (Agent-1-Clone-1)
+  Clone 2:   BC9BE161-DA2C-4A44-9E92-4B8CA4F16E6D  (Agent-1-Clone-2)
+  Clone 3:   640633A6-44DD-47AE-B036-2C58BFBA7A6C  (Agent-1-Clone-3)
 ```
 
 **CRITICAL: Always run simulators HEADLESS. Never use `open` or `activate` Simulator.app.**
@@ -12,29 +17,35 @@ DerivedData: /Users/bkase/DerivedData/agent-2
 
 ```bash
 # Source environment
-source /Users/bkase/DerivedData/agent-2/sim-config.env
+source /Users/bkase/DerivedData/agent-1/sim-config.env
 
-# Boot headless (no GUI)
-xcrun simctl boot DB91C221-C523-4279-A7A8-53929942B22B
-xcrun simctl bootstatus DB91C221-C523-4279-A7A8-53929942B22B -b  # Wait for boot
+# Boot all simulators (main + clones)
+xcrun simctl boot A76B56DB-DEA2-4933-8C81-7A0EF009AC11
+xcrun simctl boot D2360961-2626-4107-8DEC-27CFB0A62A5B
+xcrun simctl boot BC9BE161-DA2C-4A44-9E92-4B8CA4F16E6D
+xcrun simctl boot 640633A6-44DD-47AE-B036-2C58BFBA7A6C
 
 # Build and run
 xcodebuild -project <project> -scheme <app-target> \
-  -derivedDataPath /Users/bkase/DerivedData/agent-2 \
-  -destination "id=DB91C221-C523-4279-A7A8-53929942B22B" \
+  -derivedDataPath /Users/bkase/DerivedData/agent-1 \
+  -destination "id=A76B56DB-DEA2-4933-8C81-7A0EF009AC11" \
   -skipMacroValidation -skipPackagePluginValidation build
 
-# Install and launch
-xcrun simctl install DB91C221-C523-4279-A7A8-53929942B22B /Users/bkase/DerivedData/agent-2/Build/Products/Debug-iphonesimulator/<app-name>
-xcrun simctl launch DB91C221-C523-4279-A7A8-53929942B22B <app-slug>
+# Run tests with parallel execution (4 simulators)
+xcodebuild test-without-building -project <project> -scheme <test-target> \
+  -destination "id=A76B56DB-DEA2-4933-8C81-7A0EF009AC11" \
+  -destination "id=D2360961-2626-4107-8DEC-27CFB0A62A5B" \
+  -destination "id=BC9BE161-DA2C-4A44-9E92-4B8CA4F16E6D" \
+  -destination "id=640633A6-44DD-47AE-B036-2C58BFBA7A6C" \
+  -derivedDataPath /Users/bkase/DerivedData/agent-1
 
 # Take screenshots (headless)
-xcrun simctl io DB91C221-C523-4279-A7A8-53929942B22B screenshot output.png
+xcrun simctl io A76B56DB-DEA2-4933-8C81-7A0EF009AC11 screenshot output.png
 
-# UI Testing (headless) - use XCUITest
+# UI Testing (headless, single sim for E2E)
 xcodebuild test -project <project> -scheme <test-target> \
-  -derivedDataPath /Users/bkase/DerivedData/agent-2 \
-  -destination "id=DB91C221-C523-4279-A7A8-53929942B22B"
+  -derivedDataPath /Users/bkase/DerivedData/agent-1 \
+  -destination "id=A76B56DB-DEA2-4933-8C81-7A0EF009AC11"
 ```
 
 **For UI flow verification, use XCUITest - never GUI automation tools.**
@@ -45,13 +56,13 @@ xcodebuild test -project <project> -scheme <test-target> \
 
 ## Beads Workflow Integration
 
-This project uses [beads_rust](https://github.com/Dicklesworthstone/beads_rust) (`br`/`bd`) for issue tracking. Issues are stored in `.beads/` and tracked in git.
+This project uses [beads_rust](https://github.com/Dicklesworthstone/beads_rust) (`br`) for issue tracking. Issues are stored in `.beads/` and tracked in git.
 
 ### Essential Commands
 
 ```bash
 # View ready issues (unblocked, not deferred)
-br ready              # or: bd ready
+br ready              # or: br ready
 
 # List and search
 br list --status=open # All open issues
