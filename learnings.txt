@@ -397,3 +397,11 @@
 - TestStore tests: timer events are still received during pause but state doesn't change
 - When testing processor events, emit them directly without calling pauseRecording action (action triggers processor, processor emits events)
 - Accessibility identifiers on components (like RecordButton) may already exist - avoid adding duplicate identifiers that override the component's built-in identifiers
+
+## TCA Modal/Picker feature patterns
+- Modal features use `closeModal` action for parent to handle dismissal (no internal state change)
+- `selectedPersonId` can differ from `currentPersonId` during selection - confirms on explicit action
+- Inline form state (isShowingNewPersonForm, newPersonName, etc.) coexists with picker state
+- `SpeakerColor.forIndex(people.count)` assigns next color to new person automatically
+- confirmSelection fetches current record, updates it, then emits confirmed action for parent
+- Swift 6: move mock test data outside @MainActor struct as file-level `private let` to avoid isolation warnings
