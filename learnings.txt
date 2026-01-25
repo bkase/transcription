@@ -522,3 +522,9 @@
 - `$0.continuousClock = ImmediateClock()` makes all sleeps complete instantly
 - Nested `withDependencies { }` blocks inherit parent dependency overrides
 - UUID strings must only contain hex characters (0-9, A-F) - e.g., DEADBEEF-0000-0000-0000-000000000001
+
+## Snapshot test naming conflicts
+- Snapshot tests create files named `testFunctionName.snapshotName.png` in `__Snapshots__/TestClassName/`
+- Two test files with same function name (e.g., `testSpeakerPickerModal`) create conflicting output paths
+- xcodebuild fails with "Multiple commands produce" error when copying to test bundle
+- Solution: use unique function names across all snapshot test files (e.g., `testSpeakerPickerFeatureModal` vs `testSpeakerPickerModal`)
