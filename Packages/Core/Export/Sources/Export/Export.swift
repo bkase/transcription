@@ -3,6 +3,7 @@ import Models
 import Persistence
 import Dependencies
 import DependenciesMacros
+import ZIPFoundation
 
 // MARK: - Export Schema Models
 
@@ -547,5 +548,122 @@ public enum VttWriter {
         let hours = totalSeconds / 3600
 
         return String(format: "%02d:%02d:%02d.%03d", hours, minutes, seconds, ms)
+    }
+}
+
+// MARK: - Bundle Writer
+
+/// Creates a zip bundle containing all export artifacts
+public enum ExportBundleWriter {
+    /// Standard filenames used in export bundles
+    public enum BundleFile {
+        public static let audio = "audio.caf"
+        public static let transcript = "transcript.json"
+        public static let markdown = "transcript.md"
+        public static let vtt = "transcript.vtt"
+        public static let metadata = "metadata.json"
+    }
+
+    /// Result of bundle creation
+    public struct BundleResult: Sendable, Equatable {
+        public let url: URL
+        public let files: [String]
+
+        public init(url: URL, files: [String]) {
+            self.url = url
+            self.files = files
+        }
+    }
+
+    /// Create an export bundle zip file
+    /// - Parameters:
+    ///   - transcript: The export transcript data
+    ///   - metadata: The export metadata
+    ///   - audioSourceURL: Optional URL to the source audio file to include
+    ///   - outputDirectory: Directory to write the bundle to
+    ///   - bundleName: Name for the bundle (without .zip extension)
+    ///   - fileClient: File client for I/O operations
+    /// - Returns: URL to the created zip file and list of files included
+    public static func writeBundle(
+        transcript: ExportTranscript,
+        metadata: ExportMetadata,
+        audioSourceURL: URL?,
+        outputDirectory: URL,
+        bundleName: String,
+        fileClient: FileClient
+    ) async throws -> BundleResult {
+        // Create a staging directory for bundle contents
+        let stagingDirectory = outputDirectory.appendingPathComponent(bundleName)
+        try await fileClient.createDirectory(stagingDirectory)
+
+        var includedFiles: [String] = []
+
+        // Write transcript.json
+        let transcriptData = try JSONEncoder.exportEncoder.encode(transcript)
+        let transcriptURL = stagingDirectory.appendingPathComponent(BundleFile.transcript)
+        try await fileClient.write(transcriptData, transcriptURL)
+        includedFiles.append(BundleFile.transcript)
+
+        // Write metadata.json
+        let metadataData = try JSONEncoder.exportEncoder.encode(metadata)
+        let metadataURL = stagingDirectory.appendingPathComponent(BundleFile.metadata)
+        try await fileClient.write(metadataData, metadataURL)
+        includedFiles.append(BundleFile.metadata)
+
+        // Write transcript.md
+        let markdownContent = MarkdownWriter.write(transcript)
+        let markdownURL = stagingDirectory.appendingPathComponent(BundleFile.markdown)
+        try await fileClient.write(Data(markdownContent.utf8), markdownURL)
+        includedFiles.append(BundleFile.markdown)
+
+        // Write transcript.vtt
+        let vttContent = VttWriter.write(transcript)
+        let vttURL = stagingDirectory.appendingPathComponent(BundleFile.vtt)
+        try await fileClient.write(Data(vttContent.utf8), vttURL)
+        includedFiles.append(BundleFile.vtt)
+
+        // Copy audio file if provided
+        if let audioSourceURL = audioSourceURL, fileClient.exists(audioSourceURL) {
+            let audioData = try await fileClient.read(audioSourceURL)
+            let audioDestURL = stagingDirectory.appendingPathComponent(BundleFile.audio)
+            try await fileClient.write(audioData, audioDestURL)
+            includedFiles.append(BundleFile.audio)
+        }
+
+        // Create zip file
+        let zipURL = outputDirectory.appendingPathComponent("\(bundleName).zip")
+        try createZipArchive(from: stagingDirectory, to: zipURL)
+
+        // Clean up staging directory
+        try await fileClient.delete(stagingDirectory)
+
+        return BundleResult(url: zipURL, files: includedFiles)
+    }
+
+    /// Create a zip archive from a directory's contents
+    private static func createZipArchive(from sourceDirectory: URL, to destinationURL: URL) throws {
+        let fileManager = FileManager.default
+
+        // Remove existing zip if present
+        if fileManager.fileExists(atPath: destinationURL.path) {
+            try fileManager.removeItem(at: destinationURL)
+        }
+
+        // Create the archive using ZIPFoundation
+        let archive = try Archive(url: destinationURL, accessMode: .create)
+
+        // Get contents of source directory and add each file
+        let contents = try fileManager.contentsOfDirectory(
+            at: sourceDirectory,
+            includingPropertiesForKeys: nil
+        )
+
+        for fileURL in contents {
+            // Add each file at the root level of the archive (just the filename)
+            try archive.addEntry(
+                with: fileURL.lastPathComponent,
+                relativeTo: sourceDirectory
+            )
+        }
     }
 }

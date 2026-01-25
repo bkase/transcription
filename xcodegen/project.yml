@@ -67,6 +67,10 @@ packages:
   FluidAudio:
     url: https://github.com/FluidInference/FluidAudio
     from: "0.10.0"
+  # ZIP archive support
+  ZIPFoundation:
+    url: https://github.com/weichsel/ZIPFoundation
+    from: "0.9.0"
 
 targets:
   Vapor:
@@ -202,6 +206,8 @@ targets:
         product: Dependencies
       - package: swift-dependencies
         product: DependenciesMacros
+      - package: ZIPFoundation
+        product: ZIPFoundation
     settings:
       base:
         PRODUCT_NAME: Export
