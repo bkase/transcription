@@ -412,3 +412,11 @@
 - `async let` parallel queries: `async let countsTask = databaseClient.fetchPersonConversationCounts()` with `try await (a, b)`
 - When adding fields to `@DependencyClient`, clean all package `.build` directories to avoid signal 11 crashes from stale artifacts
 - Tests using live database client call `DatabaseClient.live(dbQueue:)` with in-memory DB for integration testing
+
+## swift-url-routing patterns
+- `Route(.case(SomeRoute.home))` without Path block matches root "/" path
+- `OneOf` tries routes in order for parsing, uses first matching for printing
+- `Route(.case(MyRoute.item)) { Path { "item"; Parse(.string.map(.myConversion)) } }` for parameterized routes
+- Create custom `Conversion` for typed IDs: `apply` for parsing, `unapply` for printing
+- XcodeGen targets using URLRouting need explicit `swift-parsing` (Parsing product) and `swift-case-paths` (CasePaths) dependencies
+- URLRequestData(path:) for testing parsers, router.print() returns URLRequestData with `path` as ArraySlice<Substring>
