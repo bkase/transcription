@@ -196,26 +196,7 @@ public struct SessionDetailView: View {
     // MARK: - Helpers
 
     private func speakerType(for segment: DetailSegment) -> SpeakerType {
-        guard let machineSpeakerId = segment.machineSpeakerId else {
-            return .guest
-        }
-
-        // Find the speaker track for this segment
-        if let track = store.speakerTracks.first(where: { $0.machineSpeakerId == machineSpeakerId }) {
-            if let personName = track.personName {
-                let color = SpeakerColor.forIndex(track.displayOrder - 1).color
-                return .speaker(name: personName, color: color)
-            } else {
-                // For unassigned speakers, use displayOrder to label
-                if track.displayOrder == 1 {
-                    return .user
-                } else {
-                    return .guest
-                }
-            }
-        }
-
-        return .guest
+        TranscriptRendering.speakerType(for: segment, speakerTracks: store.speakerTracks)
     }
 
     private func formatTime(_ date: Date) -> String {
@@ -238,11 +219,7 @@ public struct SessionDetailView: View {
     }
 
     private func formatTimestamp(_ milliseconds: Int) -> String {
-        let totalSeconds = milliseconds / 1000
-        let minutes = totalSeconds / 60
-        let seconds = totalSeconds % 60
-
-        return String(format: "%02d:%02d", minutes, seconds)
+        TranscriptRendering.formatTimestamp(milliseconds)
     }
 }
 
