@@ -78,6 +78,7 @@ public struct TranscriptSegment: View {
                 .lineSpacing(6)
                 .foregroundColor(VaporColor.textPrimary)
         }
+        .accessibilityIdentifier("transcriptSegment")
     }
 }
 

@@ -1,0 +1,72 @@
+import XCTest
+
+/// E2E tests for the recording feature.
+/// Validates live transcript updates appear during recording.
+final class RecordingE2ETests: XCTestCase {
+    var app: XCUIApplication!
+
+    override func setUp() {
+        super.setUp()
+        continueAfterFailure = false
+        app = XCUIApplication()
+        // Launch with UI testing flag to switch to mock dependencies
+        app.launchArguments = ["-uiTesting"]
+    }
+
+    override func tearDown() {
+        app = nil
+        super.tearDown()
+    }
+
+    /// Test that live transcript segments appear while recording.
+    /// Flow: Timeline -> Start recording -> Verify live segments appear -> Stop recording
+    func testLiveSegmentsAppear() {
+        // 1. Launch the app
+        app.launch()
+
+        // 2. Verify we're on the Timeline screen
+        let timelineTab = app.tabBars.buttons["Timeline"]
+        XCTAssertTrue(timelineTab.waitForExistence(timeout: 5), "Timeline tab should exist")
+
+        // 3. Tap the record button to start recording
+        let startRecordingButton = app.buttons["startRecordingButton"]
+        XCTAssertTrue(startRecordingButton.waitForExistence(timeout: 5), "Start recording button should exist")
+        startRecordingButton.tap()
+
+        // 4. Verify recording screen appears with the stop button
+        let stopRecordingButton = app.buttons["stopRecordingButton"]
+        XCTAssertTrue(stopRecordingButton.waitForExistence(timeout: 5), "Stop recording button should appear")
+
+        // 5. Wait for live transcript segments to appear
+        // The mock FluidAudio client emits 3 segments from twoSpeakerConversation script
+        let transcriptSegmentPredicate = NSPredicate(format: "identifier == 'transcriptSegment'")
+        let transcriptSegments = app.descendants(matching: .any).matching(transcriptSegmentPredicate)
+
+        // Wait for at least one transcript segment to appear
+        let firstSegmentExists = transcriptSegments.firstMatch.waitForExistence(timeout: 10)
+        XCTAssertTrue(firstSegmentExists, "At least one live transcript segment should appear during recording")
+
+        // 6. Verify we have multiple segments (mock script has 3 segments)
+        // Give time for all segments to be processed
+        let expectation = XCTestExpectation(description: "Multiple segments appear")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            if transcriptSegments.count >= 2 {
+                expectation.fulfill()
+            }
+        }
+        wait(for: [expectation], timeout: 5)
+        XCTAssertGreaterThanOrEqual(transcriptSegments.count, 2, "Multiple live transcript segments should appear")
+
+        // 7. Verify segment content is visible
+        // The mock script includes "Hello, how are you today?" as first segment text
+        let helloTextPredicate = NSPredicate(format: "label CONTAINS 'Hello'")
+        let helloText = app.staticTexts.matching(helloTextPredicate).firstMatch
+        XCTAssertTrue(helloText.exists, "Segment text 'Hello' should be visible")
+
+        // 8. Stop the recording
+        stopRecordingButton.tap()
+
+        // 9. Wait for recording to finish and timeline to reappear
+        XCTAssertTrue(timelineTab.waitForExistence(timeout: 10), "Should return to timeline after recording stops")
+    }
+}
