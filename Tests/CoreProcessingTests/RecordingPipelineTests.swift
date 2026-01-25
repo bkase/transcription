@@ -32,6 +32,7 @@ import Persistence
         startWriting: { _, _ in },
         appendFrame: { _ in },
         finishWriting: { 1024 },
+        cancelWriting: { },
         isWriting: { false }
     )
 
@@ -142,6 +143,7 @@ import Persistence
         startWriting: { _, _ in },
         appendFrame: { _ in },
         finishWriting: { 512 },
+        cancelWriting: { },
         isWriting: { false }
     )
 
@@ -206,6 +208,7 @@ import Persistence
         startWriting: { _, _ in },
         appendFrame: { _ in },
         finishWriting: { 2048 },
+        cancelWriting: { },
         isWriting: { false }
     )
 
@@ -271,6 +274,7 @@ import Persistence
         startWriting: { _, _ in },
         appendFrame: { _ in await frameCounter.increment() },
         finishWriting: { await frameCounter.getCount() * 4096 },
+        cancelWriting: { },
         isWriting: { false }
     )
 

@@ -36,6 +36,22 @@ public struct RecordingView: View {
         .onDisappear {
             store.send(.onDisappear)
         }
+        .alert(
+            "Discard Recording?",
+            isPresented: Binding(
+                get: { store.isShowingDiscardConfirmation },
+                set: { if !$0 { store.send(.discardCancelled) } }
+            )
+        ) {
+            Button("Cancel", role: .cancel) {
+                store.send(.discardCancelled)
+            }
+            Button("Discard", role: .destructive) {
+                store.send(.discardConfirmed)
+            }
+        } message: {
+            Text("This will permanently delete the recording and all transcript data.")
+        }
     }
 
     // MARK: - Nav Header
@@ -206,10 +222,11 @@ public struct RecordingView: View {
 
             Spacer()
 
-            // More button (right)
-            IconButton(systemName: "ellipsis", style: .transparent, iconColor: VaporColor.textSecondary) {
-                // More action - not implemented yet
+            // Discard button (right)
+            IconButton(systemName: "trash", style: .transparent, iconColor: VaporColor.recording) {
+                store.send(.discardTapped)
             }
+            .accessibilityIdentifier("discardButton")
         }
         .padding(.horizontal, VaporSpacing.xl)
         .padding(.bottom, VaporSpacing.xl)
@@ -420,15 +437,15 @@ public struct RecordingViewPreview: View {
 
                 Spacer()
 
-                // More button
+                // Discard button
                 ZStack {
                     Circle()
                         .fill(Color.clear)
                         .frame(width: 40, height: 40)
 
-                    Image(systemName: "ellipsis")
+                    Image(systemName: "trash")
                         .font(.system(size: 24, weight: .light))
-                        .foregroundColor(VaporColor.textSecondary)
+                        .foregroundColor(VaporColor.recording)
                 }
             }
             .padding(.horizontal, VaporSpacing.xl)

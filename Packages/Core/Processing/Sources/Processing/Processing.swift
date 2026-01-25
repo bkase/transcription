@@ -70,6 +70,7 @@ public enum RecordingProcessorEvent: Sendable, Equatable {
     case didPause
     case didResume
     case didFinish(SessionID)
+    case didDiscard(SessionID)
     case didFail(String)
     /// Audio session was interrupted (e.g., phone call, Siri)
     case interrupted
@@ -113,6 +114,8 @@ public struct RecordingProcessorClient: Sendable {
     public var startRecording: @Sendable (_ audioDirectory: URL) async throws -> AsyncStream<RecordingProcessorEvent>
     /// Stop the current recording session
     public var stopRecording: @Sendable () async -> Void
+    /// Discard the current recording session (delete session and audio file)
+    public var discardRecording: @Sendable () async -> Void
     /// Pause the current recording session
     public var pauseRecording: @Sendable () async -> Void
     /// Resume the current recording session
@@ -136,6 +139,9 @@ extension RecordingProcessorClient: DependencyKey {
             },
             stopRecording: {
                 await processor.stopRecording()
+            },
+            discardRecording: {
+                await processor.discardRecording()
             },
             pauseRecording: {
                 await processor.pauseRecording()
@@ -294,6 +300,41 @@ public actor RecordingProcessor {
         if let sessionId = currentSessionID {
             await finalizeSession(sessionId)
         }
+
+        currentSessionID = nil
+        eventContinuation?.finish()
+        eventContinuation = nil
+    }
+
+    /// Discard the current recording session (delete session and audio file)
+    public func discardRecording() async {
+        guard isRecording else { return }
+        guard let sessionId = currentSessionID else { return }
+
+        isRecording = false
+        isPaused = false
+        isInterrupted = false
+
+        // Stop audio session observation
+        audioSessionTask?.cancel()
+        audioSessionTask = nil
+        await audioSessionClient.stopObserving()
+
+        // Stop capture and transcription
+        await audioCaptureClient.stopCapture()
+        await fluidAudioClient.stopTranscription()
+
+        // Cancel writing (don't finalize the file)
+        await audioFileWriterClient.cancelWriting()
+
+        // Emit listening changed
+        eventContinuation?.yield(.listeningChanged(false))
+
+        // Delete session and all related data from database
+        try? await databaseClient.deleteSession(sessionId)
+
+        // Emit discard event
+        eventContinuation?.yield(.didDiscard(sessionId))
 
         currentSessionID = nil
         eventContinuation?.finish()

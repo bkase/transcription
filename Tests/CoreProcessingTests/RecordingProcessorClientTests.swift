@@ -38,6 +38,7 @@ import Persistence
         startWriting: { _, _ in },
         appendFrame: { _ in },
         finishWriting: { 1024 },
+        cancelWriting: { },
         isWriting: { false }
     )
 
@@ -167,6 +168,7 @@ import Persistence
         startWriting: { _, _ in },
         appendFrame: { _ in },
         finishWriting: { 0 },
+        cancelWriting: { },
         isWriting: { false }
     )
 
@@ -217,6 +219,7 @@ import Persistence
         startWriting: { _, _ in },
         appendFrame: { _ in },
         finishWriting: { 0 },
+        cancelWriting: { },
         isWriting: { false }
     )
 

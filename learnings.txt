@@ -555,3 +555,14 @@
 - On newDeviceAvailable route change: continue normally (no restart)
 - Tests use controllable AsyncStream with continuation to simulate session events
 - Actor CaptureState pattern tracks start/stop call counts for verification
+
+## Discard recording flow
+- Add `discardRecording` to RecordingProcessorClient alongside stopRecording for clean abort
+- Processor discardRecording: stops capture/ML/audioSession, calls cancelWriting (deletes partial file), deletes session from DB
+- AudioFileWriterClient.cancelWriting: closes file handle and deletes partial file (tracks currentFileURL in actor state)
+- RecordingFeature state: `isShowingDiscardConfirmation: Bool` for confirmation alert
+- Actions flow: discardTapped → shows confirmation, discardConfirmed → calls processor, discardCancelled → hides confirmation
+- Processor emits `.didDiscard(SessionID)` event; feature handles by resetting state including elapsedSeconds to 0
+- SwiftUI alert binding: `Binding(get: { store.prop }, set: { if !$0 { store.send(.cancel) } })` for dismissal handling
+- discardConfirmed action: always close dialog first (`state.isShowingDiscardConfirmation = false`), then guard isRecording
+- When adding new @DependencyClient closure parameters, update ALL test mock initializations

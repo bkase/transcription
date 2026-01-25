@@ -64,6 +64,7 @@ import Dependencies
         deps.recordingProcessorClient = RecordingProcessorClient(
             startRecording: { _ in AsyncStream { _ in } },
             stopRecording: { },
+            discardRecording: { },
             pauseRecording: { },
             resumeRecording: { },
             isRecording: { false },

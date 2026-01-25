@@ -21,6 +21,9 @@ public struct AudioFileWriterClient: Sendable {
     /// - Returns: The total bytes written
     public var finishWriting: @Sendable () async throws -> Int
 
+    /// Cancel writing and delete the partial file
+    public var cancelWriting: @Sendable () async -> Void
+
     /// Check if currently writing
     public var isWriting: @Sendable () async -> Bool = { false }
 }
@@ -42,6 +45,7 @@ extension DependencyValues {
 /// Actor that manages audio file writing state
 public actor LiveAudioFileWriter {
     private var audioFile: ExtendedAudioFile?
+    private var currentFileURL: URL?
     private var totalBytesWritten: Int = 0
     private var format: AudioFormatConfig?
 
@@ -85,6 +89,7 @@ public actor LiveAudioFileWriter {
         }
 
         self.audioFile = ExtendedAudioFile(ref: file)
+        self.currentFileURL = url
         self.format = format
         self.totalBytesWritten = 0
     }
@@ -130,10 +135,31 @@ public actor LiveAudioFileWriter {
 
         let bytesWritten = totalBytesWritten
         self.audioFile = nil
+        self.currentFileURL = nil
         self.format = nil
         self.totalBytesWritten = 0
 
         return bytesWritten
+    }
+
+    public func cancelWriting() {
+        guard let audioFile = audioFile else { return }
+
+        let fileURL = currentFileURL
+
+        // Dispose the audio file handle
+        ExtAudioFileDispose(audioFile.ref)
+
+        // Reset state
+        self.audioFile = nil
+        self.currentFileURL = nil
+        self.format = nil
+        self.totalBytesWritten = 0
+
+        // Delete the partial file
+        if let url = fileURL {
+            try? FileManager.default.removeItem(at: url)
+        }
     }
 
     public var isWriting: Bool {
@@ -177,6 +203,9 @@ extension AudioFileWriterClient {
             },
             finishWriting: {
                 try await writer.finishWriting()
+            },
+            cancelWriting: {
+                await writer.cancelWriting()
             },
             isWriting: {
                 await writer.isWriting

@@ -181,6 +181,7 @@ import Testing
         finishWriting: {
             await state.finish()
         },
+        cancelWriting: { },
         isWriting: {
             await state.isWriting
         }

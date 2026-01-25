@@ -87,6 +87,8 @@ public struct RecordingFeature {
         public var speakerTracks: [LiveSpeakerTrack] = []
         /// Whether microphone permission was denied (shows special UI with Settings button)
         public var isPermissionDenied: Bool = false
+        /// Whether to show discard confirmation alert
+        public var isShowingDiscardConfirmation: Bool = false
 
         public init(
             isRecording: Bool = false,
@@ -98,7 +100,8 @@ public struct RecordingFeature {
             audioDirectory: URL? = nil,
             liveSegments: [LiveSegment] = [],
             speakerTracks: [LiveSpeakerTrack] = [],
-            isPermissionDenied: Bool = false
+            isPermissionDenied: Bool = false,
+            isShowingDiscardConfirmation: Bool = false
         ) {
             self.isRecording = isRecording
             self.isPaused = isPaused
@@ -110,6 +113,7 @@ public struct RecordingFeature {
             self.liveSegments = liveSegments
             self.speakerTracks = speakerTracks
             self.isPermissionDenied = isPermissionDenied
+            self.isShowingDiscardConfirmation = isShowingDiscardConfirmation
         }
     }
 
@@ -142,6 +146,12 @@ public struct RecordingFeature {
         case permissionDenied
         /// User tapped open settings button
         case openSettingsTapped
+        /// User tapped discard button (shows confirmation)
+        case discardTapped
+        /// User confirmed discard in the confirmation alert
+        case discardConfirmed
+        /// User cancelled discard in the confirmation alert
+        case discardCancelled
     }
 
     public var body: some ReducerOf<Self> {
@@ -210,6 +220,27 @@ public struct RecordingFeature {
                 return .run { [microphonePermissionClient] _ in
                     await microphonePermissionClient.openSettings()
                 }
+
+            case .discardTapped:
+                guard state.isRecording else { return .none }
+                state.isShowingDiscardConfirmation = true
+                return .none
+
+            case .discardConfirmed:
+                state.isShowingDiscardConfirmation = false
+                guard state.isRecording else { return .none }
+
+                // Cancel timer and call discard on processor
+                return .merge(
+                    .cancel(id: CancelID.timer),
+                    .run { _ in
+                        await recordingProcessorClient.discardRecording()
+                    }
+                )
+
+            case .discardCancelled:
+                state.isShowingDiscardConfirmation = false
+                return .none
 
             case .stopRecording:
                 guard state.isRecording else { return .none }
@@ -313,6 +344,19 @@ public struct RecordingFeature {
                     state.liveSegments = []
                     state.speakerTracks = []
                     // Keep elapsedSeconds for display until view navigates away
+                    return .merge(
+                        .cancel(id: CancelID.timer),
+                        .cancel(id: CancelID.processorEvents)
+                    )
+
+                case .didDiscard:
+                    state.isRecording = false
+                    state.isPaused = false
+                    state.isListening = false
+                    state.sessionID = nil
+                    state.liveSegments = []
+                    state.speakerTracks = []
+                    state.elapsedSeconds = 0
                     return .merge(
                         .cancel(id: CancelID.timer),
                         .cancel(id: CancelID.processorEvents)
