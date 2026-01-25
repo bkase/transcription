@@ -71,4 +71,16 @@ struct RecordingViewSnapshotTests {
 
         SnapshotHarness.assertSnapshot(of: view, named: "recording_live_segments_state")
     }
+
+    @Test func testPausedState() {
+        // Paused state: recording paused by user
+        let view = RecordingViewPreview(
+            elapsedTime: "01:23",
+            isRecording: true,
+            isPaused: true,
+            contentState: .paused
+        )
+
+        SnapshotHarness.assertSnapshot(of: view, named: "recording_paused_state")
+    }
 }
