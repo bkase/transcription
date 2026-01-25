@@ -420,3 +420,13 @@
 - Create custom `Conversion` for typed IDs: `apply` for parsing, `unapply` for printing
 - XcodeGen targets using URLRouting need explicit `swift-parsing` (Parsing product) and `swift-case-paths` (CasePaths) dependencies
 - URLRequestData(path:) for testing parsers, router.print() returns URLRequestData with `path` as ArraySlice<Substring>
+
+## TCA NavigationStack patterns
+- Use `@Reducer(state: .equatable, action: .equatable) public enum Path { case screen(Feature) }` for navigation destinations
+- `StackState<Path.State>` for navigation path, `StackAction<Path.State, Path.Action>` for path actions
+- `NavigationStack(path: $store.scope(state: \.path, action: \.path)) { root } destination: { store in switch store.case { ... } }`
+- Push via `state.path.append(.screenCase(FeatureState(...)))` in parent reducer
+- Pop via `_ = state.path.popLast()` when receiving child's back action
+- Intercept child actions with `.path(.element(id: _, action: .childFeature(.someAction)))`
+- Use `.forEach(\.path, action: \.path)` in reducer body to scope child reducers
+- Test targets need explicit dependencies on feature modules and Tagged for SessionID types
