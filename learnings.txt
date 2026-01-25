@@ -502,3 +502,23 @@
 - RecoveryResult struct returns staleSessionIds and reconciledCount for logging
 - Tests need to mock recoveryRoutineClient.run in withDependencies block for AppFeature tests
 - Signal 11 crashes in SPM tests from stale macro build artifacts - skip if test results show all passed
+
+## swift-gen property testing library
+- `Gen<T>` describes randomness; call `.run(using: &rng)` to generate actual values
+- Use `Xoshiro(seed: N)` for deterministic seeded randomness in tests
+- `zip(genA, genB, ...).map { tuple in ... }` combines up to 10 generators (more requires nested zips)
+- `Gen.element(of: array)` returns `Gen<T?>` (optional), use `.map { $0 ?? default }` to unwrap
+- `Gen.letterOrNumber.string(of: .always(N))` generates random N-character strings
+- `Gen.int(in: range)` generates integers in a range
+- `Gen.bool` generates random booleans
+- `genA.array(of: .always(N))` generates arrays of N elements
+- For complex record types with >10 fields, split into nested `zip` calls (batch1, batch2, etc.)
+
+## Deterministic dependency injection for tests
+- swift-clocks provides TestClock and ImmediateClock for controllable time in tests
+- `$0.date = .constant(Date)` injects a fixed date that returns same value on each access
+- `$0.uuid = .constant(UUID)` injects a fixed UUID that returns same value on each call
+- `$0.continuousClock = TestClock()` allows `await clock.advance(by:)` to control time
+- `$0.continuousClock = ImmediateClock()` makes all sleeps complete instantly
+- Nested `withDependencies { }` blocks inherit parent dependency overrides
+- UUID strings must only contain hex characters (0-9, A-F) - e.g., DEADBEEF-0000-0000-0000-000000000001
