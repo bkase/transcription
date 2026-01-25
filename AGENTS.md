@@ -1,9 +1,9 @@
-## Agent 1 Simulator Configuration
+## Agent 2 Simulator Configuration
 
 ```
-UDID:        A76B56DB-DEA2-4933-8C81-7A0EF009AC11
-Name:        Agent-1-iPhone
-DerivedData: /Users/bkase/DerivedData/agent-1
+UDID:        DB91C221-C523-4279-A7A8-53929942B22B
+Name:        Agent-2-iPhone
+DerivedData: /Users/bkase/DerivedData/agent-2
 ```
 
 **CRITICAL: Always run simulators HEADLESS. Never use `open` or `activate` Simulator.app.**
@@ -12,29 +12,29 @@ DerivedData: /Users/bkase/DerivedData/agent-1
 
 ```bash
 # Source environment
-source /Users/bkase/DerivedData/agent-1/sim-config.env
+source /Users/bkase/DerivedData/agent-2/sim-config.env
 
 # Boot headless (no GUI)
-xcrun simctl boot A76B56DB-DEA2-4933-8C81-7A0EF009AC11
-xcrun simctl bootstatus A76B56DB-DEA2-4933-8C81-7A0EF009AC11 -b  # Wait for boot
+xcrun simctl boot DB91C221-C523-4279-A7A8-53929942B22B
+xcrun simctl bootstatus DB91C221-C523-4279-A7A8-53929942B22B -b  # Wait for boot
 
 # Build and run
 xcodebuild -project <project> -scheme <app-target> \
-  -derivedDataPath /Users/bkase/DerivedData/agent-1 \
-  -destination "id=A76B56DB-DEA2-4933-8C81-7A0EF009AC11" \
+  -derivedDataPath /Users/bkase/DerivedData/agent-2 \
+  -destination "id=DB91C221-C523-4279-A7A8-53929942B22B" \
   -skipMacroValidation -skipPackagePluginValidation build
 
 # Install and launch
-xcrun simctl install A76B56DB-DEA2-4933-8C81-7A0EF009AC11 /Users/bkase/DerivedData/agent-1/Build/Products/Debug-iphonesimulator/<app-name>
-xcrun simctl launch A76B56DB-DEA2-4933-8C81-7A0EF009AC11 <app-slug>
+xcrun simctl install DB91C221-C523-4279-A7A8-53929942B22B /Users/bkase/DerivedData/agent-2/Build/Products/Debug-iphonesimulator/<app-name>
+xcrun simctl launch DB91C221-C523-4279-A7A8-53929942B22B <app-slug>
 
 # Take screenshots (headless)
-xcrun simctl io A76B56DB-DEA2-4933-8C81-7A0EF009AC11 screenshot output.png
+xcrun simctl io DB91C221-C523-4279-A7A8-53929942B22B screenshot output.png
 
 # UI Testing (headless) - use XCUITest
 xcodebuild test -project <project> -scheme <test-target> \
-  -derivedDataPath /Users/bkase/DerivedData/agent-1 \
-  -destination "id=A76B56DB-DEA2-4933-8C81-7A0EF009AC11"
+  -derivedDataPath /Users/bkase/DerivedData/agent-2 \
+  -destination "id=DB91C221-C523-4279-A7A8-53929942B22B"
 ```
 
 **For UI flow verification, use XCUITest - never GUI automation tools.**
