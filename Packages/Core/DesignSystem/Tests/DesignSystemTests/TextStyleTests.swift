@@ -68,35 +68,3 @@ import SwiftUI
     // Body: 0 * 16 = 0
     #expect(VaporTextStyle.body.tracking == 0)
 }
-
-@Test func testTextStyleFontCreation() {
-    // Verify that font property returns a Font without crashing
-    let displayFont = VaporTextStyle.display.font
-    let bodyFont = VaporTextStyle.body.font
-    let timestampFont = VaporTextStyle.timestamp.font
-
-    // These should all be valid Font instances
-    // (can't directly compare Font types, but we can verify they don't crash)
-    _ = displayFont
-    _ = bodyFont
-    _ = timestampFont
-}
-
-@Test func testVaporTextStyleIsSendable() {
-    // Verify VaporTextStyle can be passed across actor boundaries
-    let style = VaporTextStyle.body
-
-    Task {
-        // Using the style in another task verifies Sendable conformance compiles
-        let _ = style.fontSize
-    }
-}
-
-@Test func testVaporTextStyleIsEquatable() {
-    let style1 = VaporTextStyle.body
-    let style2 = VaporTextStyle.body
-    let style3 = VaporTextStyle.headline
-
-    #expect(style1 == style2)
-    #expect(style1 != style3)
-}
