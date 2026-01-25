@@ -48,6 +48,8 @@ test: gen
 	cd Packages/Core/Audio && swift test
 	@echo "Running Processing package tests..."
 	cd Packages/Core/Processing && swift test
+	@echo "Running Routing package tests..."
+	cd Packages/Core/Routing && swift test
 	@echo "Running TimelineFeature package tests..."
 	cd Packages/Features/TimelineFeature && swift test
 	@echo "Running RecordingFeature package tests..."
