@@ -71,6 +71,35 @@ public enum RecordingProcessorEvent: Sendable, Equatable {
     case didResume
     case didFinish(SessionID)
     case didFail(String)
+    /// Audio session was interrupted (e.g., phone call, Siri)
+    case interrupted
+    /// Audio session interruption ended
+    case interruptionEnded(shouldResume: Bool)
+    /// Audio route changed (e.g., headphones disconnected)
+    case routeChanged(RouteChangeInfo)
+}
+
+/// Information about an audio route change
+public struct RouteChangeInfo: Sendable, Equatable {
+    public let reason: AudioRouteChangeReason
+    public let shouldRestartCapture: Bool
+
+    public init(reason: AudioRouteChangeReason, shouldRestartCapture: Bool) {
+        self.reason = reason
+        self.shouldRestartCapture = shouldRestartCapture
+    }
+}
+
+/// Reason for audio route change (mirrors Audio.RouteChangeReason for decoupling)
+public enum AudioRouteChangeReason: Sendable, Equatable {
+    case newDeviceAvailable
+    case oldDeviceUnavailable
+    case categoryChange
+    case override
+    case wakeFromSleep
+    case noSuitableRouteForCategory
+    case routeConfigurationChange
+    case unknown
 }
 
 // MARK: - RecordingProcessorClient
@@ -144,6 +173,7 @@ extension DependencyValues {
 public actor RecordingProcessor {
     @Dependency(\.audioCaptureClient) var audioCaptureClient
     @Dependency(\.audioFileWriterClient) var audioFileWriterClient
+    @Dependency(\.audioSessionClient) var audioSessionClient
     @Dependency(\.fluidAudioClient) var fluidAudioClient
     @Dependency(\.databaseClient) var databaseClient
     @Dependency(\.uuid) var uuid
@@ -152,8 +182,10 @@ public actor RecordingProcessor {
     private var currentSessionID: SessionID?
     private var isRecording: Bool = false
     private var isPaused: Bool = false
+    private var isInterrupted: Bool = false
     private var seenSpeakers: Set<String> = []
     private var eventContinuation: AsyncStream<RecordingProcessorEvent>.Continuation?
+    private var audioSessionTask: Task<Void, Never>?
 
     public init() {}
 
@@ -222,6 +254,16 @@ public actor RecordingProcessor {
             }
         }
 
+        // Start observing audio session events (interruptions, route changes)
+        let audioSessionStream = await audioSessionClient.startObserving()
+        audioSessionTask = Task { [weak self] in
+            for await event in audioSessionStream {
+                guard let self = self else { break }
+                guard await self.getIsRecording() else { break }
+                await self.handleAudioSessionEvent(event)
+            }
+        }
+
         return stream
     }
 
@@ -231,6 +273,12 @@ public actor RecordingProcessor {
 
         isRecording = false
         isPaused = false
+        isInterrupted = false
+
+        // Stop audio session observation
+        audioSessionTask?.cancel()
+        audioSessionTask = nil
+        await audioSessionClient.stopObserving()
 
         // Stop capture and transcription
         await audioCaptureClient.stopCapture()
@@ -298,7 +346,108 @@ public actor RecordingProcessor {
         currentSessionID
     }
 
+    /// Check if currently interrupted
+    public func getIsInterrupted() -> Bool {
+        isInterrupted
+    }
+
     // MARK: - Private Helpers
+
+    /// Handle audio session events (interruptions and route changes)
+    private func handleAudioSessionEvent(_ event: AudioSessionEvent) async {
+        switch event {
+        case .interrupted(let type):
+            await handleInterruption(type)
+        case .routeChanged(let reason):
+            await handleRouteChange(reason)
+        }
+    }
+
+    /// Handle audio session interruption
+    private func handleInterruption(_ type: InterruptionType) async {
+        switch type {
+        case .began:
+            guard !isInterrupted else { return }
+            isInterrupted = true
+
+            // Pause capture during interruption
+            await audioCaptureClient.stopCapture()
+
+            // Emit events
+            eventContinuation?.yield(.listeningChanged(false))
+            eventContinuation?.yield(.interrupted)
+
+        case .ended(let shouldResume):
+            guard isInterrupted else { return }
+            isInterrupted = false
+
+            eventContinuation?.yield(.interruptionEnded(shouldResume: shouldResume))
+
+            // Auto-resume if the system indicates we should and we're not manually paused
+            if shouldResume && !isPaused {
+                do {
+                    _ = try await audioCaptureClient.startCapture()
+                    eventContinuation?.yield(.listeningChanged(true))
+                } catch {
+                    eventContinuation?.yield(.didFail("Failed to resume after interruption: \(error.localizedDescription)"))
+                }
+            }
+        }
+    }
+
+    /// Handle audio route change
+    private func handleRouteChange(_ reason: RouteChangeReason) async {
+        let processingReason = mapRouteChangeReason(reason)
+        let shouldRestartCapture = shouldRestartCaptureForRouteChange(reason)
+
+        eventContinuation?.yield(.routeChanged(RouteChangeInfo(
+            reason: processingReason,
+            shouldRestartCapture: shouldRestartCapture
+        )))
+
+        // Restart capture if needed (e.g., when old device became unavailable)
+        if shouldRestartCapture && !isPaused && !isInterrupted {
+            // Stop current capture
+            await audioCaptureClient.stopCapture()
+
+            // Restart capture with new route
+            do {
+                _ = try await audioCaptureClient.startCapture()
+                eventContinuation?.yield(.listeningChanged(true))
+            } catch {
+                eventContinuation?.yield(.didFail("Failed to restart capture after route change: \(error.localizedDescription)"))
+            }
+        }
+    }
+
+    /// Map Audio.RouteChangeReason to Processing.AudioRouteChangeReason
+    private func mapRouteChangeReason(_ reason: RouteChangeReason) -> AudioRouteChangeReason {
+        switch reason {
+        case .newDeviceAvailable: return .newDeviceAvailable
+        case .oldDeviceUnavailable: return .oldDeviceUnavailable
+        case .categoryChange: return .categoryChange
+        case .override: return .override
+        case .wakeFromSleep: return .wakeFromSleep
+        case .noSuitableRouteForCategory: return .noSuitableRouteForCategory
+        case .routeConfigurationChange: return .routeConfigurationChange
+        case .unknown: return .unknown
+        }
+    }
+
+    /// Determine if capture should be restarted for a given route change
+    private func shouldRestartCaptureForRouteChange(_ reason: RouteChangeReason) -> Bool {
+        switch reason {
+        case .oldDeviceUnavailable:
+            // Device was unplugged - restart capture to use new route
+            return true
+        case .noSuitableRouteForCategory:
+            // No suitable route - may need to restart when one becomes available
+            return true
+        default:
+            // For other changes, capture continues normally
+            return false
+        }
+    }
 
     private func handleSegment(_ segment: TranscriptSegment, sessionId: SessionID) async {
         let now = date.now

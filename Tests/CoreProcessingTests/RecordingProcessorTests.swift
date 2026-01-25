@@ -256,3 +256,413 @@ import Persistence
     #expect(!isRecording, "Should not be recording after stop")
     #expect(sessionId == nil, "Should have no session ID after stop")
 }
+
+@Test func testProcessorHandlesInterruptionBegan() async throws {
+    // This test verifies that when an audio session interruption begins,
+    // the processor pauses capture and emits the interrupted event.
+
+    let dbQueue = try makeDatabase(configuration: .inMemory)
+
+    // Track stop calls
+    actor CaptureState {
+        var stopCallCount = 0
+        func incrementStopCount() { stopCallCount += 1 }
+        func getStopCount() -> Int { stopCallCount }
+    }
+    let captureState = CaptureState()
+
+    // Create controllable audio session stream
+    let (sessionStream, sessionContinuation) = AsyncStream<AudioSessionEvent>.makeStream()
+
+    let mockAudioCapture = AudioCaptureClient(
+        startCapture: { AsyncStream { _ in } },
+        stopCapture: { await captureState.incrementStopCount() },
+        isCapturing: { false }
+    )
+
+    let mockFileWriter = AudioFileWriterClient(
+        startWriting: { _, _ in },
+        appendFrame: { _ in },
+        finishWriting: { 0 },
+        isWriting: { false }
+    )
+
+    let mockAudioSession = AudioSessionClient(
+        startObserving: { sessionStream },
+        stopObserving: { },
+        configureForRecording: { }
+    )
+
+    let mockFluidAudio = MockFluidAudioClient.empty
+    let databaseClient = DatabaseClient.live(dbQueue: dbQueue)
+
+    var receivedEvents: [RecordingProcessorEvent] = []
+
+    let processor = withDependencies {
+        $0.audioCaptureClient = mockAudioCapture
+        $0.audioFileWriterClient = mockFileWriter
+        $0.audioSessionClient = mockAudioSession
+        $0.fluidAudioClient = mockFluidAudio
+        $0.databaseClient = databaseClient
+        $0.uuid = .incrementing
+        $0.date = .constant(Date(timeIntervalSince1970: 1000))
+    } operation: {
+        RecordingProcessor()
+    }
+
+    // Start recording
+    let tempDir = FileManager.default.temporaryDirectory
+    let eventStream = try await processor.startRecording(audioDirectory: tempDir)
+
+    // Collect events in background
+    let collectTask = Task {
+        for await event in eventStream {
+            receivedEvents.append(event)
+        }
+    }
+
+    // Wait for start
+    try await Task.sleep(for: .milliseconds(50))
+
+    // Initial stop count is 0
+    var stopCount = await captureState.getStopCount()
+    #expect(stopCount == 0, "Should not have stopped capture yet")
+
+    // Simulate interruption began
+    sessionContinuation.yield(.interrupted(.began))
+
+    // Wait for event processing
+    try await Task.sleep(for: .milliseconds(50))
+
+    // Verify processor paused capture
+    stopCount = await captureState.getStopCount()
+    #expect(stopCount == 1, "Should have stopped capture once on interruption")
+
+    // Verify isInterrupted state
+    let isInterrupted = await processor.getIsInterrupted()
+    #expect(isInterrupted, "Should be in interrupted state")
+
+    // Verify events emitted
+    let interruptedEvents = receivedEvents.filter {
+        if case .interrupted = $0 { return true }
+        return false
+    }
+    #expect(interruptedEvents.count == 1, "Should have received one interrupted event")
+
+    let listeningFalseEvents = receivedEvents.filter { $0 == .listeningChanged(false) }
+    #expect(listeningFalseEvents.count >= 1, "Should have received listeningChanged(false) on interruption")
+
+    // Clean up
+    sessionContinuation.finish()
+    await processor.stopRecording()
+    collectTask.cancel()
+}
+
+@Test func testProcessorHandlesInterruptionEndedWithResume() async throws {
+    // This test verifies that when an interruption ends with shouldResume=true,
+    // the processor auto-resumes capture.
+
+    let dbQueue = try makeDatabase(configuration: .inMemory)
+
+    // Track start/stop calls
+    actor CaptureState {
+        var startCallCount = 0
+        var stopCallCount = 0
+        func incrementStartCount() { startCallCount += 1 }
+        func incrementStopCount() { stopCallCount += 1 }
+        func getStartCount() -> Int { startCallCount }
+        func getStopCount() -> Int { stopCallCount }
+    }
+    let captureState = CaptureState()
+
+    // Create controllable audio session stream
+    let (sessionStream, sessionContinuation) = AsyncStream<AudioSessionEvent>.makeStream()
+
+    let mockAudioCapture = AudioCaptureClient(
+        startCapture: {
+            await captureState.incrementStartCount()
+            return AsyncStream { _ in }
+        },
+        stopCapture: { await captureState.incrementStopCount() },
+        isCapturing: { false }
+    )
+
+    let mockFileWriter = AudioFileWriterClient(
+        startWriting: { _, _ in },
+        appendFrame: { _ in },
+        finishWriting: { 0 },
+        isWriting: { false }
+    )
+
+    let mockAudioSession = AudioSessionClient(
+        startObserving: { sessionStream },
+        stopObserving: { },
+        configureForRecording: { }
+    )
+
+    let mockFluidAudio = MockFluidAudioClient.empty
+    let databaseClient = DatabaseClient.live(dbQueue: dbQueue)
+
+    var receivedEvents: [RecordingProcessorEvent] = []
+
+    let processor = withDependencies {
+        $0.audioCaptureClient = mockAudioCapture
+        $0.audioFileWriterClient = mockFileWriter
+        $0.audioSessionClient = mockAudioSession
+        $0.fluidAudioClient = mockFluidAudio
+        $0.databaseClient = databaseClient
+        $0.uuid = .incrementing
+        $0.date = .constant(Date(timeIntervalSince1970: 1000))
+    } operation: {
+        RecordingProcessor()
+    }
+
+    // Start recording
+    let tempDir = FileManager.default.temporaryDirectory
+    let eventStream = try await processor.startRecording(audioDirectory: tempDir)
+
+    // Collect events in background
+    let collectTask = Task {
+        for await event in eventStream {
+            receivedEvents.append(event)
+        }
+    }
+
+    // Wait for start
+    try await Task.sleep(for: .milliseconds(50))
+
+    // Initial start count is 1 (from startRecording)
+    var startCount = await captureState.getStartCount()
+    #expect(startCount == 1, "Should have started capture once")
+
+    // Simulate interruption began then ended with shouldResume
+    sessionContinuation.yield(.interrupted(.began))
+    try await Task.sleep(for: .milliseconds(50))
+
+    sessionContinuation.yield(.interrupted(.ended(shouldResume: true)))
+    try await Task.sleep(for: .milliseconds(50))
+
+    // Verify auto-resume (second start call)
+    startCount = await captureState.getStartCount()
+    #expect(startCount == 2, "Should have restarted capture after interruption ended")
+
+    // Verify isInterrupted is cleared
+    let isInterrupted = await processor.getIsInterrupted()
+    #expect(!isInterrupted, "Should not be in interrupted state after resume")
+
+    // Verify interruptionEnded event
+    let endedEvents = receivedEvents.filter {
+        if case .interruptionEnded(let shouldResume) = $0 {
+            return shouldResume
+        }
+        return false
+    }
+    #expect(endedEvents.count == 1, "Should have received interruptionEnded(shouldResume: true)")
+
+    // Clean up
+    sessionContinuation.finish()
+    await processor.stopRecording()
+    collectTask.cancel()
+}
+
+@Test func testProcessorHandlesRouteChangeOldDeviceUnavailable() async throws {
+    // This test verifies that when an old device becomes unavailable (e.g., headphones unplugged),
+    // the processor restarts capture.
+
+    let dbQueue = try makeDatabase(configuration: .inMemory)
+
+    // Track start/stop calls
+    actor CaptureState {
+        var startCallCount = 0
+        var stopCallCount = 0
+        func incrementStartCount() { startCallCount += 1 }
+        func incrementStopCount() { stopCallCount += 1 }
+        func getStartCount() -> Int { startCallCount }
+        func getStopCount() -> Int { stopCallCount }
+    }
+    let captureState = CaptureState()
+
+    // Create controllable audio session stream
+    let (sessionStream, sessionContinuation) = AsyncStream<AudioSessionEvent>.makeStream()
+
+    let mockAudioCapture = AudioCaptureClient(
+        startCapture: {
+            await captureState.incrementStartCount()
+            return AsyncStream { _ in }
+        },
+        stopCapture: { await captureState.incrementStopCount() },
+        isCapturing: { false }
+    )
+
+    let mockFileWriter = AudioFileWriterClient(
+        startWriting: { _, _ in },
+        appendFrame: { _ in },
+        finishWriting: { 0 },
+        isWriting: { false }
+    )
+
+    let mockAudioSession = AudioSessionClient(
+        startObserving: { sessionStream },
+        stopObserving: { },
+        configureForRecording: { }
+    )
+
+    let mockFluidAudio = MockFluidAudioClient.empty
+    let databaseClient = DatabaseClient.live(dbQueue: dbQueue)
+
+    var receivedEvents: [RecordingProcessorEvent] = []
+
+    let processor = withDependencies {
+        $0.audioCaptureClient = mockAudioCapture
+        $0.audioFileWriterClient = mockFileWriter
+        $0.audioSessionClient = mockAudioSession
+        $0.fluidAudioClient = mockFluidAudio
+        $0.databaseClient = databaseClient
+        $0.uuid = .incrementing
+        $0.date = .constant(Date(timeIntervalSince1970: 1000))
+    } operation: {
+        RecordingProcessor()
+    }
+
+    // Start recording
+    let tempDir = FileManager.default.temporaryDirectory
+    let eventStream = try await processor.startRecording(audioDirectory: tempDir)
+
+    // Collect events in background
+    let collectTask = Task {
+        for await event in eventStream {
+            receivedEvents.append(event)
+        }
+    }
+
+    // Wait for start
+    try await Task.sleep(for: .milliseconds(50))
+
+    // Initial counts
+    var startCount = await captureState.getStartCount()
+    var stopCount = await captureState.getStopCount()
+    #expect(startCount == 1, "Should have started capture once")
+    #expect(stopCount == 0, "Should not have stopped capture yet")
+
+    // Simulate oldDeviceUnavailable (headphones unplugged)
+    sessionContinuation.yield(.routeChanged(.oldDeviceUnavailable))
+    try await Task.sleep(for: .milliseconds(50))
+
+    // Verify restart (stop + start again)
+    startCount = await captureState.getStartCount()
+    stopCount = await captureState.getStopCount()
+    #expect(stopCount == 1, "Should have stopped capture for route change")
+    #expect(startCount == 2, "Should have restarted capture after route change")
+
+    // Verify routeChanged event
+    let routeEvents = receivedEvents.filter {
+        if case .routeChanged(let info) = $0 {
+            return info.reason == .oldDeviceUnavailable && info.shouldRestartCapture
+        }
+        return false
+    }
+    #expect(routeEvents.count == 1, "Should have received routeChanged event with shouldRestartCapture=true")
+
+    // Clean up
+    sessionContinuation.finish()
+    await processor.stopRecording()
+    collectTask.cancel()
+}
+
+@Test func testProcessorDoesNotRestartCaptureForNewDevice() async throws {
+    // This test verifies that when a new device becomes available,
+    // the processor does NOT restart capture (it continues normally).
+
+    let dbQueue = try makeDatabase(configuration: .inMemory)
+
+    // Track start/stop calls
+    actor CaptureState {
+        var startCallCount = 0
+        var stopCallCount = 0
+        func incrementStartCount() { startCallCount += 1 }
+        func incrementStopCount() { stopCallCount += 1 }
+        func getStartCount() -> Int { startCallCount }
+        func getStopCount() -> Int { stopCallCount }
+    }
+    let captureState = CaptureState()
+
+    // Create controllable audio session stream
+    let (sessionStream, sessionContinuation) = AsyncStream<AudioSessionEvent>.makeStream()
+
+    let mockAudioCapture = AudioCaptureClient(
+        startCapture: {
+            await captureState.incrementStartCount()
+            return AsyncStream { _ in }
+        },
+        stopCapture: { await captureState.incrementStopCount() },
+        isCapturing: { false }
+    )
+
+    let mockFileWriter = AudioFileWriterClient(
+        startWriting: { _, _ in },
+        appendFrame: { _ in },
+        finishWriting: { 0 },
+        isWriting: { false }
+    )
+
+    let mockAudioSession = AudioSessionClient(
+        startObserving: { sessionStream },
+        stopObserving: { },
+        configureForRecording: { }
+    )
+
+    let mockFluidAudio = MockFluidAudioClient.empty
+    let databaseClient = DatabaseClient.live(dbQueue: dbQueue)
+
+    var receivedEvents: [RecordingProcessorEvent] = []
+
+    let processor = withDependencies {
+        $0.audioCaptureClient = mockAudioCapture
+        $0.audioFileWriterClient = mockFileWriter
+        $0.audioSessionClient = mockAudioSession
+        $0.fluidAudioClient = mockFluidAudio
+        $0.databaseClient = databaseClient
+        $0.uuid = .incrementing
+        $0.date = .constant(Date(timeIntervalSince1970: 1000))
+    } operation: {
+        RecordingProcessor()
+    }
+
+    // Start recording
+    let tempDir = FileManager.default.temporaryDirectory
+    let eventStream = try await processor.startRecording(audioDirectory: tempDir)
+
+    // Collect events in background
+    let collectTask = Task {
+        for await event in eventStream {
+            receivedEvents.append(event)
+        }
+    }
+
+    // Wait for start
+    try await Task.sleep(for: .milliseconds(50))
+
+    // Simulate newDeviceAvailable (headphones plugged in)
+    sessionContinuation.yield(.routeChanged(.newDeviceAvailable))
+    try await Task.sleep(for: .milliseconds(50))
+
+    // Verify NO restart (counts unchanged after initial start)
+    let startCount = await captureState.getStartCount()
+    let stopCount = await captureState.getStopCount()
+    #expect(startCount == 1, "Should NOT restart capture for new device")
+    #expect(stopCount == 0, "Should NOT stop capture for new device")
+
+    // Verify routeChanged event with shouldRestartCapture=false
+    let routeEvents = receivedEvents.filter {
+        if case .routeChanged(let info) = $0 {
+            return info.reason == .newDeviceAvailable && !info.shouldRestartCapture
+        }
+        return false
+    }
+    #expect(routeEvents.count == 1, "Should have received routeChanged event with shouldRestartCapture=false")
+
+    // Clean up
+    sessionContinuation.finish()
+    await processor.stopRecording()
+    collectTask.cancel()
+}

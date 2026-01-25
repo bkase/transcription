@@ -329,6 +329,27 @@ public struct RecordingFeature {
                         .cancel(id: CancelID.timer),
                         .cancel(id: CancelID.processorEvents)
                     )
+
+                case .interrupted:
+                    // Audio session was interrupted (phone call, Siri, etc.)
+                    // The processor has already paused capture, update UI state
+                    state.isPaused = true
+                    return .none
+
+                case let .interruptionEnded(shouldResume):
+                    // Audio session interruption ended
+                    // If shouldResume is true and we weren't manually paused, processor auto-resumes
+                    if shouldResume {
+                        state.isPaused = false
+                    }
+                    // Otherwise, stay paused until user manually resumes
+                    return .none
+
+                case .routeChanged:
+                    // Audio route changed (headphones disconnected, etc.)
+                    // The processor handles restarting capture if needed
+                    // No UI state change needed
+                    return .none
                 }
 
             case let .recordingStarted(sessionID):

@@ -542,3 +542,16 @@
   1. Add mock: `$0.microphonePermissionClient.getStatus = { .authorized }`
   2. Change: `await store.send(.startRecording(...))` (no state change)
   3. Add: `await store.receive(\.permissionGranted) { ... state changes ... }`
+
+## AudioSessionClient patterns
+- AudioSessionClient observes AVAudioSession notifications (interruption, routeChange) via NotificationCenter
+- Use `#if os(iOS)` guards for live implementation since AVAudioSession is iOS-only
+- macOS fallback returns empty stream and no-op implementations
+- Events mapped to domain types (InterruptionType, RouteChangeReason) to decouple from AVFoundation
+- RecordingProcessor subscribes to audioSessionClient.startObserving() stream during recording
+- On interruption began: pause capture, emit .interrupted event
+- On interruption ended with shouldResume: auto-resume capture if not manually paused
+- On oldDeviceUnavailable route change: restart capture (stop then start)
+- On newDeviceAvailable route change: continue normally (no restart)
+- Tests use controllable AsyncStream with continuation to simulate session events
+- Actor CaptureState pattern tracks start/stop call counts for verification
