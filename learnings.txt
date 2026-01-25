@@ -483,3 +483,13 @@
 - Use actor (TraceContext) for thread-safe trace state management in live client
 - Convenience methods (debug/info/warning/error) auto-inject current trace ID from context
 - Tests should use actors for mock state to satisfy Sendable closures in Swift 6
+
+## ErrorEnvelope patterns
+- ErrorEnvelope type: code (ErrorCode), userMessage, traceId, sessionId, recoveryActions, underlyingError, timestamp
+- ErrorCode enum with stable raw values (DB_READ, AUDIO_CAPTURE, etc.) for debugging and analytics
+- RecoveryAction enum: retry, retryFinalize, keepPartial, deleteSession, openSettings, dismiss
+- Factory methods (databaseRead, audioCapture, recordingInterrupted, etc.) with sensible defaults
+- AlertInfo type with title, message, primaryButton, secondaryButton for SwiftUI alerts
+- toAlertInfo() maps ErrorEnvelope to AlertInfo with appropriate title and button choices
+- Primary button preference order: retry > retryFinalize > openSettings > keepPartial > dismiss
+- Secondary button shows destructive actions (deleteSession) or cancel for multi-action errors
