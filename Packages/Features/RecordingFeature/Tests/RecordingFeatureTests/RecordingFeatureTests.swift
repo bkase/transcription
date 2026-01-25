@@ -5,6 +5,7 @@ import Models
 import Persistence
 @testable import RecordingFeature
 @testable import Processing
+@testable import Audio
 
 @MainActor
 struct RecordingFeatureTests {
@@ -28,6 +29,7 @@ struct RecordingFeatureTests {
             RecordingFeature()
         } withDependencies: {
             $0.continuousClock = clock
+            $0.microphonePermissionClient.getStatus = { .authorized }
             $0.recordingProcessorClient.startRecording = { _ in
                 return eventStream
             }
@@ -40,8 +42,10 @@ struct RecordingFeatureTests {
         #expect(store.state.sessionID == nil)
         #expect(store.state.elapsedSeconds == 0)
 
-        // Start recording
-        await store.send(.startRecording(audioDirectory: audioDirectory)) {
+        // Start recording - triggers permission check then permissionGranted
+        await store.send(.startRecording(audioDirectory: audioDirectory))
+
+        await store.receive(\.permissionGranted) {
             $0.isRecording = true
             $0.audioDirectory = audioDirectory
         }
@@ -91,27 +95,30 @@ struct RecordingFeatureTests {
         let audioDirectory = FileManager.default.temporaryDirectory
 
         struct TestError: Error, LocalizedError {
-            var errorDescription: String? { "Permission denied" }
+            var errorDescription: String? { "Storage error" }
         }
 
         let store = TestStore(initialState: RecordingFeature.State()) {
             RecordingFeature()
         } withDependencies: {
+            $0.microphonePermissionClient.getStatus = { .authorized }
             $0.recordingProcessorClient.startRecording = { _ in
                 throw TestError()
             }
         }
 
-        // Start recording
-        await store.send(.startRecording(audioDirectory: audioDirectory)) {
+        // Start recording - triggers permission check then permissionGranted
+        await store.send(.startRecording(audioDirectory: audioDirectory))
+
+        await store.receive(\.permissionGranted) {
             $0.isRecording = true
             $0.audioDirectory = audioDirectory
         }
 
-        // Should receive failure
+        // Should receive failure from processor
         await store.receive(\.recordingFailed) {
             $0.isRecording = false
-            $0.error = "Permission denied"
+            $0.error = "Storage error"
         }
     }
 
@@ -133,12 +140,15 @@ struct RecordingFeatureTests {
             RecordingFeature()
         } withDependencies: {
             $0.continuousClock = clock
+            $0.microphonePermissionClient.getStatus = { .authorized }
             $0.recordingProcessorClient.startRecording = { _ in eventStream }
             $0.recordingProcessorClient.stopRecording = { }
         }
 
         // Start recording
-        await store.send(.startRecording(audioDirectory: audioDirectory)) {
+        await store.send(.startRecording(audioDirectory: audioDirectory))
+
+        await store.receive(\.permissionGranted) {
             $0.isRecording = true
             $0.audioDirectory = audioDirectory
         }
@@ -179,12 +189,15 @@ struct RecordingFeatureTests {
             RecordingFeature()
         } withDependencies: {
             $0.continuousClock = clock
+            $0.microphonePermissionClient.getStatus = { .authorized }
             $0.recordingProcessorClient.startRecording = { _ in eventStream }
             $0.recordingProcessorClient.stopRecording = { }
         }
 
         // Start recording
-        await store.send(.startRecording(audioDirectory: audioDirectory)) {
+        await store.send(.startRecording(audioDirectory: audioDirectory))
+
+        await store.receive(\.permissionGranted) {
             $0.isRecording = true
             $0.audioDirectory = audioDirectory
         }
@@ -236,6 +249,7 @@ struct RecordingFeatureTests {
             RecordingFeature()
         } withDependencies: {
             $0.continuousClock = clock
+            $0.microphonePermissionClient.getStatus = { .authorized }
             $0.recordingProcessorClient.startRecording = { _ in eventStream }
             $0.recordingProcessorClient.stopRecording = { }
             $0.databaseClient.fetchTranscriptSegments = { _ in
@@ -268,7 +282,9 @@ struct RecordingFeatureTests {
         }
 
         // Start recording
-        await store.send(.startRecording(audioDirectory: audioDirectory)) {
+        await store.send(.startRecording(audioDirectory: audioDirectory))
+
+        await store.receive(\.permissionGranted) {
             $0.isRecording = true
             $0.audioDirectory = audioDirectory
         }

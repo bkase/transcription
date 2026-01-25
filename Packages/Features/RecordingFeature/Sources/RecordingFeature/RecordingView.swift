@@ -55,8 +55,33 @@ public struct RecordingView: View {
 
     @ViewBuilder
     private var contentArea: some View {
-        if let error = store.error {
-            // Error state
+        if store.isPermissionDenied {
+            // Permission denied state with Settings button
+            VStack(spacing: VaporSpacing.lg) {
+                Spacer()
+                Text(store.error ?? "Microphone access is required to record.")
+                    .font(.system(size: 16, weight: .regular))
+                    .foregroundColor(VaporColor.recording)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, VaporSpacing.xl)
+
+                Button {
+                    store.send(.openSettingsTapped)
+                } label: {
+                    Text("Open Settings")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(VaporColor.cloud)
+                        .padding(.horizontal, VaporSpacing.xl)
+                        .padding(.vertical, VaporSpacing.md)
+                        .background(VaporColor.sky)
+                        .cornerRadius(VaporRadius.md)
+                }
+                .accessibilityIdentifier("openSettingsButton")
+
+                Spacer()
+            }
+        } else if let error = store.error {
+            // Error state (non-permission errors)
             VStack {
                 Spacer()
                 Text(error)
@@ -228,6 +253,7 @@ public struct RecordingViewPreview: View {
         case starting
         case paused
         case error(String)
+        case permissionDenied(String)
         case liveSegments([LiveSegmentData])
     }
 
@@ -303,6 +329,26 @@ public struct RecordingViewPreview: View {
                         .foregroundColor(VaporColor.recording)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, VaporSpacing.xl)
+                    Spacer()
+                }
+
+            case .permissionDenied(let message):
+                VStack(spacing: VaporSpacing.lg) {
+                    Spacer()
+                    Text(message)
+                        .font(.system(size: 16, weight: .regular))
+                        .foregroundColor(VaporColor.recording)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, VaporSpacing.xl)
+
+                    Text("Open Settings")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(VaporColor.cloud)
+                        .padding(.horizontal, VaporSpacing.xl)
+                        .padding(.vertical, VaporSpacing.md)
+                        .background(VaporColor.sky)
+                        .cornerRadius(VaporRadius.md)
+
                     Spacer()
                 }
 

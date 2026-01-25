@@ -528,3 +528,17 @@
 - Two test files with same function name (e.g., `testSpeakerPickerModal`) create conflicting output paths
 - xcodebuild fails with "Multiple commands produce" error when copying to test bundle
 - Solution: use unique function names across all snapshot test files (e.g., `testSpeakerPickerFeatureModal` vs `testSpeakerPickerModal`)
+
+## TCA permission check patterns for recording
+- Add new action flow: startRecording → check permission → permissionGranted/permissionDenied → actual recording start
+- Move recording logic from `.startRecording` to `.permissionGranted` action
+- For MicrophonePermissionClient: use `AVAudioApplication.shared.recordPermission` and `AVAudioApplication.requestRecordPermission`
+- UIKit imports need `#if os(iOS)` guards for code that uses UIApplication (not available in macOS SPM tests)
+- Live client wrapped in `#if os(iOS)` with macOS fallback returning unimplemented client
+- Tests must mock `microphonePermissionClient.getStatus = { .authorized }` for all tests that call `.startRecording`
+- When permission denied, set both `isPermissionDenied: Bool` and `error: String` state for UI to display
+- Add `openSettingsTapped` action that calls `microphonePermissionClient.openSettings()` for Settings button
+- Update all existing tests that call `.startRecording` to:
+  1. Add mock: `$0.microphonePermissionClient.getStatus = { .authorized }`
+  2. Change: `await store.send(.startRecording(...))` (no state change)
+  3. Add: `await store.receive(\.permissionGranted) { ... state changes ... }`

@@ -58,6 +58,7 @@ public struct RecordingFeature {
     @Dependency(\.databaseClient) var databaseClient
     @Dependency(\.continuousClock) var clock
     @Dependency(\.uuid) var uuid
+    @Dependency(\.microphonePermissionClient) var microphonePermissionClient
 
     private enum CancelID {
         case timer
@@ -84,6 +85,8 @@ public struct RecordingFeature {
         public var liveSegments: [LiveSegment] = []
         /// Speaker tracks with person assignments
         public var speakerTracks: [LiveSpeakerTrack] = []
+        /// Whether microphone permission was denied (shows special UI with Settings button)
+        public var isPermissionDenied: Bool = false
 
         public init(
             isRecording: Bool = false,
@@ -94,7 +97,8 @@ public struct RecordingFeature {
             error: String? = nil,
             audioDirectory: URL? = nil,
             liveSegments: [LiveSegment] = [],
-            speakerTracks: [LiveSpeakerTrack] = []
+            speakerTracks: [LiveSpeakerTrack] = [],
+            isPermissionDenied: Bool = false
         ) {
             self.isRecording = isRecording
             self.isPaused = isPaused
@@ -105,6 +109,7 @@ public struct RecordingFeature {
             self.audioDirectory = audioDirectory
             self.liveSegments = liveSegments
             self.speakerTracks = speakerTracks
+            self.isPermissionDenied = isPermissionDenied
         }
     }
 
@@ -131,6 +136,12 @@ public struct RecordingFeature {
         case onAppear
         /// View disappeared
         case onDisappear
+        /// Permission was granted after requesting
+        case permissionGranted(audioDirectory: URL)
+        /// Permission was denied
+        case permissionDenied
+        /// User tapped open settings button
+        case openSettingsTapped
     }
 
     public var body: some ReducerOf<Self> {
@@ -139,10 +150,42 @@ public struct RecordingFeature {
             case let .startRecording(audioDirectory):
                 guard !state.isRecording else { return .none }
 
+                // Clear any previous permission denied state
+                state.isPermissionDenied = false
+                state.error = nil
+
+                // Check permission status synchronously first
+                let status = microphonePermissionClient.getStatus()
+
+                switch status {
+                case .authorized:
+                    // Already authorized, proceed directly
+                    return .send(.permissionGranted(audioDirectory: audioDirectory))
+
+                case .undetermined:
+                    // Need to request permission
+                    return .run { [microphonePermissionClient] send in
+                        let granted = await microphonePermissionClient.requestPermission()
+                        if granted {
+                            await send(.permissionGranted(audioDirectory: audioDirectory))
+                        } else {
+                            await send(.permissionDenied)
+                        }
+                    }
+
+                case .denied, .restricted:
+                    // Permission denied - show UI with settings button
+                    return .send(.permissionDenied)
+                }
+
+            case let .permissionGranted(audioDirectory):
+                guard !state.isRecording else { return .none }
+
                 state.audioDirectory = audioDirectory
                 state.isRecording = true
                 state.elapsedSeconds = 0
                 state.error = nil
+                state.isPermissionDenied = false
 
                 return .run { send in
                     do {
@@ -157,6 +200,16 @@ public struct RecordingFeature {
                     }
                 }
                 .cancellable(id: CancelID.processorEvents, cancelInFlight: true)
+
+            case .permissionDenied:
+                state.isPermissionDenied = true
+                state.error = "Microphone access is required to record. Please enable it in Settings."
+                return .none
+
+            case .openSettingsTapped:
+                return .run { [microphonePermissionClient] _ in
+                    await microphonePermissionClient.openSettings()
+                }
 
             case .stopRecording:
                 guard state.isRecording else { return .none }

@@ -5,6 +5,7 @@ import Models
 import Persistence
 @testable import RecordingFeature
 @testable import Processing
+@testable import Audio
 
 @MainActor
 struct RecordingControlsTests {
@@ -28,6 +29,7 @@ struct RecordingControlsTests {
             RecordingFeature()
         } withDependencies: {
             $0.continuousClock = clock
+            $0.microphonePermissionClient.getStatus = { .authorized }
             $0.recordingProcessorClient.startRecording = { _ in
                 return eventStream
             }
@@ -41,7 +43,9 @@ struct RecordingControlsTests {
         #expect(store.state.isPaused == false)
 
         // Start recording
-        await store.send(.startRecording(audioDirectory: audioDirectory)) {
+        await store.send(.startRecording(audioDirectory: audioDirectory))
+
+        await store.receive(\.permissionGranted) {
             $0.isRecording = true
             $0.audioDirectory = audioDirectory
         }
@@ -163,13 +167,16 @@ struct RecordingControlsTests {
             RecordingFeature()
         } withDependencies: {
             $0.continuousClock = clock
+            $0.microphonePermissionClient.getStatus = { .authorized }
             $0.recordingProcessorClient.startRecording = { _ in eventStream }
             $0.recordingProcessorClient.stopRecording = { }
             $0.recordingProcessorClient.pauseRecording = { }
         }
 
         // Start recording
-        await store.send(.startRecording(audioDirectory: audioDirectory)) {
+        await store.send(.startRecording(audioDirectory: audioDirectory))
+
+        await store.receive(\.permissionGranted) {
             $0.isRecording = true
             $0.audioDirectory = audioDirectory
         }

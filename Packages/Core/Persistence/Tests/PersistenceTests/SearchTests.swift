@@ -408,29 +408,32 @@ import Models
     let dbQueue = try makeDatabase(configuration: .inMemory)
     let client = DatabaseClient.live(dbQueue: dbQueue)
 
+    // Use a fixed reference date at noon to avoid timezone boundary issues
+    let calendar = Calendar.current
     let now = Date()
+    let noon = calendar.date(bySettingHour: 12, minute: 0, second: 0, of: now)!
 
-    // Create multiple sessions today at different times
+    // Create multiple sessions today at different times (all clearly within today)
     try await client.createSession(SessionRecord(
         id: "session-early",
-        startedAt: now.addingTimeInterval(-3600), // 1 hour ago
+        startedAt: noon.addingTimeInterval(-3600), // 11:00 AM
         processingState: .processed,
-        updatedAt: now
+        updatedAt: noon
     ))
     try await client.createSession(SessionRecord(
         id: "session-later",
-        startedAt: now.addingTimeInterval(-1800), // 30 min ago
+        startedAt: noon.addingTimeInterval(-1800), // 11:30 AM
         processingState: .processed,
-        updatedAt: now
+        updatedAt: noon
     ))
     try await client.createSession(SessionRecord(
         id: "session-newest",
-        startedAt: now, // Now
+        startedAt: noon, // 12:00 PM
         processingState: .processed,
-        updatedAt: now
+        updatedAt: noon
     ))
 
-    let groups = try await client.fetchSessionsGroupedByDate(now)
+    let groups = try await client.fetchSessionsGroupedByDate(noon)
 
     #expect(groups.count == 1)
     #expect(groups[0].bucket == .today)
