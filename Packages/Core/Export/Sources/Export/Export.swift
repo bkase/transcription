@@ -4,6 +4,301 @@ import Persistence
 import Dependencies
 import DependenciesMacros
 
+// MARK: - Export Schema Models
+
+/// Top-level export transcript structure containing all session data
+/// This is the JSON representation used in transcript.json
+public struct ExportTranscript: Codable, Equatable, Sendable {
+    /// Schema version for forward/backward compatibility
+    public let schemaVersion: String
+    /// Session metadata
+    public let session: ExportSession
+    /// Ordered transcript segments
+    public let segments: [ExportSegment]
+    /// Speaker tracks with mappings to people
+    public let speakerTracks: [ExportSpeakerTrack]
+    /// People referenced by speaker tracks
+    public let people: [ExportPerson]
+
+    public init(
+        schemaVersion: String = "1.0",
+        session: ExportSession,
+        segments: [ExportSegment],
+        speakerTracks: [ExportSpeakerTrack],
+        people: [ExportPerson]
+    ) {
+        self.schemaVersion = schemaVersion
+        self.session = session
+        self.segments = segments
+        self.speakerTracks = speakerTracks
+        self.people = people
+    }
+}
+
+/// Session metadata for export
+public struct ExportSession: Codable, Equatable, Sendable {
+    /// Unique session identifier
+    public let id: String
+    /// When the recording started (ISO 8601)
+    public let startedAt: Date
+    /// When the recording ended (ISO 8601), nil if still recording
+    public let endedAt: Date?
+    /// Optional user-provided title
+    public let title: String?
+    /// Total duration in milliseconds
+    public let durationMs: Int?
+    /// Number of distinct speakers detected
+    public let speakerCount: Int
+    /// Relative path to audio file in bundle
+    public let audioPath: String?
+
+    public init(
+        id: String,
+        startedAt: Date,
+        endedAt: Date?,
+        title: String?,
+        durationMs: Int?,
+        speakerCount: Int,
+        audioPath: String?
+    ) {
+        self.id = id
+        self.startedAt = startedAt
+        self.endedAt = endedAt
+        self.title = title
+        self.durationMs = durationMs
+        self.speakerCount = speakerCount
+        self.audioPath = audioPath
+    }
+
+    /// Create from a SessionRecord
+    public init(from record: SessionRecord, audioPath: String? = nil) {
+        self.id = record.id
+        self.startedAt = record.startedAt
+        self.endedAt = record.endedAt
+        self.title = record.title
+        self.durationMs = record.durationMs
+        self.speakerCount = record.speakerCount
+        self.audioPath = audioPath ?? record.audioPath
+    }
+}
+
+/// A transcript segment for export
+public struct ExportSegment: Codable, Equatable, Sendable {
+    /// Unique segment identifier
+    public let id: String
+    /// Start time in milliseconds from session start
+    public let startMs: Int
+    /// End time in milliseconds from session start
+    public let endMs: Int
+    /// Machine speaker ID (e.g., "spk_0")
+    public let speakerId: String?
+    /// Transcribed text content
+    public let text: String
+    /// Confidence score (0.0 to 1.0)
+    public let confidence: Double?
+
+    public init(
+        id: String,
+        startMs: Int,
+        endMs: Int,
+        speakerId: String?,
+        text: String,
+        confidence: Double?
+    ) {
+        self.id = id
+        self.startMs = startMs
+        self.endMs = endMs
+        self.speakerId = speakerId
+        self.text = text
+        self.confidence = confidence
+    }
+
+    /// Create from a TranscriptSegmentRecord
+    public init(from record: TranscriptSegmentRecord) {
+        self.id = record.id
+        self.startMs = record.startMs
+        self.endMs = record.endMs
+        self.speakerId = record.machineSpeakerId
+        self.text = record.text
+        self.confidence = record.confidence
+    }
+}
+
+/// A speaker track mapping machine speaker to person
+public struct ExportSpeakerTrack: Codable, Equatable, Sendable {
+    /// Machine speaker ID (e.g., "spk_0")
+    public let speakerId: String
+    /// Display order (1 = "Speaker 1")
+    public let displayOrder: Int
+    /// Person ID if assigned, nil otherwise
+    public let personId: String?
+
+    public init(speakerId: String, displayOrder: Int, personId: String?) {
+        self.speakerId = speakerId
+        self.displayOrder = displayOrder
+        self.personId = personId
+    }
+
+    /// Create from a SpeakerTrackRecord
+    public init(from record: SpeakerTrackRecord) {
+        self.speakerId = record.machineSpeakerId
+        self.displayOrder = record.displayOrder
+        self.personId = record.personId
+    }
+}
+
+/// A person record for export
+public struct ExportPerson: Codable, Equatable, Sendable {
+    /// Unique person identifier
+    public let id: String
+    /// Display name
+    public let name: String
+    /// Color token for UI display
+    public let colorToken: String
+
+    public init(id: String, name: String, colorToken: String) {
+        self.id = id
+        self.name = name
+        self.colorToken = colorToken
+    }
+
+    /// Create from a PersonRecord
+    public init(from record: PersonRecord) {
+        self.id = record.id
+        self.name = record.name
+        self.colorToken = record.colorToken
+    }
+}
+
+/// Metadata about the export bundle
+/// This is stored in metadata.json
+public struct ExportMetadata: Codable, Equatable, Sendable {
+    /// Schema version for the metadata format
+    public let schemaVersion: String
+    /// App version that created the export
+    public let appVersion: String
+    /// Build number
+    public let buildNumber: String
+    /// Timestamp when export was created (ISO 8601)
+    public let exportedAt: Date
+    /// Optional trace ID for debugging
+    public let traceId: String?
+    /// Processing statistics
+    public let stats: ExportStats
+
+    public init(
+        schemaVersion: String = "1.0",
+        appVersion: String,
+        buildNumber: String,
+        exportedAt: Date,
+        traceId: String?,
+        stats: ExportStats
+    ) {
+        self.schemaVersion = schemaVersion
+        self.appVersion = appVersion
+        self.buildNumber = buildNumber
+        self.exportedAt = exportedAt
+        self.traceId = traceId
+        self.stats = stats
+    }
+}
+
+/// Processing statistics for the export
+public struct ExportStats: Codable, Equatable, Sendable {
+    /// Number of transcript segments
+    public let segmentCount: Int
+    /// Number of speaker tracks
+    public let speakerTrackCount: Int
+    /// Total duration in milliseconds
+    public let durationMs: Int?
+    /// Number of assigned speakers (with personId)
+    public let assignedSpeakerCount: Int
+
+    public init(
+        segmentCount: Int,
+        speakerTrackCount: Int,
+        durationMs: Int?,
+        assignedSpeakerCount: Int
+    ) {
+        self.segmentCount = segmentCount
+        self.speakerTrackCount = speakerTrackCount
+        self.durationMs = durationMs
+        self.assignedSpeakerCount = assignedSpeakerCount
+    }
+}
+
+// MARK: - Export Bundle Assembly
+
+/// Helper to assemble export data from database records
+public enum ExportAssembler {
+    /// Create ExportTranscript from database records
+    public static func assembleTranscript(
+        session: SessionRecord,
+        segments: [TranscriptSegmentRecord],
+        speakerTracks: [SpeakerTrackRecord],
+        people: [PersonRecord],
+        audioPath: String? = nil
+    ) -> ExportTranscript {
+        // Only include people that are referenced by speaker tracks
+        let referencedPersonIds = Set(speakerTracks.compactMap(\.personId))
+        let referencedPeople = people.filter { referencedPersonIds.contains($0.id) }
+
+        return ExportTranscript(
+            session: ExportSession(from: session, audioPath: audioPath),
+            segments: segments.map(ExportSegment.init(from:)),
+            speakerTracks: speakerTracks.map(ExportSpeakerTrack.init(from:)),
+            people: referencedPeople.map(ExportPerson.init(from:))
+        )
+    }
+
+    /// Create ExportMetadata with the given parameters
+    public static func assembleMetadata(
+        appVersion: String,
+        buildNumber: String,
+        exportedAt: Date,
+        traceId: String?,
+        segmentCount: Int,
+        speakerTracks: [SpeakerTrackRecord],
+        durationMs: Int?
+    ) -> ExportMetadata {
+        let assignedCount = speakerTracks.filter { $0.personId != nil }.count
+
+        return ExportMetadata(
+            appVersion: appVersion,
+            buildNumber: buildNumber,
+            exportedAt: exportedAt,
+            traceId: traceId,
+            stats: ExportStats(
+                segmentCount: segmentCount,
+                speakerTrackCount: speakerTracks.count,
+                durationMs: durationMs,
+                assignedSpeakerCount: assignedCount
+            )
+        )
+    }
+}
+
+// MARK: - JSON Encoder Configuration
+
+extension JSONEncoder {
+    /// Configured encoder for export JSON files
+    public static var exportEncoder: JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return encoder
+    }
+}
+
+extension JSONDecoder {
+    /// Configured decoder for import JSON files
+    public static var exportDecoder: JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
+    }
+}
+
 // MARK: - ExportFormat
 
 /// Supported export formats
