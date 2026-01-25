@@ -415,6 +415,9 @@ public struct DatabaseClient: Sendable {
     public var searchSessions: @Sendable (_ query: String) async throws -> [SessionSearchResult] = { _ in [] }
     public var searchSessionsWithDetails: @Sendable (_ query: String) async throws -> [SessionRecord] = { _ in [] }
     public var fetchSessionsGroupedByDate: @Sendable (_ referenceDate: Date) async throws -> [SessionGroup] = { _ in [] }
+
+    // Conversation counts (distinct sessions per person via speaker_tracks)
+    public var fetchPersonConversationCounts: @Sendable () async throws -> [String: Int] = { [:] }
 }
 
 extension DatabaseClient: DependencyKey {
@@ -573,6 +576,25 @@ extension DatabaseClient: DependencyKey {
                         guard let sessions = groups[bucket], !sessions.isEmpty else { return nil }
                         return SessionGroup(bucket: bucket, sessions: sessions)
                     }
+                }
+            },
+            fetchPersonConversationCounts: {
+                try await dbQueue.read { db in
+                    // Count distinct sessions per person via speaker_tracks
+                    let sql = """
+                        SELECT personId, COUNT(DISTINCT sessionId) as conversationCount
+                        FROM speaker_tracks
+                        WHERE personId IS NOT NULL
+                        GROUP BY personId
+                        """
+                    let rows = try Row.fetchAll(db, sql: sql)
+                    var counts: [String: Int] = [:]
+                    for row in rows {
+                        if let personId = row["personId"] as? String {
+                            counts[personId] = Int(row["conversationCount"] as Int64)
+                        }
+                    }
+                    return counts
                 }
             }
         )

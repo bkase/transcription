@@ -16,6 +16,7 @@ public struct PeopleFeature {
     @ObservableState
     public struct State: Equatable {
         public var people: [PersonRecord] = []
+        public var conversationCounts: [String: Int] = [:]
         public var searchQuery: String = ""
         public var isLoading: Bool = false
         public var error: String?
@@ -42,8 +43,14 @@ public struct PeopleFeature {
             }
         }
 
+        /// Get conversation count for a person
+        public func conversationCount(for personId: String) -> Int {
+            conversationCounts[personId] ?? 0
+        }
+
         public init(
             people: [PersonRecord] = [],
+            conversationCounts: [String: Int] = [:],
             searchQuery: String = "",
             isLoading: Bool = false,
             error: String? = nil,
@@ -54,6 +61,7 @@ public struct PeopleFeature {
             isSaving: Bool = false
         ) {
             self.people = people
+            self.conversationCounts = conversationCounts
             self.searchQuery = searchQuery
             self.isLoading = isLoading
             self.error = error
@@ -68,7 +76,7 @@ public struct PeopleFeature {
     public enum Action: Equatable, Sendable {
         case onAppear
         case loadPeople
-        case peopleLoaded([PersonRecord])
+        case peopleLoaded([PersonRecord], [String: Int])
         case peopleFailed(String)
         case searchQueryChanged(String)
         case personTapped(PersonID)
@@ -101,15 +109,18 @@ public struct PeopleFeature {
                 state.error = nil
 
                 return .run { send in
-                    let people = try await databaseClient.fetchPeople()
-                    await send(.peopleLoaded(people))
+                    async let peopleTask = databaseClient.fetchPeople()
+                    async let countsTask = databaseClient.fetchPersonConversationCounts()
+                    let (people, counts) = try await (peopleTask, countsTask)
+                    await send(.peopleLoaded(people, counts))
                 } catch: { error, send in
                     await send(.peopleFailed(error.localizedDescription))
                 }
 
-            case let .peopleLoaded(people):
+            case let .peopleLoaded(people, counts):
                 state.isLoading = false
                 state.people = people
+                state.conversationCounts = counts
                 return .none
 
             case let .peopleFailed(errorMessage):

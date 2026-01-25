@@ -134,10 +134,9 @@ public struct PeopleView: View {
 
     private func personCard(for person: PersonRecord) -> some View {
         let speakerColor = SpeakerColor(rawValue: person.colorToken) ?? .sky
-        // Note: conversationCount would come from a separate query/join in a full implementation
         return PersonCard(
             name: person.name,
-            conversationCount: 0,
+            conversationCount: store.state.conversationCount(for: person.id),
             color: speakerColor
         )
     }

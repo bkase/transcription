@@ -29,11 +29,13 @@ struct PeopleFeatureTests {
                 updatedAt: mockDate
             )
         ]
+        let mockCounts: [String: Int] = ["person-1": 5, "person-2": 3]
 
         let store = TestStore(initialState: PeopleFeature.State()) {
             PeopleFeature()
         } withDependencies: {
             $0.databaseClient.fetchPeople = { mockPeople }
+            $0.databaseClient.fetchPersonConversationCounts = { mockCounts }
         }
 
         // onAppear should trigger loadPeople (no immediate state change)
@@ -44,10 +46,11 @@ struct PeopleFeatureTests {
             $0.isLoading = true
         }
 
-        // Receive the loaded people
+        // Receive the loaded people with conversation counts
         await store.receive(\.peopleLoaded) {
             $0.isLoading = false
             $0.people = mockPeople
+            $0.conversationCounts = mockCounts
         }
     }
 
@@ -114,6 +117,7 @@ struct PeopleFeatureTests {
             $0.databaseClient.fetchPeople = {
                 throw TestError()
             }
+            $0.databaseClient.fetchPersonConversationCounts = { [:] }
         }
 
         await store.send(.loadPeople) {
