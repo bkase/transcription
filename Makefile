@@ -76,13 +76,16 @@ test: gen
 	@echo "Tests complete."
 
 # Run tests in parallel
-# Uses AGENT_SIM_UDID env var if set, otherwise defaults to agent-2
+# Pre-booted simulators for parallel testing (created via xcrun simctl clone)
 AGENT_SIM_UDID ?= DB91C221-C523-4279-A7A8-53929942B22B
+AGENT_SIM_CLONE1 ?= E866672E-6F4A-426D-8A33-F1CA95DEE2D7
+AGENT_SIM_CLONE2 ?= FD01FD9C-05DE-4A16-B85F-642185740D1B
+AGENT_SIM_CLONE3 ?= 5493F8B9-5F9F-4881-AE0F-8B6FAD042E7F
 DERIVED_DATA_PATH ?= /Users/bkase/DerivedData/agent-2
 
 test-parallel: gen
 	@echo "=== Running tests in parallel ==="
-	@echo "Simulator: $(AGENT_SIM_UDID)"
+	@echo "Using pre-booted simulators (keep alive between runs)"
 	@echo ""
 	@echo "Phase 1: Building project..."
 	xcodebuild build-for-testing \
@@ -96,15 +99,16 @@ test-parallel: gen
 	@echo "Phase 2: Running SPM package tests in parallel..."
 	@$(MAKE) -j8 _test-packages
 	@echo ""
-	@echo "Phase 3: Running Xcode tests with parallel execution..."
+	@echo "Phase 3: Running Xcode tests with 4 pre-booted simulators..."
 	xcodebuild test-without-building \
 		-project xcodegen/Vapor.xcodeproj \
 		-scheme Vapor \
 		-destination "id=$(AGENT_SIM_UDID)" \
+		-destination "id=$(AGENT_SIM_CLONE1)" \
+		-destination "id=$(AGENT_SIM_CLONE2)" \
+		-destination "id=$(AGENT_SIM_CLONE3)" \
 		-derivedDataPath $(DERIVED_DATA_PATH) \
 		-skipMacroValidation -skipPackagePluginValidation \
-		-parallel-testing-enabled YES \
-		-parallel-testing-worker-count 4 \
 		-only-testing:VaporTests \
 		-only-testing:SnapshotTests \
 		-only-testing:ToolsTests \
