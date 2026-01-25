@@ -467,3 +467,11 @@
 - Speaker lookup: build dictionary from speakerTracks mapping machine ID to person name or "Speaker N"
 - For golden tests with multi-line expected strings, use raw single-line string with explicit `\n` to avoid whitespace issues
 - DateFormatter output is locale-dependent - use substring assertions for timestamp tests, not exact match
+
+## Export bundle packaging
+- Use ZIPFoundation package for cross-platform zip archive creation (add to both Package.swift and project.yml)
+- ExportBundleWriter creates staging directory, writes files, then zips using `Archive(url:accessMode:.create)`
+- Add entries with `archive.addEntry(with: filename, relativeTo: sourceDirectory)` for flat file structure in zip
+- NSFileCoordinator with `.forUploading` creates nested folder structure - avoid for flat exports
+- FileManager.unzipItem(at:to:) from ZIPFoundation for extraction in tests
+- Bundle contents: transcript.json, transcript.md, transcript.vtt, metadata.json, optional audio.caf
