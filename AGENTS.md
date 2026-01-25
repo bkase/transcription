@@ -1,4 +1,43 @@
+## Agent 1 Simulator Configuration
 
+```
+UDID:        A76B56DB-DEA2-4933-8C81-7A0EF009AC11
+Name:        Agent-1-iPhone
+DerivedData: /Users/bkase/DerivedData/agent-1
+```
+
+**CRITICAL: Always run simulators HEADLESS. Never use `open` or `activate` Simulator.app.**
+
+**Usage:**
+
+```bash
+# Source environment
+source /Users/bkase/DerivedData/agent-1/sim-config.env
+
+# Boot headless (no GUI)
+xcrun simctl boot A76B56DB-DEA2-4933-8C81-7A0EF009AC11
+xcrun simctl bootstatus A76B56DB-DEA2-4933-8C81-7A0EF009AC11 -b  # Wait for boot
+
+# Build and run
+xcodebuild -project <project> -scheme <app-target> \
+  -derivedDataPath /Users/bkase/DerivedData/agent-1 \
+  -destination "id=A76B56DB-DEA2-4933-8C81-7A0EF009AC11" \
+  -skipMacroValidation -skipPackagePluginValidation build
+
+# Install and launch
+xcrun simctl install A76B56DB-DEA2-4933-8C81-7A0EF009AC11 /Users/bkase/DerivedData/agent-1/Build/Products/Debug-iphonesimulator/<app-name>
+xcrun simctl launch A76B56DB-DEA2-4933-8C81-7A0EF009AC11 <app-slug>
+
+# Take screenshots (headless)
+xcrun simctl io A76B56DB-DEA2-4933-8C81-7A0EF009AC11 screenshot output.png
+
+# UI Testing (headless) - use XCUITest
+xcodebuild test -project <project> -scheme <test-target> \
+  -derivedDataPath /Users/bkase/DerivedData/agent-1 \
+  -destination "id=A76B56DB-DEA2-4933-8C81-7A0EF009AC11"
+```
+
+**For UI flow verification, use XCUITest - never GUI automation tools.**
 
 <!-- br-agent-instructions-v1 -->
 

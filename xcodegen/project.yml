@@ -108,6 +108,7 @@ targets:
         INFOPLIST_FILE: ../App/Sources/Info.plist
         PRODUCT_BUNDLE_IDENTIFIER: com.vapor.app
         PRODUCT_NAME: Vapor
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks"
 
   # Core packages
   Models:
@@ -122,6 +123,7 @@ targets:
       base:
         PRODUCT_NAME: Models
         PRODUCT_MODULE_NAME: Models
+        DYLIB_INSTALL_NAME_BASE: "@rpath"
 
   Persistence:
     type: framework
@@ -142,6 +144,7 @@ targets:
       base:
         PRODUCT_NAME: Persistence
         PRODUCT_MODULE_NAME: Persistence
+        DYLIB_INSTALL_NAME_BASE: "@rpath"
 
   Audio:
     type: framework
@@ -160,6 +163,7 @@ targets:
       base:
         PRODUCT_NAME: Audio
         PRODUCT_MODULE_NAME: Audio
+        DYLIB_INSTALL_NAME_BASE: "@rpath"
 
   Processing:
     type: framework
@@ -182,6 +186,7 @@ targets:
       base:
         PRODUCT_NAME: Processing
         PRODUCT_MODULE_NAME: Processing
+        DYLIB_INSTALL_NAME_BASE: "@rpath"
 
   Export:
     type: framework
@@ -201,6 +206,7 @@ targets:
       base:
         PRODUCT_NAME: Export
         PRODUCT_MODULE_NAME: Export
+        DYLIB_INSTALL_NAME_BASE: "@rpath"
 
   Observability:
     type: framework
@@ -211,6 +217,7 @@ targets:
       base:
         PRODUCT_NAME: Observability
         PRODUCT_MODULE_NAME: Observability
+        DYLIB_INSTALL_NAME_BASE: "@rpath"
 
   Routing:
     type: framework
@@ -231,6 +238,7 @@ targets:
       base:
         PRODUCT_NAME: Routing
         PRODUCT_MODULE_NAME: Routing
+        DYLIB_INSTALL_NAME_BASE: "@rpath"
 
   DesignSystem:
     type: framework
@@ -241,6 +249,7 @@ targets:
       base:
         PRODUCT_NAME: DesignSystem
         PRODUCT_MODULE_NAME: DesignSystem
+        DYLIB_INSTALL_NAME_BASE: "@rpath"
 
   # Feature packages
   TimelineFeature:
@@ -264,6 +273,7 @@ targets:
       base:
         PRODUCT_NAME: TimelineFeature
         PRODUCT_MODULE_NAME: TimelineFeature
+        DYLIB_INSTALL_NAME_BASE: "@rpath"
 
   RecordingFeature:
     type: framework
@@ -290,6 +300,7 @@ targets:
       base:
         PRODUCT_NAME: RecordingFeature
         PRODUCT_MODULE_NAME: RecordingFeature
+        DYLIB_INSTALL_NAME_BASE: "@rpath"
 
   SessionDetailFeature:
     type: framework
@@ -315,6 +326,7 @@ targets:
       base:
         PRODUCT_NAME: SessionDetailFeature
         PRODUCT_MODULE_NAME: SessionDetailFeature
+        DYLIB_INSTALL_NAME_BASE: "@rpath"
 
   PeopleFeature:
     type: framework
@@ -337,6 +349,7 @@ targets:
       base:
         PRODUCT_NAME: PeopleFeature
         PRODUCT_MODULE_NAME: PeopleFeature
+        DYLIB_INSTALL_NAME_BASE: "@rpath"
 
   SpeakerPickerFeature:
     type: framework
@@ -359,6 +372,7 @@ targets:
       base:
         PRODUCT_NAME: SpeakerPickerFeature
         PRODUCT_MODULE_NAME: SpeakerPickerFeature
+        DYLIB_INSTALL_NAME_BASE: "@rpath"
 
   AudioPlayerFeature:
     type: framework
@@ -385,6 +399,7 @@ targets:
       base:
         PRODUCT_NAME: AudioPlayerFeature
         PRODUCT_MODULE_NAME: AudioPlayerFeature
+        DYLIB_INSTALL_NAME_BASE: "@rpath"
 
   # Test targets
   VaporTests:
