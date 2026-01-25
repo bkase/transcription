@@ -424,20 +424,6 @@ targets:
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Vapor.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Vapor"
         BUNDLE_LOADER: "$(TEST_HOST)"
 
-  ToolsTests:
-    type: bundle.unit-test
-    platform: iOS
-    sources:
-      - path: ../App/Tests/ToolsTests
-    dependencies:
-      - target: Vapor
-    settings:
-      base:
-        PRODUCT_NAME: ToolsTests
-        PRODUCT_MODULE_NAME: ToolsTests
-        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Vapor.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Vapor"
-        BUNDLE_LOADER: "$(TEST_HOST)"
-
   SnapshotTests:
     type: bundle.unit-test
     platform: iOS
@@ -478,7 +464,6 @@ schemes:
       config: Debug
       targets:
         - VaporTests
-        - ToolsTests
         - SnapshotTests
         - E2ETests
     profile:

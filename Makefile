@@ -53,49 +53,8 @@ AGENT_SIM_CLONE2 ?= $(error AGENT_SIM_CLONE2 not set - source sim-config.env fir
 AGENT_SIM_CLONE3 ?= $(error AGENT_SIM_CLONE3 not set - source sim-config.env first)
 AGENT_DERIVED_DATA ?= $(error AGENT_DERIVED_DATA not set - source sim-config.env first)
 
-test: gen
-	@echo "=== Running tests in parallel ==="
-	@echo "Main: $(AGENT_SIM_UDID)"
-	@echo "Clones: $(AGENT_SIM_CLONE1), $(AGENT_SIM_CLONE2), $(AGENT_SIM_CLONE3)"
-	@echo ""
-	@echo "Phase 1: Building project..."
-	xcodebuild build-for-testing \
-		-project xcodegen/Vapor.xcodeproj \
-		-scheme Vapor \
-		-destination "id=$(AGENT_SIM_UDID)" \
-		-derivedDataPath $(AGENT_DERIVED_DATA) \
-		-skipMacroValidation -skipPackagePluginValidation \
-		-quiet
-	@echo ""
-	@echo "Phase 2: Running SPM package tests in parallel..."
-	@$(MAKE) -j8 _test-packages
-	@echo ""
-	@echo "Phase 3: Running Xcode tests with 4 pre-booted simulators..."
-	xcodebuild test-without-building \
-		-project xcodegen/Vapor.xcodeproj \
-		-scheme Vapor \
-		-destination "id=$(AGENT_SIM_UDID)" \
-		-destination "id=$(AGENT_SIM_CLONE1)" \
-		-destination "id=$(AGENT_SIM_CLONE2)" \
-		-destination "id=$(AGENT_SIM_CLONE3)" \
-		-derivedDataPath $(AGENT_DERIVED_DATA) \
-		-skipMacroValidation -skipPackagePluginValidation \
-		-only-testing:VaporTests \
-		-only-testing:SnapshotTests \
-		-only-testing:ToolsTests \
-		2>&1 | grep -E "(Test Suite|passed|failed|error:|Executed)" || true
-	@echo ""
-	@echo "Phase 4: Running E2E tests (sequential - UI tests)..."
-	xcodebuild test-without-building \
-		-project xcodegen/Vapor.xcodeproj \
-		-scheme Vapor \
-		-destination "id=$(AGENT_SIM_UDID)" \
-		-derivedDataPath $(AGENT_DERIVED_DATA) \
-		-skipMacroValidation -skipPackagePluginValidation \
-		-only-testing:E2ETests \
-		2>&1 | grep -E "(Test Suite|passed|failed|error:|Executed)" || true
-	@echo ""
-	@echo "=== Tests complete ==="
+test:
+	@uv run scripts/run-tests.py
 
 # Internal target for parallel package testing
 _test-packages: _test-models _test-persistence _test-audio _test-export _test-routing _test-designsystem \
