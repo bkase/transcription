@@ -38,6 +38,10 @@ struct RecordingDiscardTests {
             $0.recordingProcessorClient.discardRecording = {
                 discardCalled = true
             }
+            $0.feedbackClient.playStartSound = { }
+            $0.feedbackClient.playStopSound = { }
+            $0.feedbackClient.triggerStartHaptic = { }
+            $0.feedbackClient.triggerStopHaptic = { }
         }
 
         // Start recording
@@ -123,6 +127,8 @@ struct RecordingDiscardTests {
             $0.recordingProcessorClient.discardRecording = {
                 discardCalled = true
             }
+            $0.feedbackClient.playStartSound = { }
+            $0.feedbackClient.triggerStartHaptic = { }
         }
 
         // Start recording

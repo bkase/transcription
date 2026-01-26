@@ -630,3 +630,13 @@
 - Tests using RecordingProcessor need preferencesClient mock alongside other audio dependencies
 - Mock: `PreferencesClient(getAudioRetentionMode: { .both }, setAudioRetentionMode: { _ in })`
 - Add `Audio` as dependency when importing `AudioRetentionMode` in Export package
+
+## FeedbackClient for haptics and sounds
+- Use AVAudioEngine with AVAudioSourceNode for programmatic tone generation (no audio files needed)
+- Sine wave: `sinf(phase * 2.0 * Float.pi)` with frequency sweep via linear interpolation
+- Triangle wave: `2.0 * abs(2.0 * phase - 1.0) - 1.0` for softer sound
+- Apply fade envelope (10% at start/end) to avoid clicks
+- Use actors for thread-safe audio engine state management
+- UIImpactFeedbackGenerator(style: .soft) for gentle haptic feedback
+- Wrap iOS-specific code in `#if os(iOS)` with macOS fallback returning no-op implementations
+- When adding new @DependencyClient to a feature, ALL existing tests must add mock implementations

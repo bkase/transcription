@@ -38,6 +38,10 @@ struct RecordingFeatureTests {
                 return eventStream
             }
             $0.recordingProcessorClient.stopRecording = { }
+            $0.feedbackClient.playStartSound = { }
+            $0.feedbackClient.playStopSound = { }
+            $0.feedbackClient.triggerStartHaptic = { }
+            $0.feedbackClient.triggerStopHaptic = { }
         }
 
         // Initially not recording
@@ -110,6 +114,8 @@ struct RecordingFeatureTests {
             $0.recordingProcessorClient.startRecording = { _ in
                 throw TestError()
             }
+            $0.feedbackClient.playStartSound = { }
+            $0.feedbackClient.triggerStartHaptic = { }
         }
 
         // Start recording - triggers permission check then permissionGranted
@@ -156,6 +162,8 @@ struct RecordingFeatureTests {
             $0.microphonePermissionClient.getStatus = { .authorized }
             $0.recordingProcessorClient.startRecording = { _ in eventStream }
             $0.recordingProcessorClient.stopRecording = { }
+            $0.feedbackClient.playStartSound = { }
+            $0.feedbackClient.triggerStartHaptic = { }
         }
 
         // Start recording
@@ -212,6 +220,8 @@ struct RecordingFeatureTests {
             $0.microphonePermissionClient.getStatus = { .authorized }
             $0.recordingProcessorClient.startRecording = { _ in eventStream }
             $0.recordingProcessorClient.stopRecording = { }
+            $0.feedbackClient.playStartSound = { }
+            $0.feedbackClient.triggerStartHaptic = { }
         }
 
         // Start recording
@@ -272,6 +282,8 @@ struct RecordingFeatureTests {
             $0.microphonePermissionClient.getStatus = { .authorized }
             $0.recordingProcessorClient.startRecording = { _ in eventStream }
             $0.recordingProcessorClient.stopRecording = { }
+            $0.feedbackClient.playStartSound = { }
+            $0.feedbackClient.triggerStartHaptic = { }
             $0.databaseClient.fetchTranscriptSegments = { _ in
                 [
                     TranscriptSegmentRecord(

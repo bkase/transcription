@@ -60,6 +60,7 @@ public struct RecordingFeature {
     @Dependency(\.continuousClock) var clock
     @Dependency(\.uuid) var uuid
     @Dependency(\.microphonePermissionClient) var microphonePermissionClient
+    @Dependency(\.feedbackClient) var feedbackClient
 
     private enum CancelID {
         case timer
@@ -206,19 +207,25 @@ public struct RecordingFeature {
                 state.error = nil
                 state.isPermissionDenied = false
 
-                return .run { send in
-                    do {
-                        let eventStream = try await recordingProcessorClient.startRecording(audioDirectory)
+                return .merge(
+                    .run { send in
+                        do {
+                            let eventStream = try await recordingProcessorClient.startRecording(audioDirectory)
 
-                        // Listen for events
-                        for await event in eventStream {
-                            await send(.processorEvent(event))
+                            // Listen for events
+                            for await event in eventStream {
+                                await send(.processorEvent(event))
+                            }
+                        } catch {
+                            await send(.recordingFailed(error.localizedDescription))
                         }
-                    } catch {
-                        await send(.recordingFailed(error.localizedDescription))
                     }
-                }
-                .cancellable(id: CancelID.processorEvents, cancelInFlight: true)
+                    .cancellable(id: CancelID.processorEvents, cancelInFlight: true),
+                    .run { [feedbackClient] _ in
+                        await feedbackClient.triggerStartHaptic()
+                        await feedbackClient.playStartSound()
+                    }
+                )
 
             case .permissionDenied:
                 state.isPermissionDenied = true
@@ -355,7 +362,11 @@ public struct RecordingFeature {
                     // Keep elapsedSeconds for display until view navigates away
                     return .merge(
                         .cancel(id: CancelID.timer),
-                        .cancel(id: CancelID.processorEvents)
+                        .cancel(id: CancelID.processorEvents),
+                        .run { [feedbackClient] _ in
+                            await feedbackClient.triggerStopHaptic()
+                            await feedbackClient.playStopSound()
+                        }
                     )
 
                 case .didDiscard:
@@ -368,7 +379,11 @@ public struct RecordingFeature {
                     state.elapsedSeconds = 0
                     return .merge(
                         .cancel(id: CancelID.timer),
-                        .cancel(id: CancelID.processorEvents)
+                        .cancel(id: CancelID.processorEvents),
+                        .run { [feedbackClient] _ in
+                            await feedbackClient.triggerStopHaptic()
+                            await feedbackClient.playStopSound()
+                        }
                     )
 
                 case let .didFail(errorMessage):

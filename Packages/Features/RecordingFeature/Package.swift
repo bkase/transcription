@@ -37,6 +37,7 @@ let package = Package(
                 "Models",
                 "Observability",
                 "Processing",
+                "Audio",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ]
         ),

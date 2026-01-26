@@ -36,6 +36,10 @@ struct RecordingControlsTests {
             $0.recordingProcessorClient.stopRecording = { }
             $0.recordingProcessorClient.pauseRecording = { }
             $0.recordingProcessorClient.resumeRecording = { }
+            $0.feedbackClient.playStartSound = { }
+            $0.feedbackClient.playStopSound = { }
+            $0.feedbackClient.triggerStartHaptic = { }
+            $0.feedbackClient.triggerStopHaptic = { }
         }
 
         // Initially not recording
@@ -171,6 +175,10 @@ struct RecordingControlsTests {
             $0.recordingProcessorClient.startRecording = { _ in eventStream }
             $0.recordingProcessorClient.stopRecording = { }
             $0.recordingProcessorClient.pauseRecording = { }
+            $0.feedbackClient.playStartSound = { }
+            $0.feedbackClient.playStopSound = { }
+            $0.feedbackClient.triggerStartHaptic = { }
+            $0.feedbackClient.triggerStopHaptic = { }
         }
 
         // Start recording

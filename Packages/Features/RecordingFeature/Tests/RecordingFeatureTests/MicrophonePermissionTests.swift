@@ -66,6 +66,8 @@ struct MicrophonePermissionTests {
                 return eventStream
             }
             $0.recordingProcessorClient.stopRecording = { }
+            $0.feedbackClient.playStartSound = { }
+            $0.feedbackClient.triggerStartHaptic = { }
         }
 
         // Initially not recording
@@ -128,6 +130,8 @@ struct MicrophonePermissionTests {
                 return eventStream
             }
             $0.recordingProcessorClient.stopRecording = { }
+            $0.feedbackClient.playStartSound = { }
+            $0.feedbackClient.triggerStartHaptic = { }
         }
 
         // Start recording - should request permission first

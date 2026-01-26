@@ -32,6 +32,8 @@ struct RecordingErrorTests {
             $0.recordingProcessorClient.startRecording = { _ in
                 throw TestError()
             }
+            $0.feedbackClient.playStartSound = { }
+            $0.feedbackClient.triggerStartHaptic = { }
         }
 
         // Initially no alert
@@ -82,6 +84,8 @@ struct RecordingErrorTests {
             $0.microphonePermissionClient.getStatus = { .authorized }
             $0.recordingProcessorClient.startRecording = { _ in eventStream }
             $0.recordingProcessorClient.stopRecording = { }
+            $0.feedbackClient.playStartSound = { }
+            $0.feedbackClient.triggerStartHaptic = { }
         }
 
         // Initially no alert
@@ -184,6 +188,8 @@ struct RecordingErrorTests {
             $0.microphonePermissionClient.getStatus = { .authorized }
             $0.recordingProcessorClient.startRecording = { _ in eventStream }
             $0.recordingProcessorClient.stopRecording = { }
+            $0.feedbackClient.playStartSound = { }
+            $0.feedbackClient.triggerStartHaptic = { }
         }
 
         // Tap retry
