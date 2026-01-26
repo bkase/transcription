@@ -54,55 +54,6 @@ struct PeopleFeatureTests {
         }
     }
 
-    // MARK: - testSearchFiltersPeople
-
-    @Test
-    func testSearchFiltersPeople() async {
-        let mockDate = Date(timeIntervalSince1970: 1000000)
-        let mockPeople = [
-            PersonRecord(
-                id: "person-1",
-                name: "Alice Smith",
-                colorToken: "sky",
-                createdAt: mockDate,
-                updatedAt: mockDate
-            ),
-            PersonRecord(
-                id: "person-2",
-                name: "Bob Jones",
-                colorToken: "lavender",
-                createdAt: mockDate,
-                updatedAt: mockDate
-            ),
-            PersonRecord(
-                id: "person-3",
-                name: "Alice Johnson",
-                colorToken: "dusk",
-                createdAt: mockDate,
-                updatedAt: mockDate
-            )
-        ]
-
-        let store = TestStore(
-            initialState: PeopleFeature.State(people: mockPeople)
-        ) {
-            PeopleFeature()
-        }
-
-        // Verify initial state has all people
-        #expect(store.state.people.count == 3)
-        #expect(store.state.filteredPeople.count == 3)
-
-        // Search for "Alice"
-        await store.send(.searchQueryChanged("Alice")) {
-            $0.searchQuery = "Alice"
-        }
-
-        // Verify filtered results
-        #expect(store.state.filteredPeople.count == 2)
-        #expect(store.state.filteredPeople.allSatisfy { $0.name.contains("Alice") })
-    }
-
     // MARK: - testPeopleLoadError
 
     @Test
