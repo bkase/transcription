@@ -1,3 +1,5 @@
+- Don't run the full test suite manually, it's run automatically when you commit. You can just run the particular tests that you think are affected by your change.
+
 ## Agent 1 Simulator Configuration
 
 ```

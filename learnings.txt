@@ -647,3 +647,10 @@
 - Use `role: .destructive` for destructive actions like delete/discard
 - Use `role: .cancel` for cancel button
 - Load current preference in `moreButtonTapped` action before showing menu for correct checkmarks
+
+## Calendar week calculations for date bucketing
+- Calendar.firstWeekday = 1 means Sunday is first day of week
+- Use calendar.component(.weekOfYear, from: date) to verify which week a date belongs to
+- When testing date bucketing, print actual weekday names to verify assumptions about dates
+- January 2026 example: Jan 15 is Thursday, week 3 starts on Jan 11 (Sunday)
+- DateBucket.bucket(for:relativeTo:calendar:) provides deterministic bucketing with injected calendar
