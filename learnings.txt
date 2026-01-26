@@ -749,3 +749,9 @@
 - Confirmation dialogs: Use `app.buttons["Delete"]` to tap the destructive action button
 - `waitForNonExistence(timeout:)` verifies element is gone after navigation
 - In-memory DB for UI tests: each app launch via `app.launch()` creates fresh static store with new in-memory DB
+
+## TCA periodic timer patterns with TestClock
+- TestStore with TestClock: use `await testClock.advance(by:)` to control timer ticks
+- Use actors for mutable test state to satisfy Swift 6 Sendable closure requirements
+- When testing timer ticks that update state, ensure first tick produces a state change (start with non-zero values)
+- Timer polling pattern: `.run { for await _ in clock.timer(interval:) { ... } }.cancellable(id:)` with `.cancel(id:)` on pause/stop
