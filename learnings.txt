@@ -731,3 +731,11 @@
 - Snapshot tests use SnapshotHarness.assertSnapshot() with named parameter for unique filenames
 - Font weight warnings ("Unable to update Font Descriptor's weight") are expected for thin/light weights in simulator
 - First snapshot test run records missing snapshots (fails with "No reference was found"); re-run passes
+
+## XCUITest accessibility identifier vs label
+- SwiftUI `accessibilityIdentifier()` on nested components can behave inconsistently in XCUITest
+- `app.buttons["identifier"]` may not find elements even when identifier is set on the Button
+- Query by accessibility label is more reliable: `app.buttons.matching(NSPredicate(format: "label == 'Back'")).firstMatch`
+- NavButton component has internal accessibilityIdentifier but outer modifiers don't always override
+- Use helper methods to abstract element finding and make tests more maintainable
+- Profile E2E tests: navigation, name edit, photo change (mock picker), persistence verification

@@ -75,7 +75,6 @@ public struct ProfileView: View {
             NavButton(label: "Back") {
                 store.send(.backTapped)
             }
-            .accessibilityIdentifier("profileBackButton")
 
             Spacer()
 
