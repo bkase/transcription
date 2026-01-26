@@ -246,9 +246,6 @@ public actor RecordingProcessor {
         // Fork audio stream for file writing and ML
         let (writerStream, mlStream) = forkAudioStream(audioStream)
 
-        // Start ML transcription
-        let segmentStream = try await fluidAudioClient.startTranscription(mlStream)
-
         // Process audio frames for file writing in background
         Task { [weak self] in
             for await frame in writerStream {
@@ -257,12 +254,18 @@ public actor RecordingProcessor {
             }
         }
 
-        // Process transcript segments in background
-        Task { [weak self] in
-            for await segment in segmentStream {
-                guard let self = self else { break }
-                guard await self.getIsRecording() else { break }
-                await self.handleSegment(segment, sessionId: sessionId)
+        // Start ML transcription in background (may download models on first use)
+        Task { [weak self, fluidAudioClient] in
+            guard let self = self else { return }
+            do {
+                let segmentStream = try await fluidAudioClient.startTranscription(mlStream)
+                for await segment in segmentStream {
+                    guard await self.getIsRecording() else { break }
+                    await self.handleSegment(segment, sessionId: sessionId)
+                }
+            } catch {
+                // Log error but don't fail recording - audio file will still be saved
+                print("ML transcription failed to start: \(error)")
             }
         }
 
