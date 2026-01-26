@@ -336,18 +336,128 @@ public struct ExportClient: Sendable {
     public var availableFormats: @Sendable () -> [ExportFormat] = { ExportFormat.allCases }
 }
 
+/// Error thrown by ExportClient operations
+public enum ExportError: Error, Equatable, Sendable {
+    case sessionNotFound(SessionID)
+    case exportFailed(String)
+}
+
 extension ExportClient: DependencyKey {
-    public static let liveValue: Self = {
-        // Live implementation will create export files - placeholder for now
-        Self(
-            exportSession: { _, format in
-                ExportResult(url: URL(fileURLWithPath: "/tmp/export"), format: format)
+    /// Create a live ExportClient with default app version info
+    public static func live(
+        appVersion: String = "1.0.0",
+        buildNumber: String = "1"
+    ) -> Self {
+        @Dependency(\.databaseClient) var databaseClient
+        @Dependency(\.fileClient) var fileClient
+        @Dependency(\.preferencesClient) var preferencesClient
+        @Dependency(\.date) var date
+        @Dependency(\.uuid) var uuid
+
+        return Self(
+            exportSession: { sessionId, format in
+                // Fetch session data
+                guard let session = try await databaseClient.fetchSession(sessionId) else {
+                    throw ExportError.sessionNotFound(sessionId)
+                }
+
+                let segments = try await databaseClient.fetchTranscriptSegments(sessionId)
+                let speakerTracks = try await databaseClient.fetchSpeakerTracks(sessionId)
+                let people = try await databaseClient.fetchPeople()
+
+                // Assemble transcript
+                let transcript = ExportAssembler.assembleTranscript(
+                    session: session,
+                    segments: segments,
+                    speakerTracks: speakerTracks,
+                    people: people
+                )
+
+                // Generate content based on format
+                let content: String
+                let fileExtension: String
+                switch format {
+                case .json:
+                    let data = try JSONEncoder.exportEncoder.encode(transcript)
+                    content = String(data: data, encoding: .utf8) ?? ""
+                    fileExtension = "json"
+                case .markdown:
+                    content = MarkdownWriter.write(transcript)
+                    fileExtension = "md"
+                case .vtt:
+                    content = VttWriter.write(transcript)
+                    fileExtension = "vtt"
+                }
+
+                // Write to temp file
+                let tempDir = fileClient.temporaryDirectory()
+                let fileName = "\(uuid().uuidString).\(fileExtension)"
+                let outputURL = tempDir.appendingPathComponent(fileName)
+                try await fileClient.write(Data(content.utf8), outputURL)
+
+                return ExportResult(url: outputURL, format: format)
             },
-            exportBundle: { _ in URL(fileURLWithPath: "/tmp/bundle.zip") },
+            exportBundle: { sessionId in
+                // Fetch session data
+                guard let session = try await databaseClient.fetchSession(sessionId) else {
+                    throw ExportError.sessionNotFound(sessionId)
+                }
+
+                let segments = try await databaseClient.fetchTranscriptSegments(sessionId)
+                let speakerTracks = try await databaseClient.fetchSpeakerTracks(sessionId)
+                let people = try await databaseClient.fetchPeople()
+
+                // Determine audio source URL if available
+                let audioSourceURL: URL?
+                if let audioPath = session.audioPath {
+                    audioSourceURL = URL(fileURLWithPath: audioPath)
+                } else {
+                    audioSourceURL = nil
+                }
+
+                // Assemble transcript and metadata
+                let transcript = ExportAssembler.assembleTranscript(
+                    session: session,
+                    segments: segments,
+                    speakerTracks: speakerTracks,
+                    people: people,
+                    audioPath: audioSourceURL != nil ? ExportBundleWriter.BundleFile.audio : nil
+                )
+
+                let metadata = ExportAssembler.assembleMetadata(
+                    appVersion: appVersion,
+                    buildNumber: buildNumber,
+                    exportedAt: date.now,
+                    traceId: nil,
+                    segmentCount: segments.count,
+                    speakerTracks: speakerTracks,
+                    durationMs: session.durationMs
+                )
+
+                // Get privacy mode
+                let retentionMode = preferencesClient.getAudioRetentionMode()
+
+                // Create bundle
+                let tempDir = fileClient.temporaryDirectory()
+                let bundleName = "export-\(sessionId.rawValue)"
+
+                let result = try await ExportBundleWriter.writeBundleWithPrivacy(
+                    transcript: transcript,
+                    metadata: metadata,
+                    audioSourceURL: audioSourceURL,
+                    outputDirectory: tempDir,
+                    bundleName: bundleName,
+                    fileClient: fileClient,
+                    retentionMode: retentionMode
+                )
+
+                return result.url
+            },
             availableFormats: { ExportFormat.allCases }
         )
-    }()
+    }
 
+    public static let liveValue = live()
     public static let testValue = Self()
 }
 
