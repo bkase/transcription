@@ -44,6 +44,8 @@ import Persistence
 
     // Mock FluidAudio client
     let mockFluidAudio = FluidAudioClient(
+        prepareModels: { },
+        modelStatus: { .ready },
         startTranscription: { _ in
             await stateTracker.setTranscriptionStarted(true)
             return AsyncStream { continuation in

@@ -57,6 +57,8 @@ import Dependencies
             isPlaying: { false }
         )
         deps.fluidAudioClient = FluidAudioClient(
+            prepareModels: { },
+            modelStatus: { .ready },
             startTranscription: { _ in AsyncStream { _ in } },
             stopTranscription: { },
             isTranscribing: { false }
@@ -110,6 +112,8 @@ import Dependencies
         @Dependency(\.fluidAudioClient) var fluidAudioClient
         let isTranscribing = await fluidAudioClient.isTranscribing()
         #expect(!isTranscribing, "FluidAudioClient.isTranscribing should return false by default")
+        let modelStatus = await fluidAudioClient.modelStatus()
+        #expect(modelStatus == .ready, "FluidAudioClient.modelStatus should return .ready in noop test")
 
         // Test RecordingProcessorClient defaults (non-throwing have defaults)
         @Dependency(\.recordingProcessorClient) var recordingProcessorClient
@@ -165,6 +169,7 @@ import Dependencies
         _ = await audioCaptureClient.isCapturing()
         _ = await audioPlayerClient.isPlaying()
         _ = await fluidAudioClient.isTranscribing()
+        _ = await fluidAudioClient.modelStatus()
         _ = await recordingProcessorClient.isRecording()
         _ = exportClient.availableFormats()
         _ = fileClient.exists(URL(fileURLWithPath: "/test"))

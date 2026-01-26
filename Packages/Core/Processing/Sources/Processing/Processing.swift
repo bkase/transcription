@@ -34,11 +34,29 @@ public struct TranscriptSegment: Sendable, Equatable {
     }
 }
 
+// MARK: - ModelPreparationState
+
+/// State of ML model preparation (download and loading)
+public enum ModelPreparationState: Sendable, Equatable {
+    /// Models have not been prepared yet
+    case idle
+    /// Models are currently being downloaded
+    case downloading
+    /// Models are ready to use
+    case ready
+    /// Model preparation failed with an error message
+    case failed(String)
+}
+
 // MARK: - FluidAudioClient
 
 /// Client for ML transcription and diarization (wraps FluidAudio SDK)
 @DependencyClient
 public struct FluidAudioClient: Sendable {
+    /// Prepare ML models (download and load). This is idempotent - calling when already ready is a no-op.
+    public var prepareModels: @Sendable () async -> Void
+    /// Get the current model preparation status without triggering preparation
+    public var modelStatus: @Sendable () async -> ModelPreparationState = { .idle }
     /// Start transcription on audio frames, returns a stream of transcript segments
     public var startTranscription: @Sendable (_ audioStream: AsyncStream<AudioFrame>) async throws -> AsyncStream<TranscriptSegment>
     /// Stop transcription

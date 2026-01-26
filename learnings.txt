@@ -761,3 +761,12 @@
 - Menu actions should dismiss menu (`state.isShowingActionsMenu = false`) before performing their action
 - For chained dialogs (e.g., delete from menu shows confirmation), set both states in sequence
 - Actions like share/export can trigger async effects after dismissing menu
+
+## FluidAudio model preparation API
+- ModelPreparationState enum: .idle, .downloading, .ready, .failed(String) for UI to query model status
+- FluidAudioClient.prepareModels() is idempotent - no-op when already ready or downloading
+- FluidAudioClient.modelStatus() returns current state without triggering preparation
+- LiveFluidAudioClientActor caches state and handles download/load in prepareModels()
+- MockFluidAudioClient accepts optional modelState parameter (default .ready) for test flexibility
+- MockFluidAudioClient.idle and .failed(message:) factory methods for specific test scenarios
+- When adding new parameters to @DependencyClient, update ALL explicit FluidAudioClient() constructors in tests

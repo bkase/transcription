@@ -131,14 +131,47 @@ public actor MockFluidAudioClientActor {
     private var script: MockFluidAudioScript
     private var isTranscribing: Bool = false
     private var continuation: AsyncStream<TranscriptSegment>.Continuation?
+    private var modelState: ModelPreparationState
 
-    public init(script: MockFluidAudioScript = .twoSpeakerConversation) {
+    public init(
+        script: MockFluidAudioScript = .twoSpeakerConversation,
+        modelState: ModelPreparationState = .ready
+    ) {
         self.script = script
+        self.modelState = modelState
     }
 
     /// Update the script to use for the next transcription
     public func setScript(_ script: MockFluidAudioScript) {
         self.script = script
+    }
+
+    /// Update the model state
+    public func setModelState(_ state: ModelPreparationState) {
+        self.modelState = state
+    }
+
+    /// Get current model status
+    public func getModelStatus() -> ModelPreparationState {
+        modelState
+    }
+
+    /// Prepare models (simulated - just transitions to ready unless configured to fail)
+    public func prepareModels() {
+        switch modelState {
+        case .ready:
+            // Already ready, no-op
+            return
+        case .downloading:
+            // Already downloading, no-op
+            return
+        case .idle:
+            // Transition directly to ready for mocks
+            modelState = .ready
+        case .failed:
+            // Stay in failed state - requires explicit reset
+            return
+        }
     }
 
     /// Start transcription and return a stream of segments
@@ -186,11 +219,20 @@ public actor MockFluidAudioClientActor {
 /// Creates a FluidAudioClient that emits scripted segments for testing
 public struct MockFluidAudioClient {
 
-    /// Create a FluidAudioClient with scripted segment output
-    public static func client(script: MockFluidAudioScript = .twoSpeakerConversation) -> FluidAudioClient {
-        let actor = MockFluidAudioClientActor(script: script)
+    /// Create a FluidAudioClient with scripted segment output and configurable model state
+    public static func client(
+        script: MockFluidAudioScript = .twoSpeakerConversation,
+        modelState: ModelPreparationState = .ready
+    ) -> FluidAudioClient {
+        let actor = MockFluidAudioClientActor(script: script, modelState: modelState)
 
         return FluidAudioClient(
+            prepareModels: {
+                await actor.prepareModels()
+            },
+            modelStatus: {
+                await actor.getModelStatus()
+            },
             startTranscription: { audioStream in
                 await actor.startTranscription(audioStream: audioStream)
             },
@@ -216,5 +258,15 @@ public struct MockFluidAudioClient {
     /// Create a FluidAudioClient with no segments (empty script)
     public static var empty: FluidAudioClient {
         client(script: .empty)
+    }
+
+    /// Create a FluidAudioClient configured with idle model state (not yet prepared)
+    public static var idle: FluidAudioClient {
+        client(script: .empty, modelState: .idle)
+    }
+
+    /// Create a FluidAudioClient configured with failed model state
+    public static func failed(message: String) -> FluidAudioClient {
+        client(script: .empty, modelState: .failed(message))
     }
 }

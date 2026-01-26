@@ -15,6 +15,9 @@ public actor LiveFluidAudioClientActor {
     private var isTranscribing: Bool = false
     private var continuation: AsyncStream<TranscriptSegment>.Continuation?
 
+    // Model preparation state
+    private var modelState: ModelPreparationState = .idle
+
     // Audio accumulation state
     private var accumulatedSamples: [Float] = []
     private var lastProcessedEndMs: UInt64 = 0
@@ -28,7 +31,46 @@ public actor LiveFluidAudioClientActor {
         samplesPerChunk = sampleRate * Int(chunkDurationMs) / 1000
     }
 
+    /// Get the current model preparation state
+    public func getModelStatus() -> ModelPreparationState {
+        modelState
+    }
+
+    /// Prepare ML models (download and load). Idempotent - no-op if already ready.
+    public func prepareModels() async {
+        // Idempotent: if already ready or downloading, no-op
+        switch modelState {
+        case .ready:
+            return
+        case .downloading:
+            return
+        case .idle, .failed:
+            break
+        }
+
+        modelState = .downloading
+
+        do {
+            // Initialize ASR
+            let asrModels = try await AsrModels.downloadAndLoad(version: .v3)
+            let asrConfig = ASRConfig.default
+            asrManager = AsrManager(config: asrConfig)
+            try await asrManager?.initialize(models: asrModels)
+
+            // Initialize Diarizer
+            let diarizerModels = try await DiarizerModels.downloadIfNeeded()
+            let diarizerConfig = DiarizerConfig.default
+            diarizerManager = DiarizerManager(config: diarizerConfig)
+            diarizerManager?.initialize(models: diarizerModels)
+
+            modelState = .ready
+        } catch {
+            modelState = .failed(error.localizedDescription)
+        }
+    }
+
     /// Initialize the ML models (downloads if needed, then loads)
+    /// @deprecated Use prepareModels() instead for async model preparation
     public func initialize() async throws {
         // Initialize ASR
         let asrModels = try await AsrModels.downloadAndLoad(version: .v3)
@@ -41,6 +83,8 @@ public actor LiveFluidAudioClientActor {
         let diarizerConfig = DiarizerConfig.default
         diarizerManager = DiarizerManager(config: diarizerConfig)
         diarizerManager?.initialize(models: diarizerModels)
+
+        modelState = .ready
     }
 
     /// Check if ML models are initialized and ready
@@ -238,6 +282,12 @@ public struct LiveFluidAudioClient {
         let actor = LiveFluidAudioClientActor()
 
         return FluidAudioClient(
+            prepareModels: {
+                await actor.prepareModels()
+            },
+            modelStatus: {
+                await actor.getModelStatus()
+            },
             startTranscription: { audioStream in
                 // Initialize on first use (lazy initialization inside actor)
                 try await actor.ensureInitialized()
