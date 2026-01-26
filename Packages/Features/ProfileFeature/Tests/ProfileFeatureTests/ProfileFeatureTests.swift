@@ -104,12 +104,6 @@ struct ProfileFeatureTests {
             $0.isEditingName = false
         }
 
-        let expectedProfile = UserProfile(
-            name: "Jane Doe",
-            email: "brandon@example.com",
-            avatar: .empty
-        )
-
         await store.receive(\.profileSaved) {
             $0.isSaving = false
         }
@@ -119,6 +113,7 @@ struct ProfileFeatureTests {
         // Verify storage was updated
         let savedProfile = await profileStorage.load()
         #expect(savedProfile.name == "Jane Doe")
+        #expect(savedProfile.email == "brandon@example.com")
     }
 
     @Test
@@ -160,6 +155,34 @@ struct ProfileFeatureTests {
 
         await store.send(.saveNameTapped) {
             $0.error = "Name cannot be empty"
+        }
+    }
+
+    @Test
+    func saveNameFailure() async throws {
+        struct TestError: Error, LocalizedError {
+            var errorDescription: String? { "Save failed" }
+        }
+
+        let store = TestStore(initialState: ProfileFeature.State(
+            profile: testProfile,
+            isEditingName: true,
+            editingNameText: "New Name"
+        )) {
+            ProfileFeature()
+        } withDependencies: {
+            $0.userProfileClient.save = { _ in throw TestError() }
+        }
+
+        await store.send(.saveNameTapped) {
+            $0.isSaving = true
+            $0.profile.name = "New Name"
+            $0.isEditingName = false
+        }
+
+        await store.receive(\.profileSaveFailed) {
+            $0.isSaving = false
+            $0.error = "Save failed"
         }
     }
 
@@ -210,6 +233,33 @@ struct ProfileFeatureTests {
         await store.receive(\.photoProcessed) {
             $0.isSaving = false
             $0.error = "Failed to process image"
+        }
+    }
+
+    @Test
+    func photoSaveFailure() async throws {
+        struct TestError: Error, LocalizedError {
+            var errorDescription: String? { "Storage error" }
+        }
+
+        let store = TestStore(initialState: ProfileFeature.State(profile: testProfile)) {
+            ProfileFeature()
+        } withDependencies: {
+            $0.profileImageClient.normalize = { _, _, _ in normalizedPhotoData }
+            $0.userProfileClient.save = { _ in throw TestError() }
+        }
+
+        await store.send(.photoPicked(testPhotoData)) {
+            $0.isSaving = true
+        }
+
+        await store.receive(\.photoProcessed) {
+            $0.profile.avatar = UserProfile.Avatar(imageData: normalizedPhotoData)
+        }
+
+        await store.receive(\.profileSaveFailed) {
+            $0.isSaving = false
+            $0.error = "Storage error"
         }
     }
 

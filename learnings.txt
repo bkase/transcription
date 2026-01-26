@@ -718,3 +718,9 @@
 - Mock picker uses sheet with List of Button options, each with accessibilityIdentifier for XCUITest
 - E2E test verifies: tap avatar -> profile screen -> change photo -> mock picker sheet -> select option -> sheet dismisses
 - `navigationBarTitleDisplayMode` is iOS-only - wrap in `#if os(iOS)` for cross-platform builds
+
+## TCA feature test coverage patterns
+- ProfileFeature tests: load (success/failure/skip), edit (flow/cancel/validation), save (success/failure), delegate actions
+- AppFeature integration tests: navigation push from avatar tap, delegate state sync, profile initialization with current state
+- Both success and failure paths should be tested for async operations (load, save)
+- InMemoryProfileStorage actor enables verifying saved state in tests
