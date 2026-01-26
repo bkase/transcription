@@ -14,6 +14,8 @@ public struct ProfileViewPreview: View {
         case editingName
         /// Empty state (new user)
         case empty
+        /// Editing name with error message
+        case editingNameWithError
     }
 
     private let name: String
@@ -21,19 +23,22 @@ public struct ProfileViewPreview: View {
     private let imageData: Data?
     private let displayMode: DisplayMode
     private let editingNameText: String
+    private let errorMessage: String?
 
     public init(
         name: String,
         initials: String,
         imageData: Data? = nil,
         displayMode: DisplayMode = .normal,
-        editingNameText: String = ""
+        editingNameText: String = "",
+        errorMessage: String? = nil
     ) {
         self.name = name
         self.initials = initials
         self.imageData = imageData
         self.displayMode = displayMode
         self.editingNameText = editingNameText
+        self.errorMessage = errorMessage
     }
 
     public var body: some View {
@@ -158,7 +163,7 @@ public struct ProfileViewPreview: View {
                 .foregroundColor(VaporColor.textPrimary)
 
             // Name field
-            if displayMode == .editingName {
+            if displayMode == .editingName || displayMode == .editingNameWithError {
                 nameEditField
             } else {
                 nameDisplayField
@@ -219,6 +224,12 @@ public struct ProfileViewPreview: View {
                     .fill(VaporColor.cloud)
                     .shadow(color: Color.black.opacity(0.03), radius: 8, x: 0, y: 2)
             )
+
+            if let error = errorMessage {
+                Text(error)
+                    .font(.system(size: 12, weight: .light))
+                    .foregroundColor(VaporColor.recording)
+            }
         }
     }
 
@@ -328,6 +339,15 @@ struct ProfileViewPreview_Previews: PreviewProvider {
                 editingNameText: "Brandon K"
             )
             .previewDisplayName("Editing Name")
+
+            ProfileViewPreview(
+                name: "Brandon Kase",
+                initials: "BK",
+                displayMode: .editingNameWithError,
+                editingNameText: "",
+                errorMessage: "Name cannot be empty"
+            )
+            .previewDisplayName("Editing Name Error")
         }
     }
 }

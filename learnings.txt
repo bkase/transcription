@@ -724,3 +724,10 @@
 - AppFeature integration tests: navigation push from avatar tap, delegate state sync, profile initialization with current state
 - Both success and failure paths should be tested for async operations (load, save)
 - InMemoryProfileStorage actor enables verifying saved state in tests
+
+## ProfileView snapshot testing
+- ProfileViewPreview DisplayMode enum supports different visual states: normal, editingName, empty, editingNameWithError
+- Error state snapshots need both displayMode and errorMessage parameters
+- Snapshot tests use SnapshotHarness.assertSnapshot() with named parameter for unique filenames
+- Font weight warnings ("Unable to update Font Descriptor's weight") are expected for thin/light weights in simulator
+- First snapshot test run records missing snapshots (fails with "No reference was found"); re-run passes
