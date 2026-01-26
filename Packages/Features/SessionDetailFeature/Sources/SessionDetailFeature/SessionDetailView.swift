@@ -86,6 +86,27 @@ public struct SessionDetailView: View {
             }
         }
         .confirmationDialog(
+            "Session Actions",
+            isPresented: Binding(
+                get: { store.isShowingActionsMenu },
+                set: { if !$0 { store.send(.actionsMenuDismissed) } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Share") {
+                store.send(.shareTapped)
+            }
+            Button("Export") {
+                store.send(.exportTapped)
+            }
+            Button("Delete", role: .destructive) {
+                store.send(.deleteTapped)
+            }
+            Button("Cancel", role: .cancel) {
+                store.send(.actionsMenuDismissed)
+            }
+        }
+        .confirmationDialog(
             "Delete Recording",
             isPresented: Binding(
                 get: { store.isShowingDeleteConfirmation },
@@ -150,28 +171,17 @@ public struct SessionDetailView: View {
 
                     Spacer()
 
-                    // Share button
+                    // More actions button (ellipsis)
                     IconButton(
-                        systemName: "square.and.arrow.up",
+                        systemName: "ellipsis",
                         style: .transparent,
                         iconColor: VaporColor.textTertiary
                     ) {
-                        store.send(.shareTapped)
+                        store.send(.moreButtonTapped)
                     }
-                    .accessibilityIdentifier("shareButton")
-                    .opacity(store.isExporting ? 0.5 : 1.0)
-                    .disabled(store.isExporting)
-
-                    // Delete button
-                    IconButton(
-                        systemName: "trash",
-                        style: .transparent,
-                        iconColor: VaporColor.textTertiary
-                    ) {
-                        store.send(.deleteTapped)
-                    }
-                    .accessibilityIdentifier("deleteButton")
-                    .disabled(store.isDeleting)
+                    .accessibilityIdentifier("moreButton")
+                    .opacity(store.isExporting || store.isDeleting ? 0.5 : 1.0)
+                    .disabled(store.isExporting || store.isDeleting)
                 }
 
                 // Metadata row
@@ -410,13 +420,7 @@ public struct SessionDetailViewPreview: View {
 
                                 Spacer()
 
-                                // Share icon
-                                Image(systemName: "square.and.arrow.up")
-                                    .font(.system(size: 20, weight: .light))
-                                    .foregroundColor(VaporColor.textTertiary)
-                                    .padding(VaporSpacing.sm)
-
-                                // More icon
+                                // More actions button (ellipsis)
                                 Image(systemName: "ellipsis")
                                     .font(.system(size: 20, weight: .light))
                                     .foregroundColor(VaporColor.textTertiary)

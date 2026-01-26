@@ -80,6 +80,9 @@ public struct SessionDetailFeature {
         public var isExporting: Bool = false
         public var shareURL: URL?
 
+        // Actions menu state
+        public var isShowingActionsMenu: Bool = false
+
         // Delete flow state
         public var isShowingDeleteConfirmation: Bool = false
         public var isDeleting: Bool = false
@@ -96,6 +99,7 @@ public struct SessionDetailFeature {
             speakerPicker: SpeakerPickerFeature.State? = nil,
             isExporting: Bool = false,
             shareURL: URL? = nil,
+            isShowingActionsMenu: Bool = false,
             isShowingDeleteConfirmation: Bool = false,
             isDeleting: Bool = false,
             alertInfo: AlertInfo? = nil
@@ -110,6 +114,7 @@ public struct SessionDetailFeature {
             self.speakerPicker = speakerPicker
             self.isExporting = isExporting
             self.shareURL = shareURL
+            self.isShowingActionsMenu = isShowingActionsMenu
             self.isShowingDeleteConfirmation = isShowingDeleteConfirmation
             self.isDeleting = isDeleting
             self.alertInfo = alertInfo
@@ -126,8 +131,13 @@ public struct SessionDetailFeature {
         case speakerLabelTapped(segmentId: TranscriptSegmentID, machineSpeakerId: String?)
         case speakerPicker(PresentationAction<SpeakerPickerFeature.Action>)
 
+        // Actions menu
+        case moreButtonTapped
+        case actionsMenuDismissed
+
         // Share actions
         case shareTapped
+        case exportTapped
         case exportCompleted(URL)
         case exportFailed(String)
         case shareSheetDismissed
@@ -256,9 +266,35 @@ public struct SessionDetailFeature {
                 // Other speaker picker actions handled by child reducer
                 return .none
 
+            // MARK: - Actions Menu
+
+            case .moreButtonTapped:
+                state.isShowingActionsMenu = true
+                return .none
+
+            case .actionsMenuDismissed:
+                state.isShowingActionsMenu = false
+                return .none
+
             // MARK: - Share Actions
 
             case .shareTapped:
+                // Share action from menu - triggers export then share
+                state.isShowingActionsMenu = false
+                guard !state.isExporting else { return .none }
+                state.isExporting = true
+                state.error = nil
+
+                return .run { [sessionID = state.sessionID, exportClient] send in
+                    let bundleURL = try await exportClient.exportBundle(sessionID)
+                    await send(.exportCompleted(bundleURL))
+                } catch: { error, send in
+                    await send(.exportFailed(error.localizedDescription))
+                }
+
+            case .exportTapped:
+                // Export action from menu - same as share for now
+                state.isShowingActionsMenu = false
                 guard !state.isExporting else { return .none }
                 state.isExporting = true
                 state.error = nil
@@ -287,6 +323,7 @@ public struct SessionDetailFeature {
             // MARK: - Delete Actions
 
             case .deleteTapped:
+                state.isShowingActionsMenu = false
                 state.isShowingDeleteConfirmation = true
                 return .none
 

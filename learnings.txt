@@ -755,3 +755,9 @@
 - Use actors for mutable test state to satisfy Swift 6 Sendable closure requirements
 - When testing timer ticks that update state, ensure first tick produces a state change (start with non-zero values)
 - Timer polling pattern: `.run { for await _ in clock.timer(interval:) { ... } }.cancellable(id:)` with `.cancel(id:)` on pause/stop
+
+## TCA actions menu patterns
+- Use `isShowingActionsMenu: Bool` state for confirmationDialog presentation
+- Menu actions should dismiss menu (`state.isShowingActionsMenu = false`) before performing their action
+- For chained dialogs (e.g., delete from menu shows confirmation), set both states in sequence
+- Actions like share/export can trigger async effects after dismissing menu

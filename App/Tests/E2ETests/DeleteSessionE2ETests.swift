@@ -65,20 +65,25 @@ final class DeleteSessionE2ETests: XCTestCase {
         let backButton = app.buttons["backButton"]
         XCTAssertTrue(backButton.waitForExistence(timeout: 5), "Back button should appear on session detail screen")
 
-        // 9. Tap the delete button
-        let deleteButton = app.buttons["deleteButton"]
-        XCTAssertTrue(deleteButton.waitForExistence(timeout: 5), "Delete button should exist on session detail")
-        deleteButton.tap()
+        // 9. Tap the more actions button (ellipsis) to open actions menu
+        let moreButton = app.buttons["moreButton"]
+        XCTAssertTrue(moreButton.waitForExistence(timeout: 5), "More button should exist on session detail")
+        moreButton.tap()
 
-        // 10. Verify confirmation dialog appears and tap Delete
+        // 10. Verify actions menu appears and tap Delete
+        let deleteMenuButton = app.buttons["Delete"]
+        XCTAssertTrue(deleteMenuButton.waitForExistence(timeout: 5), "Delete option should appear in actions menu")
+        deleteMenuButton.tap()
+
+        // 11. Verify confirmation dialog appears and tap Delete to confirm
         let deleteConfirmButton = app.buttons["Delete"]
         XCTAssertTrue(deleteConfirmButton.waitForExistence(timeout: 5), "Delete confirmation button should appear")
         deleteConfirmButton.tap()
 
-        // 11. Wait for navigation back to timeline - the start recording button indicates we're back
+        // 12. Wait for navigation back to timeline - the start recording button indicates we're back
         XCTAssertTrue(startRecordingButton.waitForExistence(timeout: 10), "Should return to timeline after deletion")
 
-        // 12. Verify the timeline is shown (back button from detail should be gone)
+        // 13. Verify the timeline is shown (back button from detail should be gone)
         let backButtonGone = backButton.waitForNonExistence(timeout: 5)
         XCTAssertTrue(backButtonGone, "Should no longer be on detail screen after delete")
     }
