@@ -487,6 +487,98 @@ public struct FileClient: Sendable {
     public var temporaryDirectory: @Sendable () -> URL = { URL(fileURLWithPath: NSTemporaryDirectory()) }
 }
 
+/// Error thrown by FileClient operations
+public enum FileClientError: Error, Equatable, Sendable {
+    case fileNotFound(URL)
+    case writeError(String)
+}
+
+/// In-memory file storage for testing
+/// Uses a class with locks to support synchronous `exists` calls
+public final class InMemoryFileStorage: @unchecked Sendable {
+    /// Stored file data keyed by URL path
+    private var files: [String: Data] = [:]
+    /// Set of created directories
+    private var directories: Set<String> = []
+    /// Temp directory base path
+    public let tempDirectory: URL
+    /// Lock for thread-safe access
+    private let lock = NSLock()
+
+    public init(tempDirectory: URL = URL(fileURLWithPath: "/tmp/vapor-test")) {
+        self.tempDirectory = tempDirectory
+    }
+
+    /// Read data from a file
+    public func read(_ url: URL) throws -> Data {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let data = files[url.path] else {
+            throw FileClientError.fileNotFound(url)
+        }
+        return data
+    }
+
+    /// Write data to a file
+    public func write(_ data: Data, to url: URL) {
+        lock.lock()
+        defer { lock.unlock() }
+        files[url.path] = data
+    }
+
+    /// Delete a file
+    public func delete(_ url: URL) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        // Allow deleting files
+        if files.removeValue(forKey: url.path) != nil {
+            return
+        }
+        // Allow deleting directories (remove all files with that prefix)
+        let prefix = url.path.hasSuffix("/") ? url.path : url.path + "/"
+        var deletedAny = false
+        for key in files.keys where key.hasPrefix(prefix) {
+            files.removeValue(forKey: key)
+            deletedAny = true
+        }
+        if directories.remove(url.path) != nil {
+            deletedAny = true
+        }
+        if !deletedAny {
+            throw FileClientError.fileNotFound(url)
+        }
+    }
+
+    /// Check if a file exists
+    public func exists(_ url: URL) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return files[url.path] != nil || directories.contains(url.path)
+    }
+
+    /// Create a directory
+    public func createDirectory(_ url: URL) {
+        lock.lock()
+        defer { lock.unlock() }
+        directories.insert(url.path)
+    }
+
+    /// Get all stored file paths (for testing)
+    public func allFilePaths() -> [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return Array(files.keys).sorted()
+    }
+
+    /// Reset storage (for testing)
+    public func reset() {
+        lock.lock()
+        defer { lock.unlock() }
+        files.removeAll()
+        directories.removeAll()
+    }
+}
+
 extension FileClient: DependencyKey {
     public static let liveValue: Self = {
         let fileManager = FileManager.default
@@ -503,6 +595,26 @@ extension FileClient: DependencyKey {
     }()
 
     public static let testValue = Self()
+
+    /// Create an in-memory FileClient for testing
+    /// - Parameters:
+    ///   - storage: Optional shared storage. If nil, creates a new one.
+    ///   - tempDirectory: URL for temporary directory. Defaults to /tmp/vapor-test
+    /// - Returns: A FileClient backed by in-memory storage
+    public static func inMemory(
+        storage: InMemoryFileStorage? = nil,
+        tempDirectory: URL = URL(fileURLWithPath: "/tmp/vapor-test")
+    ) -> Self {
+        let storage = storage ?? InMemoryFileStorage(tempDirectory: tempDirectory)
+        return Self(
+            read: { url in try storage.read(url) },
+            write: { data, url in storage.write(data, to: url) },
+            delete: { url in try storage.delete(url) },
+            exists: { url in storage.exists(url) },
+            createDirectory: { url in storage.createDirectory(url) },
+            temporaryDirectory: { storage.tempDirectory }
+        )
+    }
 }
 
 extension DependencyValues {

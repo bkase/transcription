@@ -659,3 +659,10 @@
 - When adding empty states to TCA views, ensure BOTH the actual View and Preview variants handle it
 - Preview variants are only used for snapshot tests; actual views need their own empty state logic
 - Check `!isLoading` alongside `isEmpty` to avoid showing empty state during initial load
+
+## In-memory FileClient for testing
+- Use `final class` with `NSLock` instead of actor when sync closures needed (e.g., `exists` is synchronous)
+- `@unchecked Sendable` for lock-based thread-safe classes
+- Store files as `[String: Data]` keyed by `url.path`, directories as `Set<String>`
+- Directory delete removes all files with matching path prefix
+- `FileClient.inMemory(storage:)` factory allows shared storage across test assertions
