@@ -560,8 +560,11 @@ public actor RecordingProcessor {
             .map { $0.text }
             .joined(separator: " ")
 
-        // Compute duration from last segment end time
-        let durationMs = segments.map { $0.endMs }.max() ?? 0
+        // Compute duration from actual recording time (startedAt to now)
+        // Fall back to transcript segments if available, but prefer actual elapsed time
+        let elapsedMs = Int(now.timeIntervalSince(session.startedAt) * 1000)
+        let segmentDurationMs = segments.map { $0.endMs }.max() ?? 0
+        let durationMs = max(elapsedMs, segmentDurationMs)
 
         // Update session
         session.endedAt = now
