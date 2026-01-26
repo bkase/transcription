@@ -74,6 +74,16 @@ public struct SessionDetailView: View {
             }
             .presentationBackground(.clear)
         }
+        .sheet(
+            isPresented: Binding(
+                get: { store.shareURL != nil },
+                set: { if !$0 { store.send(.shareSheetDismissed) } }
+            )
+        ) {
+            if let shareURL = store.shareURL {
+                ShareSheet(items: [shareURL])
+            }
+        }
         #endif
     }
 
@@ -110,8 +120,16 @@ public struct SessionDetailView: View {
                     Spacer()
 
                     // Share button
-                    IconButton(systemName: "square.and.arrow.up", style: .transparent, iconColor: VaporColor.textTertiary) {}
-                        .accessibilityIdentifier("shareButton")
+                    IconButton(
+                        systemName: "square.and.arrow.up",
+                        style: .transparent,
+                        iconColor: VaporColor.textTertiary
+                    ) {
+                        store.send(.shareTapped)
+                    }
+                    .accessibilityIdentifier("shareButton")
+                    .opacity(store.isExporting ? 0.5 : 1.0)
+                    .disabled(store.isExporting)
 
                     // More actions button
                     IconButton(systemName: "ellipsis", style: .transparent, iconColor: VaporColor.textTertiary) {}
@@ -413,6 +431,23 @@ public struct SessionDetailViewPreview: View {
 }
 
 // MARK: - Previews
+
+// MARK: - Share Sheet (UIActivityViewController wrapper)
+
+#if os(iOS)
+import UIKit
+
+/// A SwiftUI wrapper for UIActivityViewController to share files
+struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+#endif
 
 #if DEBUG
 struct SessionDetailView_Previews: PreviewProvider {

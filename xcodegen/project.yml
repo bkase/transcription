@@ -323,6 +323,7 @@ targets:
       - target: Models
       - target: Persistence
       - target: DesignSystem
+      - target: Export
       - target: AudioPlayerFeature
       - target: SpeakerPickerFeature
       - package: swift-tagged

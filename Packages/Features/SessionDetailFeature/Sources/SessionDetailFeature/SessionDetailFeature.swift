@@ -7,6 +7,7 @@ import DesignSystem
 import AudioPlayerFeature
 import SpeakerPickerFeature
 import Tagged
+import Export
 
 /// A transcript segment for display in session detail view
 public struct DetailSegment: Equatable, Sendable, Identifiable {
@@ -59,6 +60,7 @@ public struct SessionDetailFeature {
     public init() {}
 
     @Dependency(\.databaseClient) var databaseClient
+    @Dependency(\.exportClient) var exportClient
 
     @ObservableState
     public struct State: Equatable {
@@ -71,6 +73,10 @@ public struct SessionDetailFeature {
         public var audioPlayer: AudioPlayerFeature.State?
         @Presents public var speakerPicker: SpeakerPickerFeature.State?
 
+        // Share sheet state
+        public var isExporting: Bool = false
+        public var shareURL: URL?
+
         public init(
             sessionID: SessionID,
             session: SessionRecord? = nil,
@@ -79,7 +85,9 @@ public struct SessionDetailFeature {
             isLoading: Bool = false,
             error: String? = nil,
             audioPlayer: AudioPlayerFeature.State? = nil,
-            speakerPicker: SpeakerPickerFeature.State? = nil
+            speakerPicker: SpeakerPickerFeature.State? = nil,
+            isExporting: Bool = false,
+            shareURL: URL? = nil
         ) {
             self.sessionID = sessionID
             self.session = session
@@ -89,6 +97,8 @@ public struct SessionDetailFeature {
             self.error = error
             self.audioPlayer = audioPlayer
             self.speakerPicker = speakerPicker
+            self.isExporting = isExporting
+            self.shareURL = shareURL
         }
     }
 
@@ -101,6 +111,12 @@ public struct SessionDetailFeature {
         case audioPlayer(AudioPlayerFeature.Action)
         case speakerLabelTapped(segmentId: TranscriptSegmentID, machineSpeakerId: String?)
         case speakerPicker(PresentationAction<SpeakerPickerFeature.Action>)
+
+        // Share actions
+        case shareTapped
+        case exportCompleted(URL)
+        case exportFailed(String)
+        case shareSheetDismissed
     }
 
     public var body: some ReducerOf<Self> {
@@ -215,6 +231,34 @@ public struct SessionDetailFeature {
 
             case .speakerPicker:
                 // Other speaker picker actions handled by child reducer
+                return .none
+
+            // MARK: - Share Actions
+
+            case .shareTapped:
+                guard !state.isExporting else { return .none }
+                state.isExporting = true
+                state.error = nil
+
+                return .run { [sessionID = state.sessionID, exportClient] send in
+                    let bundleURL = try await exportClient.exportBundle(sessionID)
+                    await send(.exportCompleted(bundleURL))
+                } catch: { error, send in
+                    await send(.exportFailed(error.localizedDescription))
+                }
+
+            case let .exportCompleted(url):
+                state.isExporting = false
+                state.shareURL = url
+                return .none
+
+            case let .exportFailed(errorMessage):
+                state.isExporting = false
+                state.error = errorMessage
+                return .none
+
+            case .shareSheetDismissed:
+                state.shareURL = nil
                 return .none
             }
         }

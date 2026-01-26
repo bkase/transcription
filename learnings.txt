@@ -585,3 +585,10 @@
 - Nested paths after valid routes fail: `/session/abc/edit` throws (extra path component)
 - Session IDs support various formats (UUID, hyphens, underscores) via string parsing
 - Test roundtrip: parse → print → parse should yield original route
+
+## iOS Share Sheet integration with TCA
+- UIActivityViewController wrapped with UIViewControllerRepresentable for SwiftUI
+- Use simple `shareURL: URL?` state instead of @Presents for share sheet presentation
+- Binding: `isPresented: Binding(get: { store.shareURL != nil }, set: { if !$0 { store.send(.shareSheetDismissed) } })`
+- Wrap in `#if os(iOS)` since UIActivityViewController is iOS-only
+- ExportClient.exportBundle returns URL to generated zip file for sharing
