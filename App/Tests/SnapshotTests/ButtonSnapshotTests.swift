@@ -28,6 +28,18 @@ struct ButtonSnapshotTests {
                 CaptionText("Recording (Large)")
                 RecordButton(isRecording: true, size: .large) {}
             }
+
+            // Disabled state
+            VStack(spacing: 8) {
+                CaptionText("Disabled")
+                RecordButton(isRecording: false, isEnabled: false) {}
+            }
+
+            // Disabled large state
+            VStack(spacing: 8) {
+                CaptionText("Disabled (Large)")
+                RecordButton(isRecording: false, isEnabled: false, size: .large) {}
+            }
         }
         .padding(32)
         .frame(maxWidth: .infinity)
@@ -158,5 +170,24 @@ struct ButtonSnapshotTests {
         .background(VaporColor.mist)
 
         SnapshotHarness.assertSnapshot(of: view, named: "record_button_sizes")
+    }
+
+    @Test func testRecordButtonDisabled() {
+        let view = HStack(spacing: 32) {
+            VStack(spacing: 8) {
+                CaptionText("Disabled Regular")
+                RecordButton(isRecording: false, isEnabled: false) {}
+            }
+
+            VStack(spacing: 8) {
+                CaptionText("Disabled Large")
+                RecordButton(isRecording: false, isEnabled: false, size: .large) {}
+            }
+        }
+        .padding(32)
+        .frame(maxWidth: .infinity)
+        .background(VaporColor.mist)
+
+        SnapshotHarness.assertSnapshot(of: view, named: "record_button_disabled")
     }
 }

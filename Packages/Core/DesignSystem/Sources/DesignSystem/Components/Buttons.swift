@@ -2,9 +2,10 @@ import SwiftUI
 
 // MARK: - Record Button
 
-/// Recording button with idle and recording states.
+/// Recording button with idle, recording, and disabled states.
 /// - Idle: White circle with red dot (12pt)
 /// - Recording: White circle with rounded red square (24pt), breathing animation
+/// - Disabled: Haze background with overcast dot at 0.4 opacity, softened shadow
 public struct RecordButton: View {
     public enum Size {
         case regular  // 72pt
@@ -40,6 +41,7 @@ public struct RecordButton: View {
     }
 
     private let isRecording: Bool
+    private let isEnabled: Bool
     private let size: Size
     private let action: () -> Void
 
@@ -47,10 +49,12 @@ public struct RecordButton: View {
 
     public init(
         isRecording: Bool,
+        isEnabled: Bool = true,
         size: Size = .regular,
         action: @escaping () -> Void
     ) {
         self.isRecording = isRecording
+        self.isEnabled = isEnabled
         self.size = size
         self.action = action
     }
@@ -60,49 +64,52 @@ public struct RecordButton: View {
             ZStack {
                 // Background circle
                 Circle()
-                    .fill(VaporColor.cloud)
+                    .fill(isEnabled ? VaporColor.cloud : VaporColor.haze)
                     .frame(width: size.diameter, height: size.diameter)
                     .overlay(
                         Circle()
                             .strokeBorder(
-                                isRecording ? Color(hex: "#FFF5F5") : VaporColor.fog,
+                                isEnabled && isRecording ? Color(hex: "#FFF5F5") : VaporColor.fog,
                                 lineWidth: 1
                             )
                     )
                     .shadow(
-                        color: isRecording
-                            ? VaporColor.recording.opacity(0.2)
-                            : Color.black.opacity(0.06),
-                        radius: isRecording ? 24 : 16,
+                        color: !isEnabled
+                            ? Color.black.opacity(0.04)
+                            : (isRecording
+                                ? VaporColor.recording.opacity(0.2)
+                                : Color.black.opacity(0.06)),
+                        radius: !isEnabled ? 8 : (isRecording ? 24 : 16),
                         x: 0,
-                        y: 4
+                        y: !isEnabled ? 2 : 4
                     )
 
                 // Icon
-                if isRecording {
+                if isEnabled && isRecording {
                     RoundedRectangle(cornerRadius: size.cornerRadius)
                         .fill(VaporColor.recording.opacity(0.8))
                         .frame(width: size.iconSize, height: size.iconSize)
                         .scaleEffect(breatheScale)
                 } else {
                     Circle()
-                        .fill(VaporColor.recording.opacity(0.6))
+                        .fill(isEnabled ? VaporColor.recording.opacity(0.6) : VaporColor.overcast.opacity(0.4))
                         .frame(width: size.idleDotSize, height: size.idleDotSize)
                 }
             }
         }
         .buttonStyle(PlainButtonStyle())
+        .disabled(!isEnabled)
         .accessibilityIdentifier(isRecording ? "stopRecordingButton" : "startRecordingButton")
         .accessibilityLabel(isRecording ? "Stop Recording" : "Start Recording")
         .onChange(of: isRecording) { _, newValue in
-            if newValue {
+            if newValue && isEnabled {
                 startBreathingAnimation()
             } else {
                 breatheScale = 1.0
             }
         }
         .onAppear {
-            if isRecording {
+            if isRecording && isEnabled {
                 startBreathingAnimation()
             }
         }
@@ -212,6 +219,8 @@ struct RecordButton_Previews: PreviewProvider {
             RecordButton(isRecording: false) {}
             RecordButton(isRecording: true) {}
             RecordButton(isRecording: true, size: .large) {}
+            RecordButton(isRecording: false, isEnabled: false) {}
+            RecordButton(isRecording: false, isEnabled: false, size: .large) {}
         }
         .padding()
         .background(VaporColor.mist)
