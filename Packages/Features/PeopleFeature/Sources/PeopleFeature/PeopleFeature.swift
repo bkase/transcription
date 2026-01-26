@@ -141,7 +141,7 @@ public struct PeopleFeature {
             case .addPersonTapped:
                 state.editingPerson = nil
                 state.formName = ""
-                state.formColorToken = SpeakerColor.sky.rawValue
+                state.formColorToken = SpeakerColor.forIndex(state.people.count).rawValue
                 state.isShowingAddPersonSheet = true
                 state.error = nil
                 return .none
