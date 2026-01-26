@@ -577,3 +577,11 @@
 - When TCA reducer maps DB record IDs to domain model IDs, test expectations must use the mock data IDs
 - Example: mockSpeakerTracks has `personId: "person-1"`, expected value must be `personId: "person-1"` not `personId: "person-alice"`
 - Test failures show diff with `-` for expected and `+` for actual values
+
+## swift-url-routing deep link regression test patterns
+- URLRouting handles trailing slashes automatically: `/people/` parses same as `/people`
+- Query parameters in URLRequestData.query are ignored by Route matching
+- URL paths are case-sensitive by default: `/PEOPLE` won't match `/people`
+- Nested paths after valid routes fail: `/session/abc/edit` throws (extra path component)
+- Session IDs support various formats (UUID, hyphens, underscores) via string parsing
+- Test roundtrip: parse → print → parse should yield original route
