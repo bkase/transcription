@@ -274,6 +274,7 @@ targets:
       - target: Models
       - target: Persistence
       - target: DesignSystem
+      - target: Processing
       - package: swift-tagged
         product: Tagged
       - package: swift-composable-architecture

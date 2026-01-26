@@ -6,6 +6,7 @@ import Observability
 import Persistence
 import DesignSystem
 import Export
+import Processing
 
 @Reducer
 public struct TimelineFeature {
@@ -15,6 +16,7 @@ public struct TimelineFeature {
     @Dependency(\.fileClient) var fileClient
     @Dependency(\.date) var date
     @Dependency(\.uuid) var uuid
+    @Dependency(\.fluidAudioClient) var fluidAudioClient
 
     @ObservableState
     public struct State: Equatable {
@@ -31,9 +33,17 @@ public struct TimelineFeature {
         public var isShowingDeleteConfirmation: Bool = false
         public var isDeleting: Bool = false
 
+        // Model preparation state
+        public var modelPreparationState: ModelPreparationState = .idle
+
         /// Whether the user is actively searching (non-empty query)
         public var isSearching: Bool {
             !searchQuery.isEmpty
+        }
+
+        /// Whether recording is enabled (models ready)
+        public var isRecordEnabled: Bool {
+            modelPreparationState == .ready
         }
 
         public init(
@@ -45,7 +55,8 @@ public struct TimelineFeature {
             alertInfo: AlertInfo? = nil,
             sessionToDelete: SessionRecord? = nil,
             isShowingDeleteConfirmation: Bool = false,
-            isDeleting: Bool = false
+            isDeleting: Bool = false,
+            modelPreparationState: ModelPreparationState = .idle
         ) {
             self.searchQuery = searchQuery
             self.sessionGroups = sessionGroups
@@ -56,6 +67,7 @@ public struct TimelineFeature {
             self.sessionToDelete = sessionToDelete
             self.isShowingDeleteConfirmation = isShowingDeleteConfirmation
             self.isDeleting = isDeleting
+            self.modelPreparationState = modelPreparationState
         }
     }
 
@@ -81,16 +93,34 @@ public struct TimelineFeature {
         case deleteCancelled
         case deleteCompleted(SessionID)
         case deleteFailed(String)
+
+        // Model preparation actions
+        case prepareModels
+        case modelPreparationSucceeded
+        case modelPreparationFailed(String)
     }
 
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
             case .onAppear:
-                guard state.sessionGroups.isEmpty && !state.isLoading else {
-                    return .none
+                // Start model preparation if not already ready or downloading
+                let shouldPrepareModels = state.modelPreparationState == .idle
+
+                // Load sessions if needed
+                let shouldLoadSessions = state.sessionGroups.isEmpty && !state.isLoading
+
+                if shouldPrepareModels && shouldLoadSessions {
+                    return .merge(
+                        .send(.prepareModels),
+                        .send(.loadSessions)
+                    )
+                } else if shouldPrepareModels {
+                    return .send(.prepareModels)
+                } else if shouldLoadSessions {
+                    return .send(.loadSessions)
                 }
-                return .send(.loadSessions)
+                return .none
 
             case let .searchQueryChanged(query):
                 state.searchQuery = query
@@ -149,6 +179,10 @@ public struct TimelineFeature {
                 return .none
 
             case .newRecordingTapped:
+                // Gate recording: only proceed if models are ready
+                guard state.isRecordEnabled else {
+                    return .none
+                }
                 // Navigation intent - will be handled by parent
                 return .none
 
@@ -231,6 +265,33 @@ public struct TimelineFeature {
                     primaryButton: alertInfo.primaryButton,
                     secondaryButton: alertInfo.secondaryButton
                 )
+                return .none
+
+            // MARK: - Model Preparation Actions
+
+            case .prepareModels:
+                // Set state to downloading immediately
+                state.modelPreparationState = .downloading
+                return .run { [fluidAudioClient] send in
+                    await fluidAudioClient.prepareModels()
+                    let status = await fluidAudioClient.modelStatus()
+                    switch status {
+                    case .ready:
+                        await send(.modelPreparationSucceeded)
+                    case .failed(let message):
+                        await send(.modelPreparationFailed(message))
+                    case .idle, .downloading:
+                        // Shouldn't happen after prepareModels completes, but handle gracefully
+                        await send(.modelPreparationFailed("Model preparation did not complete"))
+                    }
+                }
+
+            case .modelPreparationSucceeded:
+                state.modelPreparationState = .ready
+                return .none
+
+            case let .modelPreparationFailed(message):
+                state.modelPreparationState = .failed(message)
                 return .none
             }
         }

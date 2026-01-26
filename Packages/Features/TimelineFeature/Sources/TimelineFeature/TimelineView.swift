@@ -221,7 +221,7 @@ public struct TimelineView: View {
     private var fabSection: some View {
         HStack {
             Spacer()
-            RecordButton(isRecording: false) {
+            RecordButton(isRecording: false, isEnabled: store.isRecordEnabled) {
                 store.send(.newRecordingTapped)
             }
             Spacer()

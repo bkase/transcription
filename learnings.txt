@@ -770,3 +770,22 @@
 - MockFluidAudioClient accepts optional modelState parameter (default .ready) for test flexibility
 - MockFluidAudioClient.idle and .failed(message:) factory methods for specific test scenarios
 - When adding new parameters to @DependencyClient, update ALL explicit FluidAudioClient() constructors in tests
+
+## SwiftUI button disabled state patterns
+- Add `isEnabled: Bool = true` parameter with default for backwards compatibility
+- Use `.disabled(!isEnabled)` modifier to prevent taps while preserving accessibility identifiers
+- Disabled visuals: muted background, lighter stroke, reduced opacity icon, softened shadow
+- Guard animation start with `isEnabled` check to prevent animation in disabled state
+- Snapshot tests: delete old snapshots and regenerate project when adding states to existing snapshot test
+
+## TCA model preparation gating patterns
+- Add modelPreparationState to feature State (ModelPreparationState from Processing module)
+- Computed property `isRecordEnabled` returns true only when state == .ready
+- On onAppear, check if preparation needed and merge both prepareModels and loadSessions effects
+- prepareModels action sets state to .downloading immediately, then async calls fluidAudioClient
+- After prepareModels completes, query modelStatus to determine success/failure
+- Gate navigation actions (like newRecordingTapped) with guard on computed isEnabled property
+- Pass isEnabled to UI components (RecordButton has isEnabled parameter)
+- When adding Processing dependency to feature, also update project.yml XcodeGen config
+- Tests for existing features need modelPreparationState: .ready when not testing model prep flow
+- Merged effects (.merge) can resolve in any order - test receives may need adjustment

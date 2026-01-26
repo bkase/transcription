@@ -5,6 +5,7 @@ import Models
 import Observability
 import Persistence
 import Export
+import Processing
 @testable import TimelineFeature
 
 // Test UUID for deterministic alert IDs
@@ -36,7 +37,8 @@ struct TimelineFeatureTests {
             SessionGroup(bucket: .today, sessions: mockSessions)
         ]
 
-        let store = TestStore(initialState: TimelineFeature.State()) {
+        // Start with models already ready to isolate session loading behavior
+        let store = TestStore(initialState: TimelineFeature.State(modelPreparationState: .ready)) {
             TimelineFeature()
         } withDependencies: {
             $0.date = .constant(mockDate)
@@ -300,7 +302,8 @@ struct TimelineFeatureTests {
 
     @Test
     func testNewRecordingTappedIsNavigationIntent() async {
-        let store = TestStore(initialState: TimelineFeature.State()) {
+        // Models must be ready for newRecordingTapped to work
+        let store = TestStore(initialState: TimelineFeature.State(modelPreparationState: .ready)) {
             TimelineFeature()
         }
 
@@ -330,8 +333,12 @@ struct TimelineFeatureTests {
             ])
         ]
 
+        // Start with sessions AND models ready to ensure onAppear is a no-op
         let store = TestStore(
-            initialState: TimelineFeature.State(sessionGroups: existingGroups)
+            initialState: TimelineFeature.State(
+                sessionGroups: existingGroups,
+                modelPreparationState: .ready
+            )
         ) {
             TimelineFeature()
         } withDependencies: {

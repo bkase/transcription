@@ -3,6 +3,7 @@ import Foundation
 import ComposableArchitecture
 import Models
 import Persistence
+import Processing
 @testable import TimelineFeature
 
 @MainActor
@@ -12,7 +13,8 @@ struct TimelineFabTests {
 
     @Test
     func testFabStartsRecording() async {
-        let store = TestStore(initialState: TimelineFeature.State()) {
+        // Models must be ready for FAB to trigger recording
+        let store = TestStore(initialState: TimelineFeature.State(modelPreparationState: .ready)) {
             TimelineFeature()
         }
 
