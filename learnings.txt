@@ -666,3 +666,11 @@
 - Store files as `[String: Data]` keyed by `url.path`, directories as `Set<String>`
 - Directory delete removes all files with matching path prefix
 - `FileClient.inMemory(storage:)` factory allows shared storage across test assertions
+
+## TCA delete flow patterns
+- Delete confirmation flow: deleteTapped → shows confirmation, deleteConfirmed → effect, deleteCompleted/deleteFailed
+- Delete audio file before DB deletion: check `fileClient.exists(audioURL)` then `try? await fileClient.delete(audioURL)`
+- DB cascade handles segments/tracks cleanup automatically via ON DELETE CASCADE in schema
+- For immutable collections in state (e.g., SessionGroup with `let sessions`), use `compactMap` to filter and recreate
+- ErrorEnvelope.databaseWrite generates alert with title "Data Error", buttons "Retry"/"Cancel"
+- When testing delete with alert, use actual AlertInfo values from ErrorEnvelope.toAlertInfo() not assumed values

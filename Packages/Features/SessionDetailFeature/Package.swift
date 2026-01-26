@@ -13,6 +13,7 @@ let package = Package(
         .package(path: "../../Core/Persistence"),
         .package(path: "../../Core/DesignSystem"),
         .package(path: "../../Core/Export"),
+        .package(path: "../../Core/Observability"),
         .package(path: "../AudioPlayerFeature"),
         .package(path: "../SpeakerPickerFeature"),
         .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.0.0"),
@@ -26,6 +27,7 @@ let package = Package(
                 "Persistence",
                 "DesignSystem",
                 "Export",
+                "Observability",
                 "AudioPlayerFeature",
                 "SpeakerPickerFeature",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
@@ -38,6 +40,7 @@ let package = Package(
                 "SessionDetailFeature",
                 "AudioPlayerFeature",
                 "Export",
+                "Observability",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ]
         ),

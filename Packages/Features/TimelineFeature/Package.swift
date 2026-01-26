@@ -13,6 +13,7 @@ let package = Package(
         .package(path: "../../Core/Persistence"),
         .package(path: "../../Core/DesignSystem"),
         .package(path: "../../Core/Observability"),
+        .package(path: "../../Core/Export"),
         .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.0.0"),
     ],
     targets: [
@@ -23,6 +24,7 @@ let package = Package(
                 "Persistence",
                 "DesignSystem",
                 "Observability",
+                "Export",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ]
         ),
@@ -31,6 +33,7 @@ let package = Package(
             dependencies: [
                 "TimelineFeature",
                 "Observability",
+                "Export",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ]
         ),

@@ -8,6 +8,7 @@ import AudioPlayerFeature
 import SpeakerPickerFeature
 import Tagged
 import Export
+import Observability
 
 /// A transcript segment for display in session detail view
 public struct DetailSegment: Equatable, Sendable, Identifiable {
@@ -61,6 +62,8 @@ public struct SessionDetailFeature {
 
     @Dependency(\.databaseClient) var databaseClient
     @Dependency(\.exportClient) var exportClient
+    @Dependency(\.fileClient) var fileClient
+    @Dependency(\.uuid) var uuid
 
     @ObservableState
     public struct State: Equatable {
@@ -77,6 +80,11 @@ public struct SessionDetailFeature {
         public var isExporting: Bool = false
         public var shareURL: URL?
 
+        // Delete flow state
+        public var isShowingDeleteConfirmation: Bool = false
+        public var isDeleting: Bool = false
+        public var alertInfo: AlertInfo?
+
         public init(
             sessionID: SessionID,
             session: SessionRecord? = nil,
@@ -87,7 +95,10 @@ public struct SessionDetailFeature {
             audioPlayer: AudioPlayerFeature.State? = nil,
             speakerPicker: SpeakerPickerFeature.State? = nil,
             isExporting: Bool = false,
-            shareURL: URL? = nil
+            shareURL: URL? = nil,
+            isShowingDeleteConfirmation: Bool = false,
+            isDeleting: Bool = false,
+            alertInfo: AlertInfo? = nil
         ) {
             self.sessionID = sessionID
             self.session = session
@@ -99,6 +110,9 @@ public struct SessionDetailFeature {
             self.speakerPicker = speakerPicker
             self.isExporting = isExporting
             self.shareURL = shareURL
+            self.isShowingDeleteConfirmation = isShowingDeleteConfirmation
+            self.isDeleting = isDeleting
+            self.alertInfo = alertInfo
         }
     }
 
@@ -117,6 +131,15 @@ public struct SessionDetailFeature {
         case exportCompleted(URL)
         case exportFailed(String)
         case shareSheetDismissed
+
+        // Delete actions
+        case deleteTapped
+        case deleteConfirmed
+        case deleteCancelled
+        case deleteCompleted
+        case deleteFailed(String)
+        case alertActionTapped(RecoveryAction)
+        case alertDismissed
     }
 
     public var body: some ReducerOf<Self> {
@@ -259,6 +282,71 @@ public struct SessionDetailFeature {
 
             case .shareSheetDismissed:
                 state.shareURL = nil
+                return .none
+
+            // MARK: - Delete Actions
+
+            case .deleteTapped:
+                state.isShowingDeleteConfirmation = true
+                return .none
+
+            case .deleteConfirmed:
+                state.isShowingDeleteConfirmation = false
+                guard !state.isDeleting else { return .none }
+                state.isDeleting = true
+
+                return .run { [sessionID = state.sessionID, session = state.session, databaseClient, fileClient] send in
+                    // Delete audio file if it exists
+                    if let audioPath = session?.audioPath {
+                        let audioURL = URL(fileURLWithPath: audioPath)
+                        if fileClient.exists(audioURL) {
+                            try? await fileClient.delete(audioURL)
+                        }
+                    }
+
+                    // Delete session from database (cascades to segments, tracks, etc.)
+                    try await databaseClient.deleteSession(sessionID)
+
+                    await send(.deleteCompleted)
+                } catch: { error, send in
+                    await send(.deleteFailed(error.localizedDescription))
+                }
+
+            case .deleteCancelled:
+                state.isShowingDeleteConfirmation = false
+                return .none
+
+            case .deleteCompleted:
+                state.isDeleting = false
+                // Navigation back handled by parent - this is a signal that deletion succeeded
+                return .none
+
+            case let .deleteFailed(errorMessage):
+                state.isDeleting = false
+                let envelope = ErrorEnvelope.databaseWrite(message: errorMessage)
+                let alertInfo = envelope.toAlertInfo()
+                state.alertInfo = AlertInfo(
+                    id: uuid().uuidString,
+                    title: alertInfo.title,
+                    message: alertInfo.message,
+                    primaryButton: alertInfo.primaryButton,
+                    secondaryButton: alertInfo.secondaryButton
+                )
+                return .none
+
+            case let .alertActionTapped(action):
+                state.alertInfo = nil
+                switch action {
+                case .retry:
+                    return .send(.deleteConfirmed)
+                case .dismiss:
+                    return .none
+                default:
+                    return .none
+                }
+
+            case .alertDismissed:
+                state.alertInfo = nil
                 return .none
             }
         }

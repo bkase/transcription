@@ -4,6 +4,7 @@ import ComposableArchitecture
 import Models
 import Observability
 import Persistence
+import Export
 @testable import TimelineFeature
 
 // Test UUID for deterministic alert IDs
@@ -344,5 +345,286 @@ struct TimelineFeatureTests {
 
         // onAppear should not trigger reload when sessions already exist
         await store.send(.onAppear)
+    }
+
+    // MARK: - Delete Tests
+
+    @Test
+    func testDeleteSessionFromTimeline() async {
+        let mockDate = Date(timeIntervalSince1970: 1000000)
+
+        let session1 = SessionRecord(
+            id: "session-1",
+            startedAt: mockDate,
+            title: "Session 1",
+            previewText: "First session",
+            durationMs: 60000,
+            audioPath: "/audio/session-1.caf",
+            processingState: .processed,
+            speakerCount: 1,
+            updatedAt: mockDate
+        )
+
+        let session2 = SessionRecord(
+            id: "session-2",
+            startedAt: mockDate.addingTimeInterval(-3600),
+            title: "Session 2",
+            previewText: "Second session",
+            durationMs: 45000,
+            processingState: .processed,
+            speakerCount: 2,
+            updatedAt: mockDate
+        )
+
+        let mockGroups = [
+            SessionGroup(bucket: .today, sessions: [session1, session2])
+        ]
+
+        var deletedSessionId: SessionID?
+
+        let store = TestStore(
+            initialState: TimelineFeature.State(sessionGroups: mockGroups)
+        ) {
+            TimelineFeature()
+        } withDependencies: {
+            $0.date = .constant(mockDate)
+            $0.uuid = .constant(testUUID)
+            $0.databaseClient.deleteSession = { id in
+                deletedSessionId = id
+            }
+            $0.fileClient.exists = { url in
+                return url.path == "/audio/session-1.caf"
+            }
+            $0.fileClient.delete = { _ in }
+        }
+
+        // Tap delete on session 1
+        await store.send(.deleteSessionTapped(session1)) {
+            $0.sessionToDelete = session1
+            $0.isShowingDeleteConfirmation = true
+        }
+
+        // Confirm delete
+        await store.send(.deleteConfirmed) {
+            $0.isShowingDeleteConfirmation = false
+            $0.isDeleting = true
+        }
+
+        // Receive completion - session removed from groups
+        await store.receive(\.deleteCompleted) {
+            $0.isDeleting = false
+            $0.sessionToDelete = nil
+            // Session 1 should be removed from the group
+            $0.sessionGroups = [
+                SessionGroup(bucket: .today, sessions: [session2])
+            ]
+        }
+
+        #expect(deletedSessionId == SessionID("session-1"))
+    }
+
+    @Test
+    func testDeleteLastSessionRemovesGroup() async {
+        let mockDate = Date(timeIntervalSince1970: 1000000)
+
+        let session = SessionRecord(
+            id: "session-only",
+            startedAt: mockDate,
+            title: "Only Session",
+            processingState: .processed,
+            speakerCount: 1,
+            updatedAt: mockDate
+        )
+
+        let mockGroups = [
+            SessionGroup(bucket: .today, sessions: [session])
+        ]
+
+        let store = TestStore(
+            initialState: TimelineFeature.State(sessionGroups: mockGroups)
+        ) {
+            TimelineFeature()
+        } withDependencies: {
+            $0.date = .constant(mockDate)
+            $0.databaseClient.deleteSession = { _ in }
+            $0.fileClient.exists = { _ in false }
+        }
+
+        // Tap delete
+        await store.send(.deleteSessionTapped(session)) {
+            $0.sessionToDelete = session
+            $0.isShowingDeleteConfirmation = true
+        }
+
+        // Confirm delete
+        await store.send(.deleteConfirmed) {
+            $0.isShowingDeleteConfirmation = false
+            $0.isDeleting = true
+        }
+
+        // Receive completion - group should be removed since it's now empty
+        await store.receive(\.deleteCompleted) {
+            $0.isDeleting = false
+            $0.sessionToDelete = nil
+            $0.sessionGroups = [] // Group removed because it's empty
+        }
+    }
+
+    @Test
+    func testDeleteCancelledDoesNotRemoveSession() async {
+        let mockDate = Date(timeIntervalSince1970: 1000000)
+
+        let session = SessionRecord(
+            id: "session-1",
+            startedAt: mockDate,
+            title: "Test Session",
+            processingState: .processed,
+            speakerCount: 1,
+            updatedAt: mockDate
+        )
+
+        let mockGroups = [
+            SessionGroup(bucket: .today, sessions: [session])
+        ]
+
+        var deleteWasCalled = false
+
+        let store = TestStore(
+            initialState: TimelineFeature.State(sessionGroups: mockGroups)
+        ) {
+            TimelineFeature()
+        } withDependencies: {
+            $0.databaseClient.deleteSession = { _ in
+                deleteWasCalled = true
+            }
+        }
+
+        // Tap delete
+        await store.send(.deleteSessionTapped(session)) {
+            $0.sessionToDelete = session
+            $0.isShowingDeleteConfirmation = true
+        }
+
+        // Cancel delete
+        await store.send(.deleteCancelled) {
+            $0.isShowingDeleteConfirmation = false
+            $0.sessionToDelete = nil
+        }
+
+        // Verify delete was NOT called and sessions are unchanged
+        #expect(!deleteWasCalled)
+        #expect(store.state.sessionGroups.count == 1)
+        #expect(store.state.sessionGroups[0].sessions.count == 1)
+    }
+
+    @Test
+    func testDeleteFailedShowsAlert() async {
+        let mockDate = Date(timeIntervalSince1970: 1000000)
+
+        let session = SessionRecord(
+            id: "session-1",
+            startedAt: mockDate,
+            title: "Test Session",
+            processingState: .processed,
+            speakerCount: 1,
+            updatedAt: mockDate
+        )
+
+        let mockGroups = [
+            SessionGroup(bucket: .today, sessions: [session])
+        ]
+
+        struct TestError: Error, LocalizedError {
+            var errorDescription: String? { "Delete failed" }
+        }
+
+        let store = TestStore(
+            initialState: TimelineFeature.State(sessionGroups: mockGroups)
+        ) {
+            TimelineFeature()
+        } withDependencies: {
+            $0.date = .constant(mockDate)
+            $0.uuid = .constant(testUUID)
+            $0.databaseClient.deleteSession = { _ in
+                throw TestError()
+            }
+            $0.fileClient.exists = { _ in false }
+        }
+
+        // Tap delete
+        await store.send(.deleteSessionTapped(session)) {
+            $0.sessionToDelete = session
+            $0.isShowingDeleteConfirmation = true
+        }
+
+        // Confirm delete
+        await store.send(.deleteConfirmed) {
+            $0.isShowingDeleteConfirmation = false
+            $0.isDeleting = true
+        }
+
+        // Receive failure with alert
+        await store.receive(\.deleteFailed) {
+            $0.isDeleting = false
+            $0.sessionToDelete = nil
+            $0.alertInfo = AlertInfo(
+                id: testUUID.uuidString,
+                title: "Data Error",
+                message: "Delete failed",
+                primaryButton: AlertInfo.AlertButton(title: "Retry", action: .retry, isDestructive: false),
+                secondaryButton: AlertInfo.AlertButton(title: "Cancel", action: .dismiss, isDestructive: false)
+            )
+        }
+
+        // Session should still be in groups
+        #expect(store.state.sessionGroups[0].sessions.count == 1)
+    }
+
+    @Test
+    func testDeleteRemovesFromSearchResults() async {
+        let mockDate = Date(timeIntervalSince1970: 1000000)
+
+        let session = SessionRecord(
+            id: "session-1",
+            startedAt: mockDate,
+            title: "Test Session",
+            processingState: .processed,
+            speakerCount: 1,
+            updatedAt: mockDate
+        )
+
+        let store = TestStore(
+            initialState: TimelineFeature.State(
+                searchQuery: "test",
+                sessionGroups: [SessionGroup(bucket: .today, sessions: [session])],
+                searchResults: [session]
+            )
+        ) {
+            TimelineFeature()
+        } withDependencies: {
+            $0.date = .constant(mockDate)
+            $0.databaseClient.deleteSession = { _ in }
+            $0.fileClient.exists = { _ in false }
+        }
+
+        // Tap delete
+        await store.send(.deleteSessionTapped(session)) {
+            $0.sessionToDelete = session
+            $0.isShowingDeleteConfirmation = true
+        }
+
+        // Confirm delete
+        await store.send(.deleteConfirmed) {
+            $0.isShowingDeleteConfirmation = false
+            $0.isDeleting = true
+        }
+
+        // Receive completion - removed from both groups and search results
+        await store.receive(\.deleteCompleted) {
+            $0.isDeleting = false
+            $0.sessionToDelete = nil
+            $0.sessionGroups = []
+            $0.searchResults = []
+        }
     }
 }
