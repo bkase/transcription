@@ -79,7 +79,13 @@ public struct TimelineView: View {
         HStack {
             PageHeader(kicker: "Archive", title: "Timeline")
             Spacer()
-            Avatar(size: .medium)
+            Button {
+                store.send(.avatarTapped)
+            } label: {
+                Avatar(size: .medium)
+            }
+            .buttonStyle(PlainButtonStyle())
+            .accessibilityIdentifier("profileAvatarButton")
         }
         .padding(.top, 56)
         .padding(.horizontal, VaporSpacing.lg)

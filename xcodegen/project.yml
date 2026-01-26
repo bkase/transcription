@@ -448,8 +448,10 @@ targets:
     dependencies:
       - target: Vapor
       - target: Models
+      - target: Persistence
       - target: Processing
       - target: SessionDetailFeature
+      - target: ProfileFeature
       - package: swift-snapshot-testing
         product: SnapshotTesting
       - package: swift-composable-architecture
@@ -458,6 +460,8 @@ targets:
         product: Tagged
       - package: swift-dependencies
         product: Dependencies
+      - package: swift-case-paths
+        product: CasePaths
     settings:
       base:
         PRODUCT_NAME: VaporTests

@@ -695,3 +695,10 @@
 - Use `@State private var selectedPhoto: PhotosPickerItem?` and `.onChange(of:)` to load data
 - `item.loadTransferable(type: Data.self)` to get raw image data from PhotosPickerItem
 - Wrap UIImage usage in `#if os(iOS)` with UIKit import for cross-platform builds
+
+## TCA navigation stack with profile feature
+- Add feature cases to AppFeature.Path enum with `case profile(ProfileFeature)`
+- Initialize profile with app-level state when navigating: `ProfileFeature.State(profile: state.userProfile)`
+- Intercept delegate actions for app-level state sync: `.path(.element(id: _, action: .profile(.delegate(.didSaveProfile(profile)))))`
+- Load user profile on app onAppear and emit `.userProfileLoaded(profile)` action to update state
+- Test targets using feature modules need CasePaths dependency for @CasePathable macro-generated code

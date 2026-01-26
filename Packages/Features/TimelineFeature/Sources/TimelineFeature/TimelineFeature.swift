@@ -68,6 +68,8 @@ public struct TimelineFeature {
         case searchPerformed([SessionRecord])
         case sessionTapped(SessionID)
         case newRecordingTapped
+        /// User tapped the header avatar to navigate to profile
+        case avatarTapped
         /// User tapped a recovery action in the alert
         case alertActionTapped(RecoveryAction)
         /// Alert was dismissed
@@ -147,6 +149,10 @@ public struct TimelineFeature {
                 return .none
 
             case .newRecordingTapped:
+                // Navigation intent - will be handled by parent
+                return .none
+
+            case .avatarTapped:
                 // Navigation intent - will be handled by parent
                 return .none
 

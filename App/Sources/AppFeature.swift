@@ -4,6 +4,8 @@ import TimelineFeature
 import RecordingFeature
 import SessionDetailFeature
 import PeopleFeature
+import ProfileFeature
+import Persistence
 import Processing
 import Models
 
@@ -18,6 +20,7 @@ public struct AppFeature {
     @Reducer(state: .equatable, action: .equatable)
     public enum Path {
         case sessionDetail(SessionDetailFeature)
+        case profile(ProfileFeature)
     }
 
     @ObservableState
@@ -27,19 +30,22 @@ public struct AppFeature {
         public var timeline: TimelineFeature.State
         public var people: PeopleFeature.State
         @Presents public var recording: RecordingFeature.State?
+        public var userProfile: UserProfile = .empty
 
         public init(
             currentTab: Tab = .timeline,
             path: StackState<Path.State> = StackState(),
             timeline: TimelineFeature.State = .init(),
             people: PeopleFeature.State = .init(),
-            recording: RecordingFeature.State? = nil
+            recording: RecordingFeature.State? = nil,
+            userProfile: UserProfile = .empty
         ) {
             self.currentTab = currentTab
             self.path = path
             self.timeline = timeline
             self.people = people
             self.recording = recording
+            self.userProfile = userProfile
         }
     }
 
@@ -56,9 +62,11 @@ public struct AppFeature {
         case people(PeopleFeature.Action)
         case recording(PresentationAction<RecordingFeature.Action>)
         case dismissRecording
+        case userProfileLoaded(UserProfile)
     }
 
     @Dependency(\.recoveryRoutineClient) var recoveryRoutineClient
+    @Dependency(\.userProfileClient) var userProfileClient
 
     public var body: some ReducerOf<Self> {
         Scope(state: \.timeline, action: \.timeline) {
@@ -72,10 +80,16 @@ public struct AppFeature {
         Reduce { state, action in
             switch action {
             case .onAppear:
-                // Run recovery routine to reconcile any interrupted recordings
-                return .run { _ in
+                // Run recovery routine and load user profile on app start
+                return .run { [userProfileClient] send in
                     _ = try? await recoveryRoutineClient.run()
+                    let profile = try await userProfileClient.load()
+                    await send(.userProfileLoaded(profile))
                 }
+
+            case let .userProfileLoaded(profile):
+                state.userProfile = profile
+                return .none
 
             case let .tabSelected(tab):
                 state.currentTab = tab
@@ -86,6 +100,16 @@ public struct AppFeature {
             case .path(.element(id: _, action: .sessionDetail(.backTapped))):
                 // Pop the navigation stack when back is tapped
                 _ = state.path.popLast()
+                return .none
+
+            case .path(.element(id: _, action: .profile(.backTapped))):
+                // Pop the navigation stack when back is tapped in profile
+                _ = state.path.popLast()
+                return .none
+
+            case let .path(.element(id: _, action: .profile(.delegate(.didSaveProfile(profile))))):
+                // Update app-level profile state when profile is saved
+                state.userProfile = profile
                 return .none
 
             case .path:
@@ -108,6 +132,11 @@ public struct AppFeature {
                 // Create directory if needed
                 try? FileManager.default.createDirectory(at: audioDir, withIntermediateDirectories: true)
                 return .send(.recording(.presented(.startRecording(audioDirectory: audioDir))))
+
+            case .timeline(.avatarTapped):
+                // Push profile onto navigation stack with current user profile
+                state.path.append(.profile(ProfileFeature.State(profile: state.userProfile)))
+                return .none
 
             case .timeline:
                 return .none

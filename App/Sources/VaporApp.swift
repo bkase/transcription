@@ -4,6 +4,7 @@ import TimelineFeature
 import RecordingFeature
 import SessionDetailFeature
 import PeopleFeature
+import ProfileFeature
 import Dependencies
 import Audio
 import Processing
@@ -71,6 +72,9 @@ struct AppView: View {
                     switch store.case {
                     case let .sessionDetail(sessionDetailStore):
                         SessionDetailView(store: sessionDetailStore)
+                            .navigationBarHidden(true)
+                    case let .profile(profileStore):
+                        ProfileView(store: profileStore)
                             .navigationBarHidden(true)
                     }
                 }
