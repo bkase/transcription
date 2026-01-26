@@ -2,10 +2,14 @@ import Testing
 import Foundation
 import ComposableArchitecture
 import Models
+import Observability
 import Persistence
 @testable import RecordingFeature
 @testable import Processing
 @testable import Audio
+
+// Test UUID for deterministic alert IDs
+private let testUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
 
 @MainActor
 struct RecordingProcessorWiringTests {
@@ -31,6 +35,7 @@ struct RecordingProcessorWiringTests {
 
         // Mock database returns for segments
         var fetchSegmentsCallCount = 0
+        var fetchTracksCallCount = 0
 
         let store = TestStore(initialState: RecordingFeature.State()) {
             RecordingFeature()
@@ -91,7 +96,8 @@ struct RecordingProcessorWiringTests {
                 }
             }
             $0.databaseClient.fetchSpeakerTracks = { _ in
-                if fetchSegmentsCallCount == 1 {
+                fetchTracksCallCount += 1
+                if fetchTracksCallCount == 1 {
                     return [
                         SpeakerTrackRecord(
                             id: "track-1",
@@ -289,6 +295,7 @@ struct RecordingProcessorWiringTests {
             RecordingFeature()
         } withDependencies: {
             $0.continuousClock = clock
+            $0.uuid = .constant(testUUID)
             $0.microphonePermissionClient.getStatus = { .authorized }
             $0.recordingProcessorClient.startRecording = { _ in eventStream }
             $0.recordingProcessorClient.stopRecording = { }
@@ -360,7 +367,7 @@ struct RecordingProcessorWiringTests {
         #expect(store.state.liveSegments.count == 1)
         #expect(store.state.speakerTracks.count == 1)
 
-        // Now fail
+        // Now fail - should clear segments and show alert
         eventContinuation?.yield(.didFail("Storage error"))
         await store.receive(\.processorEvent) {
             $0.error = "Storage error"
@@ -368,6 +375,13 @@ struct RecordingProcessorWiringTests {
             $0.isListening = false
             $0.liveSegments = []
             $0.speakerTracks = []
+            $0.alertInfo = AlertInfo(
+                id: testUUID.uuidString,
+                title: "Recording Error",
+                message: "Storage error",
+                primaryButton: .init(title: "Retry", action: .retryFinalize),
+                secondaryButton: .init(title: "Cancel", action: .dismiss)
+            )
         }
 
         // Segments and speaker tracks should be cleared

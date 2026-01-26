@@ -1,6 +1,7 @@
 import ComposableArchitecture
 import DesignSystem
 import Models
+import Observability
 import Persistence
 import SwiftUI
 
@@ -40,6 +41,35 @@ public struct TimelineView: View {
         .background(VaporColor.mist)
         .onAppear {
             store.send(.onAppear)
+        }
+        .alert(
+            item: Binding(
+                get: { store.alertInfo },
+                set: { if $0 == nil { store.send(.alertDismissed) } }
+            )
+        ) { alertInfo in
+            Alert(
+                title: Text(alertInfo.title),
+                message: Text(alertInfo.message),
+                primaryButton: alertButton(for: alertInfo.primaryButton),
+                secondaryButton: alertInfo.secondaryButton.map { alertButton(for: $0) } ?? .cancel()
+            )
+        }
+    }
+
+    private func alertButton(for button: AlertInfo.AlertButton) -> Alert.Button {
+        if button.isDestructive {
+            return .destructive(Text(button.title)) {
+                store.send(.alertActionTapped(button.action))
+            }
+        } else if button.action == .dismiss {
+            return .cancel(Text(button.title)) {
+                store.send(.alertActionTapped(button.action))
+            }
+        } else {
+            return .default(Text(button.title)) {
+                store.send(.alertActionTapped(button.action))
+            }
         }
     }
 

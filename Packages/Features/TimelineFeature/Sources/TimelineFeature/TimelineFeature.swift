@@ -2,6 +2,7 @@ import ComposableArchitecture
 import Dependencies
 import Foundation
 import Models
+import Observability
 import Persistence
 import DesignSystem
 
@@ -11,6 +12,7 @@ public struct TimelineFeature {
 
     @Dependency(\.databaseClient) var databaseClient
     @Dependency(\.date) var date
+    @Dependency(\.uuid) var uuid
 
     @ObservableState
     public struct State: Equatable {
@@ -19,6 +21,8 @@ public struct TimelineFeature {
         public var searchResults: [SessionRecord] = []
         public var isLoading: Bool = false
         public var error: String?
+        /// Alert info for displaying errors with recovery options
+        public var alertInfo: AlertInfo?
 
         /// Whether the user is actively searching (non-empty query)
         public var isSearching: Bool {
@@ -30,13 +34,15 @@ public struct TimelineFeature {
             sessionGroups: [SessionGroup] = [],
             searchResults: [SessionRecord] = [],
             isLoading: Bool = false,
-            error: String? = nil
+            error: String? = nil,
+            alertInfo: AlertInfo? = nil
         ) {
             self.searchQuery = searchQuery
             self.sessionGroups = sessionGroups
             self.searchResults = searchResults
             self.isLoading = isLoading
             self.error = error
+            self.alertInfo = alertInfo
         }
     }
 
@@ -49,6 +55,10 @@ public struct TimelineFeature {
         case searchPerformed([SessionRecord])
         case sessionTapped(SessionID)
         case newRecordingTapped
+        /// User tapped a recovery action in the alert
+        case alertActionTapped(RecoveryAction)
+        /// Alert was dismissed
+        case alertDismissed
     }
 
     public var body: some ReducerOf<Self> {
@@ -96,6 +106,16 @@ public struct TimelineFeature {
             case let .sessionsFailed(errorMessage):
                 state.isLoading = false
                 state.error = errorMessage
+                // Create an error envelope and convert to alert with deterministic ID
+                let envelope = ErrorEnvelope.databaseRead(message: errorMessage)
+                let alertInfo = envelope.toAlertInfo()
+                state.alertInfo = AlertInfo(
+                    id: uuid().uuidString,
+                    title: alertInfo.title,
+                    message: alertInfo.message,
+                    primaryButton: alertInfo.primaryButton,
+                    secondaryButton: alertInfo.secondaryButton
+                )
                 return .none
 
             case let .searchPerformed(results):
@@ -108,6 +128,21 @@ public struct TimelineFeature {
 
             case .newRecordingTapped:
                 // Navigation intent - will be handled by parent
+                return .none
+
+            case let .alertActionTapped(action):
+                state.alertInfo = nil
+                switch action {
+                case .retry:
+                    return .send(.loadSessions)
+                case .dismiss:
+                    return .none
+                default:
+                    return .none
+                }
+
+            case .alertDismissed:
+                state.alertInfo = nil
                 return .none
             }
         }

@@ -598,3 +598,10 @@
 - Load fixtures with `Bundle.module.url(forResource:, withExtension:, subdirectory: "Fixtures")`
 - Trailing whitespace varies between files and generated output - use `.trimmingCharacters(in: .whitespacesAndNewlines)` for robust golden comparisons
 - For locale-dependent output (e.g., DateFormatter), strip variable lines before comparing to goldens
+
+## TCA AlertInfo with deterministic IDs
+- AlertInfo.id defaults to UUID().uuidString which breaks TestStore exact state comparisons
+- Use @Dependency(\.uuid) in reducers and create AlertInfo with `id: uuid().uuidString` for deterministic tests
+- Test setup: `$0.uuid = .constant(testUUID)` where testUUID is a file-level constant
+- AlertInfo pattern: `state.alertInfo = AlertInfo(id: uuid().uuidString, title: alertInfo.title, ...)`
+- Recovery actions in alerts: .retry triggers feature-specific reload, .dismiss just clears alert

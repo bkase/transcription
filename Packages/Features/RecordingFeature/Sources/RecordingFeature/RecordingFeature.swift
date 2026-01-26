@@ -2,6 +2,7 @@ import ComposableArchitecture
 import Dependencies
 import Foundation
 import Models
+import Observability
 import Persistence
 import Audio
 import Processing
@@ -89,6 +90,8 @@ public struct RecordingFeature {
         public var isPermissionDenied: Bool = false
         /// Whether to show discard confirmation alert
         public var isShowingDiscardConfirmation: Bool = false
+        /// Alert info for displaying errors with recovery options
+        public var alertInfo: AlertInfo?
 
         public init(
             isRecording: Bool = false,
@@ -101,7 +104,8 @@ public struct RecordingFeature {
             liveSegments: [LiveSegment] = [],
             speakerTracks: [LiveSpeakerTrack] = [],
             isPermissionDenied: Bool = false,
-            isShowingDiscardConfirmation: Bool = false
+            isShowingDiscardConfirmation: Bool = false,
+            alertInfo: AlertInfo? = nil
         ) {
             self.isRecording = isRecording
             self.isPaused = isPaused
@@ -114,6 +118,7 @@ public struct RecordingFeature {
             self.speakerTracks = speakerTracks
             self.isPermissionDenied = isPermissionDenied
             self.isShowingDiscardConfirmation = isShowingDiscardConfirmation
+            self.alertInfo = alertInfo
         }
     }
 
@@ -152,6 +157,10 @@ public struct RecordingFeature {
         case discardConfirmed
         /// User cancelled discard in the confirmation alert
         case discardCancelled
+        /// User tapped a recovery action in the error alert
+        case alertActionTapped(RecoveryAction)
+        /// Error alert was dismissed
+        case alertDismissed
     }
 
     public var body: some ReducerOf<Self> {
@@ -369,6 +378,19 @@ public struct RecordingFeature {
                     state.isListening = false
                     state.liveSegments = []
                     state.speakerTracks = []
+                    // Create an error envelope and convert to alert with deterministic ID
+                    let envelope = ErrorEnvelope.recordingFinalization(
+                        sessionId: state.sessionID?.rawValue ?? "",
+                        message: errorMessage
+                    )
+                    let alertInfo = envelope.toAlertInfo()
+                    state.alertInfo = AlertInfo(
+                        id: uuid().uuidString,
+                        title: alertInfo.title,
+                        message: alertInfo.message,
+                        primaryButton: alertInfo.primaryButton,
+                        secondaryButton: alertInfo.secondaryButton
+                    )
                     return .merge(
                         .cancel(id: CancelID.timer),
                         .cancel(id: CancelID.processorEvents)
@@ -403,6 +425,16 @@ public struct RecordingFeature {
             case let .recordingFailed(errorMessage):
                 state.isRecording = false
                 state.error = errorMessage
+                // Create an error envelope and convert to alert with deterministic ID
+                let envelope = ErrorEnvelope.recordingStart(message: errorMessage)
+                let alertInfo = envelope.toAlertInfo()
+                state.alertInfo = AlertInfo(
+                    id: uuid().uuidString,
+                    title: alertInfo.title,
+                    message: alertInfo.message,
+                    primaryButton: alertInfo.primaryButton,
+                    secondaryButton: alertInfo.secondaryButton
+                )
                 return .none
 
             case let .segmentsLoaded(segments, tracks):
@@ -419,6 +451,25 @@ public struct RecordingFeature {
                     .cancel(id: CancelID.timer),
                     .cancel(id: CancelID.processorEvents)
                 )
+
+            case let .alertActionTapped(action):
+                state.alertInfo = nil
+                switch action {
+                case .retry:
+                    // Retry starting recording if we have an audio directory
+                    if let audioDirectory = state.audioDirectory {
+                        return .send(.startRecording(audioDirectory: audioDirectory))
+                    }
+                    return .none
+                case .dismiss:
+                    return .none
+                default:
+                    return .none
+                }
+
+            case .alertDismissed:
+                state.alertInfo = nil
+                return .none
             }
         }
     }

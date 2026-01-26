@@ -2,10 +2,14 @@ import Testing
 import Foundation
 import ComposableArchitecture
 import Models
+import Observability
 import Persistence
 @testable import RecordingFeature
 @testable import Processing
 @testable import Audio
+
+// Test UUID for deterministic alert IDs
+private let testUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
 
 @MainActor
 struct RecordingFeatureTests {
@@ -101,6 +105,7 @@ struct RecordingFeatureTests {
         let store = TestStore(initialState: RecordingFeature.State()) {
             RecordingFeature()
         } withDependencies: {
+            $0.uuid = .constant(testUUID)
             $0.microphonePermissionClient.getStatus = { .authorized }
             $0.recordingProcessorClient.startRecording = { _ in
                 throw TestError()
@@ -115,10 +120,17 @@ struct RecordingFeatureTests {
             $0.audioDirectory = audioDirectory
         }
 
-        // Should receive failure from processor
+        // Should receive failure from processor with alert
         await store.receive(\.recordingFailed) {
             $0.isRecording = false
             $0.error = "Storage error"
+            $0.alertInfo = AlertInfo(
+                id: testUUID.uuidString,
+                title: "Recording Error",
+                message: "Storage error",
+                primaryButton: .init(title: "Retry", action: .retry),
+                secondaryButton: .init(title: "Cancel", action: .dismiss)
+            )
         }
     }
 
@@ -140,6 +152,7 @@ struct RecordingFeatureTests {
             RecordingFeature()
         } withDependencies: {
             $0.continuousClock = clock
+            $0.uuid = .constant(testUUID)
             $0.microphonePermissionClient.getStatus = { .authorized }
             $0.recordingProcessorClient.startRecording = { _ in eventStream }
             $0.recordingProcessorClient.stopRecording = { }
@@ -159,12 +172,19 @@ struct RecordingFeatureTests {
             $0.sessionID = mockSessionID
         }
 
-        // Emit failure event
+        // Emit failure event with alert
         eventContinuation?.yield(.didFail("Storage full"))
         await store.receive(\.processorEvent) {
             $0.error = "Storage full"
             $0.isRecording = false
             $0.isListening = false
+            $0.alertInfo = AlertInfo(
+                id: testUUID.uuidString,
+                title: "Recording Error",
+                message: "Storage full",
+                primaryButton: .init(title: "Retry", action: .retryFinalize),
+                secondaryButton: .init(title: "Cancel", action: .dismiss)
+            )
         }
 
         // Clean up

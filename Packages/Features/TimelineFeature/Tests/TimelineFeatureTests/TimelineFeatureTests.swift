@@ -2,8 +2,12 @@ import Testing
 import Foundation
 import ComposableArchitecture
 import Models
+import Observability
 import Persistence
 @testable import TimelineFeature
+
+// Test UUID for deterministic alert IDs
+private let testUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
 
 @MainActor
 struct TimelineFeatureTests {
@@ -257,6 +261,7 @@ struct TimelineFeatureTests {
             TimelineFeature()
         } withDependencies: {
             $0.date = .constant(mockDate)
+            $0.uuid = .constant(testUUID)
             $0.databaseClient.fetchSessionsGroupedByDate = { _ in
                 throw TestError()
             }
@@ -269,6 +274,14 @@ struct TimelineFeatureTests {
         await store.receive(\.sessionsFailed) {
             $0.isLoading = false
             $0.error = "Database connection failed"
+            // Alert should be shown with database read error
+            $0.alertInfo = AlertInfo(
+                id: testUUID.uuidString,
+                title: "Data Error",
+                message: "Database connection failed",
+                primaryButton: .init(title: "Retry", action: .retry),
+                secondaryButton: .init(title: "Cancel", action: .dismiss)
+            )
         }
     }
 
