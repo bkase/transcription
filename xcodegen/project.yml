@@ -1,6 +1,6 @@
 name: Vapor
 options:
-  bundleIdPrefix: com.vapor
+  bundleIdPrefix: com.bkase.vapor
   deploymentTarget:
     iOS: "17.0"
   xcodeVersion: "15.0"
@@ -111,7 +111,7 @@ targets:
     settings:
       base:
         INFOPLIST_FILE: ../App/Sources/Info.plist
-        PRODUCT_BUNDLE_IDENTIFIER: com.vapor.app
+        PRODUCT_BUNDLE_IDENTIFIER: com.bkase.vapor.app
         PRODUCT_NAME: Vapor
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks"
 

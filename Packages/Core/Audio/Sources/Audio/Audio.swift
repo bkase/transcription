@@ -30,14 +30,7 @@ public struct AudioCaptureClient: Sendable {
 }
 
 extension AudioCaptureClient: DependencyKey {
-    public static let liveValue: Self = {
-        // Live implementation will use AVAudioEngine - placeholder for now
-        Self(
-            startCapture: { AsyncStream { _ in } },
-            stopCapture: { },
-            isCapturing: { false }
-        )
-    }()
+    public static let liveValue: Self = .live()
 
     public static let testValue = Self()
 }
