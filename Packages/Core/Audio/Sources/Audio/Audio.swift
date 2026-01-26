@@ -69,17 +69,7 @@ public struct AudioPlayerClient: Sendable {
 }
 
 extension AudioPlayerClient: DependencyKey {
-    public static let liveValue: Self = {
-        // Live implementation will use AVAudioPlayer - placeholder for now
-        Self(
-            play: { _ in },
-            pause: { },
-            stop: { },
-            seek: { _ in },
-            currentTime: { 0 },
-            isPlaying: { false }
-        )
-    }()
+    public static let liveValue: Self = .live()
 
     public static let testValue = Self()
 }
