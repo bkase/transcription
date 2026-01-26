@@ -18,6 +18,39 @@ final class TimelineE2ETests: XCTestCase {
         super.tearDown()
     }
 
+    /// Test that empty state shows "Ready to record" when models are ready.
+    /// Since mock dependencies start with models ready, the ready state should show.
+    func testEmptyStateShowsReadyToRecord() {
+        // 1. Launch the app
+        app.launch()
+
+        // 2. Verify we're on the Timeline screen
+        let timelineTab = app.tabBars.buttons["Timeline"]
+        XCTAssertTrue(timelineTab.waitForExistence(timeout: 5), "Timeline tab should exist")
+
+        // 3. Verify empty state elements
+        let emptyStateTitlePredicate = NSPredicate(format: "identifier == 'emptyStateTitle'")
+        let emptyStateTitle = app.descendants(matching: .staticText).matching(emptyStateTitlePredicate).firstMatch
+        XCTAssertTrue(emptyStateTitle.waitForExistence(timeout: 5), "Empty state title should exist")
+        XCTAssertEqual(emptyStateTitle.label, "Ready to record", "Empty state should show 'Ready to record' when models are ready")
+
+        // 4. Verify empty state description
+        let emptyStateDescPredicate = NSPredicate(format: "identifier == 'emptyStateDescription'")
+        let emptyStateDesc = app.descendants(matching: .staticText).matching(emptyStateDescPredicate).firstMatch
+        XCTAssertTrue(emptyStateDesc.waitForExistence(timeout: 2), "Empty state description should exist")
+        XCTAssertTrue(emptyStateDesc.label.contains("first transcription"), "Description should mention first transcription")
+
+        // 5. Verify record button is enabled (models ready)
+        let startRecordingButton = app.buttons["startRecordingButton"]
+        XCTAssertTrue(startRecordingButton.waitForExistence(timeout: 2), "Start recording button should exist")
+        XCTAssertTrue(startRecordingButton.isEnabled, "Record button should be enabled when models are ready")
+
+        // 6. Verify no status text below FAB (only shown for downloading/error states)
+        let statusPredicate = NSPredicate(format: "identifier == 'emptyStateStatus'")
+        let statusText = app.descendants(matching: .staticText).matching(statusPredicate).firstMatch
+        XCTAssertFalse(statusText.exists, "Status text should not exist in ready state")
+    }
+
     /// Test that completing a recording creates a session that appears in the timeline.
     /// Flow: Timeline -> Tap Record -> Recording starts -> Stop recording -> Session appears in timeline
     func testRecordCreatesTimelineSession() {

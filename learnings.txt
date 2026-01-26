@@ -789,3 +789,11 @@
 - When adding Processing dependency to feature, also update project.yml XcodeGen config
 - Tests for existing features need modelPreparationState: .ready when not testing model prep flow
 - Merged effects (.merge) can resolve in any order - test receives may need adjustment
+
+## Timeline empty state patterns
+- Create reusable TimelineEmptyStateView component with variant enum (downloading/error/ready)
+- Empty states can show status text under FAB for non-ready states (e.g., "Downloading models...")
+- Status text visibility tied to both empty state AND model preparation state
+- TimelineViewPreview DisplayMode enum extends to support all empty state variants for snapshot testing
+- SF Symbols for cloud icons: `icloud.and.arrow.down` (downloading), `icloud.slash` (error), `mic` (ready)
+- Fixed-width text frames (220-260pt) ensure consistent line wrapping across states

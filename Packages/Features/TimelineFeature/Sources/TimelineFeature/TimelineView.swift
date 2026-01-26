@@ -3,6 +3,7 @@ import DesignSystem
 import Models
 import Observability
 import Persistence
+import Processing
 import SwiftUI
 
 // MARK: - Timeline View
@@ -125,21 +126,16 @@ public struct TimelineView: View {
         }
     }
 
+    @ViewBuilder
     private var emptyStateContent: some View {
-        VStack(spacing: VaporSpacing.lg) {
-            Spacer()
-                .frame(height: VaporSpacing.xl * 4)
-
-            Text("No recordings yet")
-                .vaporTextStyle(.title)
-                .foregroundColor(VaporColor.textSecondary)
-
-            Text("Tap the record button to start capturing")
-                .vaporTextStyle(.body)
-                .foregroundColor(VaporColor.textTertiary)
-                .multilineTextAlignment(.center)
+        switch store.modelPreparationState {
+        case .idle, .downloading:
+            TimelineEmptyStateView(variant: .downloading)
+        case .failed:
+            TimelineEmptyStateView(variant: .error)
+        case .ready:
+            TimelineEmptyStateView(variant: .ready)
         }
-        .frame(maxWidth: .infinity)
     }
 
     private var searchResultsContent: some View {
@@ -219,16 +215,142 @@ public struct TimelineView: View {
     // MARK: - FAB Section
 
     private var fabSection: some View {
-        HStack {
-            Spacer()
+        VStack(spacing: VaporSpacing.sm) {
             RecordButton(isRecording: false, isEnabled: store.isRecordEnabled) {
                 store.send(.newRecordingTapped)
             }
-            Spacer()
+
+            // Status text for downloading/error states
+            if let statusText = fabStatusText {
+                Text(statusText)
+                    .font(.system(size: 12, weight: .light))
+                    .foregroundColor(VaporColor.textTertiary)
+                    .accessibilityIdentifier("emptyStateStatus")
+            }
         }
         .padding(.bottom, VaporSpacing.lg)
     }
 
+    private var fabStatusText: String? {
+        // Only show status text when there are no sessions (empty state)
+        guard store.sessionGroups.isEmpty && !store.isLoading else { return nil }
+
+        switch store.modelPreparationState {
+        case .idle, .downloading:
+            return "Downloading models..."
+        case .failed:
+            return "Something went wrong"
+        case .ready:
+            return nil
+        }
+    }
+
+}
+
+// MARK: - Timeline Empty State View
+
+/// Empty state view for the timeline, matching Pencil designs.
+/// Shows different content based on model preparation state.
+public struct TimelineEmptyStateView: View {
+    public enum Variant: Equatable {
+        case downloading
+        case error
+        case ready
+    }
+
+    private let variant: Variant
+
+    public init(variant: Variant) {
+        self.variant = variant
+    }
+
+    public var body: some View {
+        VStack(alignment: .center, spacing: VaporSpacing.md) {
+            iconView
+            titleView
+            descriptionView
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @ViewBuilder
+    private var iconView: some View {
+        Image(systemName: iconName)
+            .font(.system(size: 48, weight: .light))
+            .foregroundColor(iconColor)
+    }
+
+    private var iconName: String {
+        switch variant {
+        case .downloading:
+            return "icloud.and.arrow.down"
+        case .error:
+            return "icloud.slash"
+        case .ready:
+            return "mic"
+        }
+    }
+
+    private var iconColor: Color {
+        switch variant {
+        case .downloading:
+            return VaporColor.overcast
+        case .error:
+            return VaporColor.recording
+        case .ready:
+            return VaporColor.sky
+        }
+    }
+
+    private var titleView: some View {
+        Text(titleText)
+            .font(.system(size: 20, weight: .light))
+            .foregroundColor(VaporColor.textPrimary)
+            .accessibilityIdentifier("emptyStateTitle")
+    }
+
+    private var titleText: String {
+        switch variant {
+        case .downloading:
+            return "Setting up Vapor"
+        case .error:
+            return "Unable to connect"
+        case .ready:
+            return "Ready to record"
+        }
+    }
+
+    private var descriptionView: some View {
+        Text(descriptionText)
+            .font(.system(size: 14, weight: .light))
+            .foregroundColor(VaporColor.textTertiary)
+            .multilineTextAlignment(.center)
+            .lineSpacing(4)
+            .frame(width: descriptionWidth)
+            .accessibilityIdentifier("emptyStateDescription")
+    }
+
+    private var descriptionText: String {
+        switch variant {
+        case .downloading:
+            return "Downloading speech models for\noffline transcription..."
+        case .error:
+            return "Check your connection and try again.\nVapor needs to download models\nto enable recording."
+        case .ready:
+            return "Tap the button below to start\nyour first transcription."
+        }
+    }
+
+    private var descriptionWidth: CGFloat {
+        switch variant {
+        case .downloading:
+            return 240
+        case .error:
+            return 260
+        case .ready:
+            return 220
+        }
+    }
 }
 
 // MARK: - Timeline View Preview (for snapshots)
@@ -280,7 +402,13 @@ public struct TimelineViewPreview: View {
     public enum DisplayMode {
         /// Normal grouped timeline view
         case grouped
-        /// Empty state with no sessions
+        /// Empty state - downloading models
+        case emptyDownloading
+        /// Empty state - error downloading models
+        case emptyError
+        /// Empty state - ready to record
+        case emptyReady
+        /// Legacy empty state (for backwards compatibility)
         case empty
         /// Search results mode
         case searchResults(results: [SessionData])
@@ -302,7 +430,7 @@ public struct TimelineViewPreview: View {
         switch displayMode {
         case .grouped:
             self.sections = []
-        case .empty:
+        case .empty, .emptyDownloading, .emptyError, .emptyReady:
             self.sections = []
         case .searchResults:
             self.sections = []
@@ -335,15 +463,44 @@ public struct TimelineViewPreview: View {
                 }
             }
 
-            // FAB
-            HStack {
-                Spacer()
-                RecordButton(isRecording: false) {}
-                Spacer()
-            }
-            .padding(.bottom, VaporSpacing.lg)
+            // FAB with status text
+            fabSection
         }
         .background(VaporColor.mist)
+    }
+
+    private var fabSection: some View {
+        VStack(spacing: VaporSpacing.sm) {
+            RecordButton(isRecording: false, isEnabled: isRecordEnabled) {}
+
+            // Status text for downloading/error states
+            if let statusText = fabStatusText {
+                Text(statusText)
+                    .font(.system(size: 12, weight: .light))
+                    .foregroundColor(VaporColor.textTertiary)
+            }
+        }
+        .padding(.bottom, VaporSpacing.lg)
+    }
+
+    private var isRecordEnabled: Bool {
+        switch displayMode {
+        case .emptyReady, .grouped, .searchResults:
+            return true
+        case .emptyDownloading, .emptyError, .empty:
+            return false
+        }
+    }
+
+    private var fabStatusText: String? {
+        switch displayMode {
+        case .emptyDownloading:
+            return "Downloading models..."
+        case .emptyError:
+            return "Something went wrong"
+        default:
+            return nil
+        }
     }
 
     @ViewBuilder
@@ -351,8 +508,12 @@ public struct TimelineViewPreview: View {
         switch displayMode {
         case .grouped:
             groupedContent
-        case .empty:
-            emptyStateContent
+        case .empty, .emptyReady:
+            TimelineEmptyStateView(variant: .ready)
+        case .emptyDownloading:
+            TimelineEmptyStateView(variant: .downloading)
+        case .emptyError:
+            TimelineEmptyStateView(variant: .error)
         case .searchResults(let results):
             searchResultsContent(results: results)
         }
@@ -379,23 +540,6 @@ public struct TimelineViewPreview: View {
                 }
             }
         }
-    }
-
-    private var emptyStateContent: some View {
-        VStack(spacing: VaporSpacing.lg) {
-            Spacer()
-                .frame(height: VaporSpacing.xl * 4)
-
-            Text("No recordings yet")
-                .vaporTextStyle(.title)
-                .foregroundColor(VaporColor.textSecondary)
-
-            Text("Tap the record button to start capturing")
-                .vaporTextStyle(.body)
-                .foregroundColor(VaporColor.textTertiary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
     }
 
     private func searchResultsContent(results: [SessionData]) -> some View {

@@ -83,11 +83,25 @@ struct TimelineViewSnapshotTests {
         SnapshotHarness.assertSnapshot(of: view, named: "timeline_hover_state")
     }
 
-    @Test func testTimelineEmpty() {
-        // Empty state: no recordings yet
-        let view = TimelineViewPreview(displayMode: .empty)
+    @Test func testTimelineEmptyDownloading() {
+        // Empty state: downloading models
+        let view = TimelineViewPreview(displayMode: .emptyDownloading)
 
-        SnapshotHarness.assertSnapshot(of: view, named: "timeline_empty")
+        SnapshotHarness.assertSnapshot(of: view, named: "timeline_empty_downloading")
+    }
+
+    @Test func testTimelineEmptyError() {
+        // Empty state: error downloading models
+        let view = TimelineViewPreview(displayMode: .emptyError)
+
+        SnapshotHarness.assertSnapshot(of: view, named: "timeline_empty_error")
+    }
+
+    @Test func testTimelineEmptyReady() {
+        // Empty state: ready to record
+        let view = TimelineViewPreview(displayMode: .emptyReady)
+
+        SnapshotHarness.assertSnapshot(of: view, named: "timeline_empty_ready")
     }
 
     @Test func testTimelineSearchResults() {
