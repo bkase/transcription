@@ -1,3 +1,4 @@
+import Audio
 import ComposableArchitecture
 import DesignSystem
 import Observability
@@ -65,6 +66,47 @@ public struct RecordingView: View {
                 primaryButton: alertButton(for: alertInfo.primaryButton),
                 secondaryButton: alertInfo.secondaryButton.map { alertButton(for: $0) } ?? .cancel()
             )
+        }
+        .confirmationDialog(
+            "Recording Options",
+            isPresented: Binding(
+                get: { store.isShowingActionsMenu },
+                set: { if !$0 { store.send(.actionsMenuDismissed) } }
+            ),
+            titleVisibility: .visible
+        ) {
+            // Privacy mode options
+            Button(privacyModeLabel(for: .both)) {
+                store.send(.setAudioRetentionMode(.both))
+            }
+            Button(privacyModeLabel(for: .transcriptOnly)) {
+                store.send(.setAudioRetentionMode(.transcriptOnly))
+            }
+            Button(privacyModeLabel(for: .audioOnly)) {
+                store.send(.setAudioRetentionMode(.audioOnly))
+            }
+
+            // Discard option
+            Button("Discard Recording", role: .destructive) {
+                store.send(.discardTapped)
+            }
+
+            Button("Cancel", role: .cancel) {
+                store.send(.actionsMenuDismissed)
+            }
+        }
+    }
+
+    private func privacyModeLabel(for mode: AudioRetentionMode) -> String {
+        let isSelected = store.audioRetentionMode == mode
+        let checkmark = isSelected ? "✓ " : "   "
+        switch mode {
+        case .both:
+            return "\(checkmark)Keep Audio & Transcript"
+        case .transcriptOnly:
+            return "\(checkmark)Transcript Only (Delete Audio)"
+        case .audioOnly:
+            return "\(checkmark)Audio Only (No Transcript)"
         }
     }
 
@@ -252,11 +294,11 @@ public struct RecordingView: View {
 
             Spacer()
 
-            // Discard button (right)
-            IconButton(systemName: "trash", style: .transparent, iconColor: VaporColor.recording) {
-                store.send(.discardTapped)
+            // More actions button (right)
+            IconButton(systemName: "ellipsis", style: .transparent, iconColor: VaporColor.textSecondary) {
+                store.send(.moreButtonTapped)
             }
-            .accessibilityIdentifier("discardButton")
+            .accessibilityIdentifier("moreButton")
         }
         .padding(.horizontal, VaporSpacing.xl)
         .padding(.bottom, VaporSpacing.xl)
@@ -467,15 +509,15 @@ public struct RecordingViewPreview: View {
 
                 Spacer()
 
-                // Discard button
+                // More actions button
                 ZStack {
                     Circle()
                         .fill(Color.clear)
                         .frame(width: 40, height: 40)
 
-                    Image(systemName: "trash")
+                    Image(systemName: "ellipsis")
                         .font(.system(size: 24, weight: .light))
-                        .foregroundColor(VaporColor.recording)
+                        .foregroundColor(VaporColor.textSecondary)
                 }
             }
             .padding(.horizontal, VaporSpacing.xl)

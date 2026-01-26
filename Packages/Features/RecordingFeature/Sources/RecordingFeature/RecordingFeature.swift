@@ -61,6 +61,7 @@ public struct RecordingFeature {
     @Dependency(\.uuid) var uuid
     @Dependency(\.microphonePermissionClient) var microphonePermissionClient
     @Dependency(\.feedbackClient) var feedbackClient
+    @Dependency(\.preferencesClient) var preferencesClient
 
     private enum CancelID {
         case timer
@@ -93,6 +94,10 @@ public struct RecordingFeature {
         public var isShowingDiscardConfirmation: Bool = false
         /// Alert info for displaying errors with recovery options
         public var alertInfo: AlertInfo?
+        /// Whether to show the actions menu (more button)
+        public var isShowingActionsMenu: Bool = false
+        /// Current audio retention mode (privacy setting)
+        public var audioRetentionMode: AudioRetentionMode = .both
 
         public init(
             isRecording: Bool = false,
@@ -106,7 +111,9 @@ public struct RecordingFeature {
             speakerTracks: [LiveSpeakerTrack] = [],
             isPermissionDenied: Bool = false,
             isShowingDiscardConfirmation: Bool = false,
-            alertInfo: AlertInfo? = nil
+            alertInfo: AlertInfo? = nil,
+            isShowingActionsMenu: Bool = false,
+            audioRetentionMode: AudioRetentionMode = .both
         ) {
             self.isRecording = isRecording
             self.isPaused = isPaused
@@ -120,6 +127,8 @@ public struct RecordingFeature {
             self.isPermissionDenied = isPermissionDenied
             self.isShowingDiscardConfirmation = isShowingDiscardConfirmation
             self.alertInfo = alertInfo
+            self.isShowingActionsMenu = isShowingActionsMenu
+            self.audioRetentionMode = audioRetentionMode
         }
     }
 
@@ -162,6 +171,12 @@ public struct RecordingFeature {
         case alertActionTapped(RecoveryAction)
         /// Error alert was dismissed
         case alertDismissed
+        /// User tapped more (ellipsis) button
+        case moreButtonTapped
+        /// Actions menu was dismissed
+        case actionsMenuDismissed
+        /// User selected a privacy mode from the menu
+        case setAudioRetentionMode(AudioRetentionMode)
     }
 
     public var body: some ReducerOf<Self> {
@@ -485,6 +500,23 @@ public struct RecordingFeature {
             case .alertDismissed:
                 state.alertInfo = nil
                 return .none
+
+            case .moreButtonTapped:
+                guard state.isRecording else { return .none }
+                // Load current preference before showing menu
+                state.audioRetentionMode = preferencesClient.getAudioRetentionMode()
+                state.isShowingActionsMenu = true
+                return .none
+
+            case .actionsMenuDismissed:
+                state.isShowingActionsMenu = false
+                return .none
+
+            case let .setAudioRetentionMode(mode):
+                state.audioRetentionMode = mode
+                return .run { [preferencesClient] _ in
+                    preferencesClient.setAudioRetentionMode(mode)
+                }
             }
         }
     }

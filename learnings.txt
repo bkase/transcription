@@ -640,3 +640,10 @@
 - UIImpactFeedbackGenerator(style: .soft) for gentle haptic feedback
 - Wrap iOS-specific code in `#if os(iOS)` with macOS fallback returning no-op implementations
 - When adding new @DependencyClient to a feature, ALL existing tests must add mock implementations
+
+## SwiftUI confirmationDialog for action menus
+- `.confirmationDialog(title, isPresented:, titleVisibility:)` for action sheets
+- Binding pattern: `Binding(get: { store.prop }, set: { if !$0 { store.send(.dismissed) } })`
+- Use `role: .destructive` for destructive actions like delete/discard
+- Use `role: .cancel` for cancel button
+- Load current preference in `moreButtonTapped` action before showing menu for correct checkmarks
