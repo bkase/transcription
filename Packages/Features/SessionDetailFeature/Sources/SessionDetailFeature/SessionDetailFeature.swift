@@ -5,6 +5,7 @@ import Models
 import Persistence
 import DesignSystem
 import AudioPlayerFeature
+import SpeakerPickerFeature
 import Tagged
 
 /// A transcript segment for display in session detail view
@@ -32,17 +33,23 @@ public struct DetailSegment: Equatable, Sendable, Identifiable {
 
 /// A speaker track with optional person assignment
 public struct DetailSpeakerTrack: Equatable, Sendable {
+    public let id: String
     public let machineSpeakerId: String
     public let displayOrder: Int
+    public let personId: String?
     public let personName: String?
 
     public init(
+        id: String,
         machineSpeakerId: String,
         displayOrder: Int,
+        personId: String?,
         personName: String?
     ) {
+        self.id = id
         self.machineSpeakerId = machineSpeakerId
         self.displayOrder = displayOrder
+        self.personId = personId
         self.personName = personName
     }
 }
@@ -62,6 +69,7 @@ public struct SessionDetailFeature {
         public var isLoading: Bool = false
         public var error: String?
         public var audioPlayer: AudioPlayerFeature.State?
+        @Presents public var speakerPicker: SpeakerPickerFeature.State?
 
         public init(
             sessionID: SessionID,
@@ -70,7 +78,8 @@ public struct SessionDetailFeature {
             speakerTracks: [DetailSpeakerTrack] = [],
             isLoading: Bool = false,
             error: String? = nil,
-            audioPlayer: AudioPlayerFeature.State? = nil
+            audioPlayer: AudioPlayerFeature.State? = nil,
+            speakerPicker: SpeakerPickerFeature.State? = nil
         ) {
             self.sessionID = sessionID
             self.session = session
@@ -79,6 +88,7 @@ public struct SessionDetailFeature {
             self.isLoading = isLoading
             self.error = error
             self.audioPlayer = audioPlayer
+            self.speakerPicker = speakerPicker
         }
     }
 
@@ -89,6 +99,8 @@ public struct SessionDetailFeature {
         case loadFailed(String)
         case backTapped
         case audioPlayer(AudioPlayerFeature.Action)
+        case speakerLabelTapped(segmentId: TranscriptSegmentID, machineSpeakerId: String?)
+        case speakerPicker(PresentationAction<SpeakerPickerFeature.Action>)
     }
 
     public var body: some ReducerOf<Self> {
@@ -133,8 +145,10 @@ public struct SessionDetailFeature {
                     // Map speaker tracks with person names
                     let tracks = trackRecords.map { record in
                         DetailSpeakerTrack(
+                            id: record.id,
                             machineSpeakerId: record.machineSpeakerId,
                             displayOrder: record.displayOrder,
+                            personId: record.personId,
                             personName: record.personId.flatMap { personLookup[$0] }
                         )
                     }
@@ -173,10 +187,42 @@ public struct SessionDetailFeature {
             case .audioPlayer:
                 // Handled by child reducer
                 return .none
+
+            case let .speakerLabelTapped(_, machineSpeakerId):
+                // Find the speaker track for this segment
+                guard let speakerId = machineSpeakerId,
+                      let track = state.speakerTracks.first(where: { $0.machineSpeakerId == speakerId }) else {
+                    return .none
+                }
+
+                // Open the speaker picker modal
+                state.speakerPicker = SpeakerPickerFeature.State(
+                    speakerTrackId: track.id,
+                    sessionId: state.sessionID,
+                    displayOrder: track.displayOrder,
+                    currentPersonId: track.personId.map { PersonID($0) }
+                )
+                return .none
+
+            case .speakerPicker(.presented(.selectionConfirmed)):
+                // Dismiss the modal and reload to get updated speaker tracks
+                state.speakerPicker = nil
+                return .send(.loadSession)
+
+            case .speakerPicker(.presented(.closeModal)):
+                state.speakerPicker = nil
+                return .none
+
+            case .speakerPicker:
+                // Other speaker picker actions handled by child reducer
+                return .none
             }
         }
         .ifLet(\.audioPlayer, action: \.audioPlayer) {
             AudioPlayerFeature()
+        }
+        .ifLet(\.$speakerPicker, action: \.speakerPicker) {
+            SpeakerPickerFeature()
         }
     }
 }

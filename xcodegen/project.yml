@@ -324,6 +324,7 @@ targets:
       - target: Persistence
       - target: DesignSystem
       - target: AudioPlayerFeature
+      - target: SpeakerPickerFeature
       - package: swift-tagged
         product: Tagged
       - package: swift-composable-architecture

@@ -566,3 +566,14 @@
 - SwiftUI alert binding: `Binding(get: { store.prop }, set: { if !$0 { store.send(.cancel) } })` for dismissal handling
 - discardConfirmed action: always close dialog first (`state.isShowingDiscardConfirmation = false`), then guard isRecording
 - When adding new @DependencyClient closure parameters, update ALL test mock initializations
+
+## XCUITest text inside buttons
+- Text inside SwiftUI Button is not found via `app.staticTexts["text"]` query
+- Use `app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'text'"))` for broader search
+- Coordinate-based tapping: `element.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.1)).tap()`
+- For tappable labels in transcript segments, tap the segment container at an offset rather than finding the button
+
+## Test expectation IDs must match mock data
+- When TCA reducer maps DB record IDs to domain model IDs, test expectations must use the mock data IDs
+- Example: mockSpeakerTracks has `personId: "person-1"`, expected value must be `personId: "person-1"` not `personId: "person-alice"`
+- Test failures show diff with `-` for expected and `+` for actual values

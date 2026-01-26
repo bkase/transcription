@@ -41,30 +41,31 @@ public struct TranscriptSegment: View {
     private let speaker: SpeakerType
     private let timestamp: String
     private let text: String
+    private let onSpeakerTap: (() -> Void)?
 
     /// Create a transcript segment.
     /// - Parameters:
     ///   - speaker: The speaker type (user, guest, or custom)
     ///   - timestamp: Timestamp string (e.g., "00:12")
     ///   - text: The transcript text content
+    ///   - onSpeakerTap: Optional callback when speaker label is tapped
     public init(
         speaker: SpeakerType,
         timestamp: String,
-        text: String
+        text: String,
+        onSpeakerTap: (() -> Void)? = nil
     ) {
         self.speaker = speaker
         self.timestamp = timestamp
         self.text = text
+        self.onSpeakerTap = onSpeakerTap
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             // Header: speaker label + timestamp
             HStack(spacing: 12) {
-                Text(speaker.label)
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(1)
-                    .foregroundColor(speaker.color)
+                speakerLabel
 
                 Text(timestamp)
                     .font(.system(size: 10, weight: .light))
@@ -79,6 +80,39 @@ public struct TranscriptSegment: View {
                 .foregroundColor(VaporColor.textPrimary)
         }
         .accessibilityIdentifier("transcriptSegment")
+    }
+
+    @ViewBuilder
+    private var speakerLabel: some View {
+        if let onTap = onSpeakerTap {
+            Button(action: onTap) {
+                Text(speaker.label)
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(1)
+                    .foregroundColor(speaker.color)
+            }
+            .buttonStyle(SpeakerLabelButtonStyle())
+            .accessibilityIdentifier("speakerLabel")
+        } else {
+            speakerLabelContent
+        }
+    }
+
+    private var speakerLabelContent: some View {
+        Text(speaker.label)
+            .font(.system(size: 10, weight: .semibold))
+            .tracking(1)
+            .foregroundColor(speaker.color)
+    }
+}
+
+// MARK: - Speaker Label Button Style
+
+/// Custom button style for speaker labels that preserves the text appearance
+private struct SpeakerLabelButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .opacity(configuration.isPressed ? 0.7 : 1.0)
     }
 }
 

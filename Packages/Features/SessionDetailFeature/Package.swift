@@ -13,6 +13,7 @@ let package = Package(
         .package(path: "../../Core/Persistence"),
         .package(path: "../../Core/DesignSystem"),
         .package(path: "../AudioPlayerFeature"),
+        .package(path: "../SpeakerPickerFeature"),
         .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.0.0"),
         .package(url: "https://github.com/pointfreeco/swift-tagged", from: "0.10.0"),
     ],
@@ -24,6 +25,7 @@ let package = Package(
                 "Persistence",
                 "DesignSystem",
                 "AudioPlayerFeature",
+                "SpeakerPickerFeature",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
                 .product(name: "Tagged", package: "swift-tagged"),
             ]

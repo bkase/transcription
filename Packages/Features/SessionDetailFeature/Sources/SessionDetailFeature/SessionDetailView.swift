@@ -2,6 +2,7 @@ import ComposableArchitecture
 import DesignSystem
 import Models
 import AudioPlayerFeature
+import SpeakerPickerFeature
 import SwiftUI
 
 // MARK: - Session Detail View
@@ -57,6 +58,23 @@ public struct SessionDetailView: View {
         .onAppear {
             store.send(.onAppear)
         }
+        #if os(iOS)
+        .fullScreenCover(
+            item: $store.scope(state: \.speakerPicker, action: \.speakerPicker)
+        ) { speakerPickerStore in
+            ZStack {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        store.send(.speakerPicker(.presented(.closeModal)))
+                    }
+
+                SpeakerPickerView(store: speakerPickerStore)
+                    .padding(VaporSpacing.lg)
+            }
+            .presentationBackground(.clear)
+        }
+        #endif
     }
 
     // MARK: - Navigation Header
@@ -168,7 +186,13 @@ public struct SessionDetailView: View {
                     TranscriptSegment(
                         speaker: speakerType(for: segment),
                         timestamp: formatTimestamp(segment.startMs),
-                        text: segment.text
+                        text: segment.text,
+                        onSpeakerTap: {
+                            store.send(.speakerLabelTapped(
+                                segmentId: segment.id,
+                                machineSpeakerId: segment.machineSpeakerId
+                            ))
+                        }
                     )
                 }
             }

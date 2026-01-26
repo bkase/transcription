@@ -73,8 +73,10 @@ struct TranscriptRenderingTests {
         )
         let tracks = [
             DetailSpeakerTrack(
+                id: "track-1",
                 machineSpeakerId: "spk_0",
                 displayOrder: 1,
+                personId: nil,
                 personName: nil
             )
         ]
@@ -95,8 +97,10 @@ struct TranscriptRenderingTests {
         )
         let tracks = [
             DetailSpeakerTrack(
+                id: "track-1",
                 machineSpeakerId: "spk_0",
                 displayOrder: 1,
+                personId: "person-alice",
                 personName: "Alice"
             )
         ]
@@ -122,8 +126,10 @@ struct TranscriptRenderingTests {
         )
         let tracks = [
             DetailSpeakerTrack(
+                id: "track-1",
                 machineSpeakerId: "spk_0",
                 displayOrder: 1,
+                personId: nil,
                 personName: nil
             )
         ]
@@ -144,13 +150,17 @@ struct TranscriptRenderingTests {
         )
         let tracks = [
             DetailSpeakerTrack(
+                id: "track-1",
                 machineSpeakerId: "spk_0",
                 displayOrder: 1,
+                personId: nil,
                 personName: nil
             ),
             DetailSpeakerTrack(
+                id: "track-2",
                 machineSpeakerId: "spk_1",
                 displayOrder: 2,
+                personId: nil,
                 personName: nil
             )
         ]
@@ -165,13 +175,17 @@ struct TranscriptRenderingTests {
         // Multiple tracks: one with person name, one without
         let tracks = [
             DetailSpeakerTrack(
+                id: "track-1",
                 machineSpeakerId: "spk_0",
                 displayOrder: 1,
+                personId: "person-alice",
                 personName: "Alice"
             ),
             DetailSpeakerTrack(
+                id: "track-2",
                 machineSpeakerId: "spk_1",
                 displayOrder: 2,
+                personId: nil,
                 personName: nil
             )
         ]
@@ -213,28 +227,38 @@ struct TranscriptRenderingTests {
         // Test that colors are assigned based on displayOrder
         let tracks = [
             DetailSpeakerTrack(
+                id: "track-1",
                 machineSpeakerId: "spk_0",
                 displayOrder: 1,
+                personId: "p1",
                 personName: "Speaker1"  // Should get color at index 0 (sky)
             ),
             DetailSpeakerTrack(
+                id: "track-2",
                 machineSpeakerId: "spk_1",
                 displayOrder: 2,
+                personId: "p2",
                 personName: "Speaker2"  // Should get color at index 1 (lavender)
             ),
             DetailSpeakerTrack(
+                id: "track-3",
                 machineSpeakerId: "spk_2",
                 displayOrder: 3,
+                personId: "p3",
                 personName: "Speaker3"  // Should get color at index 2 (deep)
             ),
             DetailSpeakerTrack(
+                id: "track-4",
                 machineSpeakerId: "spk_3",
                 displayOrder: 4,
+                personId: "p4",
                 personName: "Speaker4"  // Should get color at index 3 (dusk)
             ),
             DetailSpeakerTrack(
+                id: "track-5",
                 machineSpeakerId: "spk_4",
                 displayOrder: 5,
+                personId: "p5",
                 personName: "Speaker5"  // Should cycle back to index 0 (sky)
             )
         ]
@@ -275,13 +299,17 @@ struct TranscriptRenderingTests {
 
         let tracks = [
             DetailSpeakerTrack(
+                id: "track-1",
                 machineSpeakerId: "spk_0",
                 displayOrder: 1,
+                personId: "person-alice",
                 personName: "Alice"
             ),
             DetailSpeakerTrack(
+                id: "track-2",
                 machineSpeakerId: "spk_1",
                 displayOrder: 2,
+                personId: nil,
                 personName: nil
             )
         ]

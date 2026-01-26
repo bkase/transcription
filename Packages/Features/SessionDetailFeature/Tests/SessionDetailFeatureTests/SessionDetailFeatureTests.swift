@@ -150,13 +150,17 @@ struct SessionDetailFeatureTests {
 
         let expectedTracks = [
             DetailSpeakerTrack(
+                id: "track-1",
                 machineSpeakerId: "spk_0",
                 displayOrder: 1,
+                personId: "person-1",
                 personName: "Alice"
             ),
             DetailSpeakerTrack(
+                id: "track-2",
                 machineSpeakerId: "spk_1",
                 displayOrder: 2,
+                personId: nil,
                 personName: nil
             )
         ]
