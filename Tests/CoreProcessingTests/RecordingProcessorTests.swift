@@ -80,6 +80,12 @@ import Persistence
         configureForRecording: { }
     )
 
+    // Mock preferences client (default to both mode)
+    let mockPreferences = PreferencesClient(
+        getAudioRetentionMode: { .both },
+        setAudioRetentionMode: { _ in }
+    )
+
     // Run the test with injected dependencies
     let processor = withDependencies {
         $0.audioCaptureClient = mockAudioCapture
@@ -87,6 +93,7 @@ import Persistence
         $0.audioSessionClient = mockAudioSession
         $0.fluidAudioClient = mockFluidAudio
         $0.databaseClient = databaseClient
+        $0.preferencesClient = mockPreferences
         $0.uuid = .incrementing
         $0.date = .constant(Date(timeIntervalSince1970: 1000))
     } operation: {
@@ -195,12 +202,19 @@ import Persistence
     let mockFluidAudio = MockFluidAudioClient.empty
     let databaseClient = DatabaseClient.live(dbQueue: dbQueue)
 
+    // Mock preferences client (default to both mode)
+    let mockPreferences = PreferencesClient(
+        getAudioRetentionMode: { .both },
+        setAudioRetentionMode: { _ in }
+    )
+
     let processor = withDependencies {
         $0.audioCaptureClient = mockAudioCapture
         $0.audioFileWriterClient = mockFileWriter
         $0.audioSessionClient = mockAudioSession
         $0.fluidAudioClient = mockFluidAudio
         $0.databaseClient = databaseClient
+        $0.preferencesClient = mockPreferences
         $0.uuid = .incrementing
         $0.date = .constant(Date(timeIntervalSince1970: 1000))
     } operation: {
@@ -248,12 +262,19 @@ import Persistence
     let mockFluidAudio = MockFluidAudioClient.empty
     let databaseClient = DatabaseClient.live(dbQueue: dbQueue)
 
+    // Mock preferences client (default to both mode)
+    let mockPreferences = PreferencesClient(
+        getAudioRetentionMode: { .both },
+        setAudioRetentionMode: { _ in }
+    )
+
     let processor = withDependencies {
         $0.audioCaptureClient = mockAudioCapture
         $0.audioFileWriterClient = mockFileWriter
         $0.audioSessionClient = mockAudioSession
         $0.fluidAudioClient = mockFluidAudio
         $0.databaseClient = databaseClient
+        $0.preferencesClient = mockPreferences
         $0.uuid = .incrementing
         $0.date = .constant(Date(timeIntervalSince1970: 1000))
     } operation: {
@@ -326,12 +347,19 @@ import Persistence
 
     var receivedEvents: [RecordingProcessorEvent] = []
 
+    // Mock preferences client (default to both mode)
+    let mockPreferences = PreferencesClient(
+        getAudioRetentionMode: { .both },
+        setAudioRetentionMode: { _ in }
+    )
+
     let processor = withDependencies {
         $0.audioCaptureClient = mockAudioCapture
         $0.audioFileWriterClient = mockFileWriter
         $0.audioSessionClient = mockAudioSession
         $0.fluidAudioClient = mockFluidAudio
         $0.databaseClient = databaseClient
+        $0.preferencesClient = mockPreferences
         $0.uuid = .incrementing
         $0.date = .constant(Date(timeIntervalSince1970: 1000))
     } operation: {
@@ -434,12 +462,19 @@ import Persistence
 
     var receivedEvents: [RecordingProcessorEvent] = []
 
+    // Mock preferences client (default to both mode)
+    let mockPreferences = PreferencesClient(
+        getAudioRetentionMode: { .both },
+        setAudioRetentionMode: { _ in }
+    )
+
     let processor = withDependencies {
         $0.audioCaptureClient = mockAudioCapture
         $0.audioFileWriterClient = mockFileWriter
         $0.audioSessionClient = mockAudioSession
         $0.fluidAudioClient = mockFluidAudio
         $0.databaseClient = databaseClient
+        $0.preferencesClient = mockPreferences
         $0.uuid = .incrementing
         $0.date = .constant(Date(timeIntervalSince1970: 1000))
     } operation: {
@@ -542,12 +577,19 @@ import Persistence
 
     var receivedEvents: [RecordingProcessorEvent] = []
 
+    // Mock preferences client (default to both mode)
+    let mockPreferences = PreferencesClient(
+        getAudioRetentionMode: { .both },
+        setAudioRetentionMode: { _ in }
+    )
+
     let processor = withDependencies {
         $0.audioCaptureClient = mockAudioCapture
         $0.audioFileWriterClient = mockFileWriter
         $0.audioSessionClient = mockAudioSession
         $0.fluidAudioClient = mockFluidAudio
         $0.databaseClient = databaseClient
+        $0.preferencesClient = mockPreferences
         $0.uuid = .incrementing
         $0.date = .constant(Date(timeIntervalSince1970: 1000))
     } operation: {
@@ -647,12 +689,19 @@ import Persistence
 
     var receivedEvents: [RecordingProcessorEvent] = []
 
+    // Mock preferences client (default to both mode)
+    let mockPreferences = PreferencesClient(
+        getAudioRetentionMode: { .both },
+        setAudioRetentionMode: { _ in }
+    )
+
     let processor = withDependencies {
         $0.audioCaptureClient = mockAudioCapture
         $0.audioFileWriterClient = mockFileWriter
         $0.audioSessionClient = mockAudioSession
         $0.fluidAudioClient = mockFluidAudio
         $0.databaseClient = databaseClient
+        $0.preferencesClient = mockPreferences
         $0.uuid = .incrementing
         $0.date = .constant(Date(timeIntervalSince1970: 1000))
     } operation: {

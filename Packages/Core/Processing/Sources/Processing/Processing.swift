@@ -182,10 +182,12 @@ public actor RecordingProcessor {
     @Dependency(\.audioSessionClient) var audioSessionClient
     @Dependency(\.fluidAudioClient) var fluidAudioClient
     @Dependency(\.databaseClient) var databaseClient
+    @Dependency(\.preferencesClient) var preferencesClient
     @Dependency(\.uuid) var uuid
     @Dependency(\.date) var date
 
     private var currentSessionID: SessionID?
+    private var currentAudioFileURL: URL?
     private var isRecording: Bool = false
     private var isPaused: Bool = false
     private var isInterrupted: Bool = false
@@ -229,6 +231,7 @@ public actor RecordingProcessor {
 
         // Start audio file writing
         let audioPath = audioDirectory.appendingPathComponent("\(sessionId.rawValue).caf")
+        self.currentAudioFileURL = audioPath
         try await audioFileWriterClient.startWriting(audioPath, .recording)
 
         // Start audio capture
@@ -298,10 +301,11 @@ public actor RecordingProcessor {
 
         // Finalize session
         if let sessionId = currentSessionID {
-            await finalizeSession(sessionId)
+            await finalizeSession(sessionId, audioFileURL: currentAudioFileURL)
         }
 
         currentSessionID = nil
+        currentAudioFileURL = nil
         eventContinuation?.finish()
         eventContinuation = nil
     }
@@ -531,7 +535,7 @@ public actor RecordingProcessor {
         }
     }
 
-    private func finalizeSession(_ sessionId: SessionID) async {
+    private func finalizeSession(_ sessionId: SessionID, audioFileURL: URL?) async {
         let now = date.now
 
         // Fetch current session
@@ -560,6 +564,14 @@ public actor RecordingProcessor {
         session.processingState = .processed
         session.speakerCount = seenSpeakers.count
         session.updatedAt = now
+
+        // Check privacy mode and handle audio retention
+        let retentionMode = preferencesClient.getAudioRetentionMode()
+        if retentionMode == .transcriptOnly, let audioURL = audioFileURL {
+            // Delete audio file and clear audioPath
+            try? FileManager.default.removeItem(at: audioURL)
+            session.audioPath = nil
+        }
 
         do {
             try await databaseClient.updateSession(session)

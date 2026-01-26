@@ -1,6 +1,7 @@
 import Foundation
 import Models
 import Persistence
+import Audio
 import Dependencies
 import DependenciesMacros
 import ZIPFoundation
@@ -665,5 +666,75 @@ public enum ExportBundleWriter {
                 relativeTo: sourceDirectory
             )
         }
+    }
+
+    /// Create an export bundle zip file respecting privacy mode
+    /// - Parameters:
+    ///   - transcript: The export transcript data
+    ///   - metadata: The export metadata
+    ///   - audioSourceURL: Optional URL to the source audio file to include
+    ///   - outputDirectory: Directory to write the bundle to
+    ///   - bundleName: Name for the bundle (without .zip extension)
+    ///   - fileClient: File client for I/O operations
+    ///   - retentionMode: Privacy mode that controls what artifacts to include
+    /// - Returns: URL to the created zip file and list of files included
+    public static func writeBundleWithPrivacy(
+        transcript: ExportTranscript,
+        metadata: ExportMetadata,
+        audioSourceURL: URL?,
+        outputDirectory: URL,
+        bundleName: String,
+        fileClient: FileClient,
+        retentionMode: AudioRetentionMode
+    ) async throws -> BundleResult {
+        // Create a staging directory for bundle contents
+        let stagingDirectory = outputDirectory.appendingPathComponent(bundleName)
+        try await fileClient.createDirectory(stagingDirectory)
+
+        var includedFiles: [String] = []
+
+        // Always include metadata.json
+        let metadataData = try JSONEncoder.exportEncoder.encode(metadata)
+        let metadataURL = stagingDirectory.appendingPathComponent(BundleFile.metadata)
+        try await fileClient.write(metadataData, metadataURL)
+        includedFiles.append(BundleFile.metadata)
+
+        // Include transcript artifacts unless audioOnly mode
+        if retentionMode != .audioOnly {
+            // Write transcript.json
+            let transcriptData = try JSONEncoder.exportEncoder.encode(transcript)
+            let transcriptURL = stagingDirectory.appendingPathComponent(BundleFile.transcript)
+            try await fileClient.write(transcriptData, transcriptURL)
+            includedFiles.append(BundleFile.transcript)
+
+            // Write transcript.md
+            let markdownContent = MarkdownWriter.write(transcript)
+            let markdownURL = stagingDirectory.appendingPathComponent(BundleFile.markdown)
+            try await fileClient.write(Data(markdownContent.utf8), markdownURL)
+            includedFiles.append(BundleFile.markdown)
+
+            // Write transcript.vtt
+            let vttContent = VttWriter.write(transcript)
+            let vttURL = stagingDirectory.appendingPathComponent(BundleFile.vtt)
+            try await fileClient.write(Data(vttContent.utf8), vttURL)
+            includedFiles.append(BundleFile.vtt)
+        }
+
+        // Include audio unless transcriptOnly mode
+        if retentionMode != .transcriptOnly, let audioSourceURL = audioSourceURL, fileClient.exists(audioSourceURL) {
+            let audioData = try await fileClient.read(audioSourceURL)
+            let audioDestURL = stagingDirectory.appendingPathComponent(BundleFile.audio)
+            try await fileClient.write(audioData, audioDestURL)
+            includedFiles.append(BundleFile.audio)
+        }
+
+        // Create zip file
+        let zipURL = outputDirectory.appendingPathComponent("\(bundleName).zip")
+        try createZipArchive(from: stagingDirectory, to: zipURL)
+
+        // Clean up staging directory
+        try await fileClient.delete(stagingDirectory)
+
+        return BundleResult(url: zipURL, files: includedFiles)
     }
 }

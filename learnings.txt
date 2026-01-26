@@ -617,3 +617,16 @@
 - Tests using RecordingProcessor need audioSessionClient mock alongside audioCaptureClient, audioFileWriterClient, fluidAudioClient
 - No-op mock: `AudioSessionClient(startObserving: { AsyncStream { $0.finish() } }, stopObserving: { }, configureForRecording: { })`
 - Add to withDependencies block: `$0.audioSessionClient = mockAudioSession`
+
+## Privacy mode enforcement (AudioRetentionMode)
+- PreferencesClient exposes getAudioRetentionMode() returning .transcriptOnly, .audioOnly, or .both
+- RecordingProcessor.finalizeSession checks privacy mode after updating session:
+  - If `.transcriptOnly`: delete audio file, set session.audioPath = nil
+  - If `.audioOnly` or `.both`: retain audio file
+- ExportBundleWriter.writeBundleWithPrivacy takes retentionMode parameter:
+  - If `.transcriptOnly`: skip audio in bundle
+  - If `.audioOnly`: skip transcript artifacts (md, vtt, json)
+  - If `.both`: include all artifacts
+- Tests using RecordingProcessor need preferencesClient mock alongside other audio dependencies
+- Mock: `PreferencesClient(getAudioRetentionMode: { .both }, setAudioRetentionMode: { _ in })`
+- Add `Audio` as dependency when importing `AudioRetentionMode` in Export package
