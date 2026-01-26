@@ -229,6 +229,9 @@ public actor RecordingProcessor {
         // Emit didStart event
         continuation.yield(.didStart(sessionId))
 
+        // Configure audio session for recording (required on iOS before AVAudioEngine can access mic)
+        try await audioSessionClient.configureForRecording()
+
         // Start audio file writing
         let audioPath = audioDirectory.appendingPathComponent("\(sessionId.rawValue).caf")
         self.currentAudioFileURL = audioPath
