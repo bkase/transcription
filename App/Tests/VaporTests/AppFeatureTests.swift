@@ -168,4 +168,32 @@ struct AppFeatureTests {
             Issue.record("Expected profile state in path")
         }
     }
+
+    @Test
+    func testNavigateToProfileFromPeopleTab() async {
+        let testProfile = UserProfile(name: "Brandon Kase", email: "brandon@example.com")
+
+        let store = TestStore(initialState: AppFeature.State(currentTab: .people, userProfile: testProfile)) {
+            AppFeature()
+        }
+
+        // Initially, path should be empty
+        #expect(store.state.path.isEmpty)
+
+        // When avatar is tapped in people view, it should push profile onto path
+        await store.send(.people(.avatarTapped)) {
+            $0.path.append(.profile(ProfileFeature.State(profile: testProfile)))
+        }
+
+        // Verify path contains the profile screen
+        #expect(store.state.path.count == 1)
+
+        // When back is tapped in profile, path should pop
+        await store.send(.path(.element(id: 0, action: .profile(.backTapped)))) {
+            _ = $0.path.popLast()
+        }
+
+        // Path should be empty again
+        #expect(store.state.path.isEmpty)
+    }
 }

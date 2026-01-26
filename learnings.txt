@@ -702,3 +702,10 @@
 - Intercept delegate actions for app-level state sync: `.path(.element(id: _, action: .profile(.delegate(.didSaveProfile(profile)))))`
 - Load user profile on app onAppear and emit `.userProfileLoaded(profile)` action to update state
 - Test targets using feature modules need CasePaths dependency for @CasePathable macro-generated code
+
+## Header avatar tap navigation pattern
+- Multiple tabs can share the same profile navigation: add `avatarTapped` action to each feature reducer
+- AppFeature handles avatar tap from any tab by pushing profile onto navigation stack
+- Preview variants need to match actual View header layout (include all header elements as static views)
+- Snapshot tests with .missing record mode don't overwrite existing snapshots - delete old snapshots to re-record
+- SnapshotConfig.precision of 0.99 allows 1% tolerance, may pass with minor visual differences

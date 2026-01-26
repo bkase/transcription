@@ -80,6 +80,8 @@ public struct PeopleFeature {
         case peopleFailed(String)
         case searchQueryChanged(String)
         case personTapped(PersonID)
+        /// User tapped the header avatar to navigate to profile
+        case avatarTapped
 
         // CRUD actions
         case addPersonTapped
@@ -133,6 +135,10 @@ public struct PeopleFeature {
                 return .none
 
             case .personTapped:
+                // Navigation intent - will be handled by parent
+                return .none
+
+            case .avatarTapped:
                 // Navigation intent - will be handled by parent
                 return .none
 

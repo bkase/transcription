@@ -57,6 +57,14 @@ public struct PeopleView: View {
                     .foregroundColor(VaporColor.deep)
             }
             .accessibilityIdentifier("addPersonButton")
+
+            Button {
+                store.send(.avatarTapped)
+            } label: {
+                Avatar(size: .medium)
+            }
+            .buttonStyle(PlainButtonStyle())
+            .accessibilityIdentifier("profileAvatarButton")
         }
         .padding(.top, 56)
         .padding(.horizontal, VaporSpacing.lg)
@@ -288,6 +296,9 @@ public struct PeopleViewPreview: View {
             HStack {
                 PageHeader(kicker: "Directory", title: "People")
                 Spacer()
+                Image(systemName: "plus.circle.fill")
+                    .font(.system(size: 28))
+                    .foregroundColor(VaporColor.deep)
                 Avatar(size: .medium)
             }
             .padding(.top, 56)

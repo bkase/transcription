@@ -143,6 +143,11 @@ public struct AppFeature {
 
             // MARK: - People Actions
 
+            case .people(.avatarTapped):
+                // Push profile onto navigation stack with current user profile
+                state.path.append(.profile(ProfileFeature.State(profile: state.userProfile)))
+                return .none
+
             case .people:
                 return .none
 
