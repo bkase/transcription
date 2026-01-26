@@ -30,6 +30,9 @@ let package = Package(
             dependencies: [
                 "Export",
                 .product(name: "ZIPFoundation", package: "ZIPFoundation"),
+            ],
+            resources: [
+                .copy("Fixtures")
             ]
         ),
     ]

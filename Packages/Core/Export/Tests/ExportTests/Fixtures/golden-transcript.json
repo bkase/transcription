@@ -1,0 +1,48 @@
+{
+  "people" : [
+    {
+      "colorToken" : "sky",
+      "id" : "person-alice",
+      "name" : "Alice"
+    }
+  ],
+  "schemaVersion" : "1.0",
+  "segments" : [
+    {
+      "confidence" : 0.95,
+      "endMs" : 3000,
+      "id" : "seg-1",
+      "speakerId" : "spk_0",
+      "startMs" : 0,
+      "text" : "Hello, how are you?"
+    },
+    {
+      "confidence" : 0.92,
+      "endMs" : 6000,
+      "id" : "seg-2",
+      "speakerId" : "spk_1",
+      "startMs" : 3000,
+      "text" : "I'm doing well, thanks!"
+    }
+  ],
+  "session" : {
+    "audioPath" : "audio.caf",
+    "durationMs" : 600000,
+    "endedAt" : "2024-01-25T00:10:00Z",
+    "id" : "session-123",
+    "speakerCount" : 2,
+    "startedAt" : "2024-01-25T00:00:00Z",
+    "title" : "Test Meeting"
+  },
+  "speakerTracks" : [
+    {
+      "displayOrder" : 1,
+      "personId" : "person-alice",
+      "speakerId" : "spk_0"
+    },
+    {
+      "displayOrder" : 2,
+      "speakerId" : "spk_1"
+    }
+  ]
+}
