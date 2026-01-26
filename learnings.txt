@@ -674,3 +674,13 @@
 - For immutable collections in state (e.g., SessionGroup with `let sessions`), use `compactMap` to filter and recreate
 - ErrorEnvelope.databaseWrite generates alert with title "Data Error", buttons "Retry"/"Cancel"
 - When testing delete with alert, use actual AlertInfo values from ErrorEnvelope.toAlertInfo() not assumed values
+
+## UserProfile persistence patterns
+- UserProfileClient for UserDefaults-backed profile storage using JSON encoding
+- Use InMemoryProfileStorage actor for thread-safe test storage that can be shared across clients
+- `UserProfileClient.inMemory(storage:)` factory creates test client backed by shared actor state
+- ProfileImageClient for deterministic image normalization with downscale/compress hooks
+- ProfileImageClient has test helpers: `.passthrough` (returns input), `.alwaysFails` (returns nil), `.fixed(data)` (returns constant)
+- Live ProfileImageClient needs `#if os(iOS)` with UIKit for UIImage-based resize/compress, macOS passthrough fallback
+- @DependencyClient testValue returns unimplemented stubs - don't test testValue behavior, use explicit test helpers instead
+- Use actors for capturing async call parameters in tests to satisfy Swift 6 Sendable closure requirements
