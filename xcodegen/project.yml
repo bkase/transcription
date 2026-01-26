@@ -107,6 +107,7 @@ targets:
       - target: PeopleFeature
       - target: SpeakerPickerFeature
       - target: AudioPlayerFeature
+      - target: ProfileFeature
     settings:
       base:
         INFOPLIST_FILE: ../App/Sources/Info.plist
@@ -413,6 +414,29 @@ targets:
       base:
         PRODUCT_NAME: AudioPlayerFeature
         PRODUCT_MODULE_NAME: AudioPlayerFeature
+        DYLIB_INSTALL_NAME_BASE: "@rpath"
+
+  ProfileFeature:
+    type: framework
+    platform: iOS
+    sources:
+      - path: ../Packages/Features/ProfileFeature/Sources/ProfileFeature
+    dependencies:
+      - target: Models
+      - target: Persistence
+      - target: DesignSystem
+      - package: swift-tagged
+        product: Tagged
+      - package: swift-composable-architecture
+        product: ComposableArchitecture
+      - package: swift-case-paths
+        product: CasePaths
+      - package: swift-dependencies
+        product: Dependencies
+    settings:
+      base:
+        PRODUCT_NAME: ProfileFeature
+        PRODUCT_MODULE_NAME: ProfileFeature
         DYLIB_INSTALL_NAME_BASE: "@rpath"
 
   # Test targets

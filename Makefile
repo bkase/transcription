@@ -58,7 +58,7 @@ test: gen
 
 # Internal target for parallel package testing
 _test-packages: _test-models _test-persistence _test-audio _test-processing _test-export _test-routing _test-designsystem _test-observability \
-                _test-timeline _test-recording _test-sessiondetail _test-audioplayer _test-people _test-speakerpicker
+                _test-timeline _test-recording _test-sessiondetail _test-audioplayer _test-people _test-speakerpicker _test-profile
 
 _test-models:
 	@cd Packages/Core/Models && swift test --quiet 2>&1 | tail -5
@@ -101,6 +101,9 @@ _test-people:
 
 _test-speakerpicker:
 	@cd Packages/Features/SpeakerPickerFeature && swift test --quiet 2>&1 | tail -5
+
+_test-profile:
+	@cd Packages/Features/ProfileFeature && swift test --quiet 2>&1 | tail -5
 
 # Run slow integration tests (nightly)
 test-slow: gen
