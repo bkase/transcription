@@ -709,3 +709,12 @@
 - Preview variants need to match actual View header layout (include all header elements as static views)
 - Snapshot tests with .missing record mode don't overwrite existing snapshots - delete old snapshots to re-record
 - SnapshotConfig.precision of 0.99 allows 1% tolerance, may pass with minor visual differences
+
+## UI-test photo picker fallback
+- PhotosPicker is difficult to automate in XCUITest (system UI, permissions)
+- Create mock picker for `-uiTesting` mode: TCA state `isShowingMockPhotoPicker`, actions `showMockPhotoPicker/mockPhotoSelected/dismissMockPhotoPicker`
+- View checks `ProcessInfo.processInfo.arguments.contains("-uiTesting")` to conditionally show mock vs real picker
+- MockPhotoData enum generates deterministic test image data for each mock option index
+- Mock picker uses sheet with List of Button options, each with accessibilityIdentifier for XCUITest
+- E2E test verifies: tap avatar -> profile screen -> change photo -> mock picker sheet -> select option -> sheet dismisses
+- `navigationBarTitleDisplayMode` is iOS-only - wrap in `#if os(iOS)` for cross-platform builds

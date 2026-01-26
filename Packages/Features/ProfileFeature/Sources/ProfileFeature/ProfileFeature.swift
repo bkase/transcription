@@ -23,13 +23,17 @@ public struct ProfileFeature {
         public var isEditingName: Bool
         public var editingNameText: String
 
+        // Mock photo picker state (for UI testing)
+        public var isShowingMockPhotoPicker: Bool
+
         public init(
             profile: UserProfile = .empty,
             isLoading: Bool = false,
             isSaving: Bool = false,
             error: String? = nil,
             isEditingName: Bool = false,
-            editingNameText: String = ""
+            editingNameText: String = "",
+            isShowingMockPhotoPicker: Bool = false
         ) {
             self.profile = profile
             self.isLoading = isLoading
@@ -37,6 +41,7 @@ public struct ProfileFeature {
             self.error = error
             self.isEditingName = isEditingName
             self.editingNameText = editingNameText
+            self.isShowingMockPhotoPicker = isShowingMockPhotoPicker
         }
 
         /// Compute initials from the profile name for avatar display
@@ -63,6 +68,11 @@ public struct ProfileFeature {
         case changePhotoTapped
         case photoPicked(Data)
         case photoProcessed(Data?)
+
+        // Mock photo picker actions (for UI testing)
+        case showMockPhotoPicker
+        case mockPhotoSelected(Int)
+        case dismissMockPhotoPicker
 
         // Name editing
         case editNameTapped
@@ -115,7 +125,22 @@ public struct ProfileFeature {
                 return .none
 
             case .changePhotoTapped:
-                // View layer handles PhotosPicker presentation
+                // View layer handles PhotosPicker presentation (live mode)
+                // or triggers showMockPhotoPicker (UI testing mode)
+                return .none
+
+            case .showMockPhotoPicker:
+                state.isShowingMockPhotoPicker = true
+                return .none
+
+            case let .mockPhotoSelected(index):
+                state.isShowingMockPhotoPicker = false
+                // Generate deterministic test image data based on index
+                let testImageData = MockPhotoData.imageData(forIndex: index)
+                return .send(.photoPicked(testImageData))
+
+            case .dismissMockPhotoPicker:
+                state.isShowingMockPhotoPicker = false
                 return .none
 
             case let .photoPicked(data):
@@ -196,5 +221,31 @@ public struct ProfileFeature {
                 return .none
             }
         }
+    }
+}
+
+// MARK: - Mock Photo Data
+
+/// Generates deterministic test image data for UI testing.
+/// Each index produces a unique colored square image.
+public enum MockPhotoData {
+    /// Available mock photo options for the UI test picker
+    public static let options: [(name: String, color: String)] = [
+        ("Blue Square", "blue"),
+        ("Green Square", "green"),
+        ("Red Square", "red"),
+    ]
+
+    /// Generate deterministic image data for a given index.
+    /// Returns a small PNG-like data blob that can be identified by index.
+    public static func imageData(forIndex index: Int) -> Data {
+        // Create a simple identifiable data pattern
+        // In a real scenario this would be actual image data,
+        // but for testing we just need deterministic bytes
+        let header: [UInt8] = [0x89, 0x50, 0x4E, 0x47] // PNG header
+        let indexBytes = withUnsafeBytes(of: UInt32(index).bigEndian) { Array($0) }
+        // Add some padding to make it look more like real image data
+        let padding: [UInt8] = Array(repeating: UInt8(index % 256), count: 100)
+        return Data(header + indexBytes + padding)
     }
 }

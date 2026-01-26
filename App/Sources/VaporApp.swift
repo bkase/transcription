@@ -25,6 +25,8 @@ struct VaporApp: App {
             // Create in-memory database for testing
             let dbQueue = try! makeDatabase(configuration: .inMemory)
             let databaseClient = DatabaseClient.live(dbQueue: dbQueue)
+            // Create in-memory profile storage for testing
+            let profileStorage = InMemoryProfileStorage()
 
             // Inject mock dependencies for deterministic E2E tests
             return withDependencies {
@@ -34,6 +36,10 @@ struct VaporApp: App {
                 $0.fluidAudioClient = MockFluidAudioClient.twoSpeakerConversation
                 // Use in-memory database
                 $0.databaseClient = databaseClient
+                // Use in-memory profile client for profile tests
+                $0.userProfileClient = .inMemory(storage: profileStorage)
+                // Use passthrough image client (no actual image processing in tests)
+                $0.profileImageClient = .passthrough
             } operation: {
                 Store(initialState: AppFeature.State()) {
                     AppFeature()

@@ -16,6 +16,11 @@ public struct ProfileView: View {
     @Bindable var store: StoreOf<ProfileFeature>
     @State private var selectedPhoto: PhotosPickerItem?
 
+    /// Whether we're running in UI testing mode
+    private var isUITesting: Bool {
+        ProcessInfo.processInfo.arguments.contains("-uiTesting")
+    }
+
     public init(store: StoreOf<ProfileFeature>) {
         self.store = store
     }
@@ -51,6 +56,14 @@ public struct ProfileView: View {
                 }
             }
             selectedPhoto = nil
+        }
+        .sheet(
+            isPresented: Binding(
+                get: { store.isShowingMockPhotoPicker },
+                set: { if !$0 { store.send(.dismissMockPhotoPicker) } }
+            )
+        ) {
+            MockPhotoPickerSheet(store: store)
         }
         .accessibilityIdentifier("profileScreen")
     }
@@ -98,29 +111,23 @@ public struct ProfileView: View {
     private var avatarSection: some View {
         VStack(spacing: VaporSpacing.sm) {
             // Large avatar with camera badge
-            PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                ZStack(alignment: .bottomTrailing) {
-                    avatarImage(size: 80, fontSize: 28)
-
-                    // Camera badge
-                    ZStack {
-                        Circle()
-                            .fill(VaporColor.cloud)
-                            .frame(width: 28, height: 28)
-                            .overlay(
-                                Circle()
-                                    .strokeBorder(VaporColor.fog, lineWidth: 1)
-                            )
-
-                        Image(systemName: "camera")
-                            .font(.system(size: 14))
-                            .foregroundColor(VaporColor.textSecondary)
-                    }
-                    .offset(x: 4, y: 4)
+            if isUITesting {
+                // Mock picker button for UI tests
+                Button {
+                    store.send(.showMockPhotoPicker)
+                } label: {
+                    avatarWithBadge
                 }
+                .buttonStyle(PlainButtonStyle())
+                .accessibilityIdentifier("profileChangePhotoButton")
+            } else {
+                // Real PhotosPicker for live mode
+                PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                    avatarWithBadge
+                }
+                .buttonStyle(PlainButtonStyle())
+                .accessibilityIdentifier("profileChangePhotoButton")
             }
-            .buttonStyle(PlainButtonStyle())
-            .accessibilityIdentifier("profileChangePhotoButton")
 
             Text("Tap to change photo")
                 .font(.system(size: 12, weight: .light))
@@ -128,6 +135,28 @@ public struct ProfileView: View {
         }
         .padding(.horizontal, VaporSpacing.lg)
         .padding(.bottom, VaporSpacing.lg)
+    }
+
+    private var avatarWithBadge: some View {
+        ZStack(alignment: .bottomTrailing) {
+            avatarImage(size: 80, fontSize: 28)
+
+            // Camera badge
+            ZStack {
+                Circle()
+                    .fill(VaporColor.cloud)
+                    .frame(width: 28, height: 28)
+                    .overlay(
+                        Circle()
+                            .strokeBorder(VaporColor.fog, lineWidth: 1)
+                    )
+
+                Image(systemName: "camera")
+                    .font(.system(size: 14))
+                    .foregroundColor(VaporColor.textSecondary)
+            }
+            .offset(x: 4, y: 4)
+        }
     }
 
     // MARK: - Content Area
@@ -318,6 +347,58 @@ public struct ProfileView: View {
                     .foregroundColor(VaporColor.cloud)
             }
             #endif
+        }
+    }
+}
+
+// MARK: - Mock Photo Picker Sheet (for UI Testing)
+
+/// A simple sheet with pre-defined photo options for deterministic UI testing.
+/// Avoids system Photos picker which is difficult to automate in XCUITest.
+struct MockPhotoPickerSheet: View {
+    let store: StoreOf<ProfileFeature>
+
+    var body: some View {
+        NavigationView {
+            List {
+                ForEach(Array(MockPhotoData.options.enumerated()), id: \.offset) { index, option in
+                    Button {
+                        store.send(.mockPhotoSelected(index))
+                    } label: {
+                        HStack {
+                            Circle()
+                                .fill(colorForName(option.color))
+                                .frame(width: 44, height: 44)
+
+                            Text(option.name)
+                                .foregroundColor(VaporColor.textPrimary)
+                        }
+                    }
+                    .accessibilityIdentifier("mockPhotoOption-\(index)")
+                }
+            }
+            .navigationTitle("Choose Photo")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        store.send(.dismissMockPhotoPicker)
+                    }
+                    .accessibilityIdentifier("mockPhotoPickerCancel")
+                }
+            }
+        }
+        .accessibilityIdentifier("mockPhotoPickerSheet")
+    }
+
+    private func colorForName(_ name: String) -> Color {
+        switch name {
+        case "blue": return .blue
+        case "green": return .green
+        case "red": return .red
+        default: return .gray
         }
     }
 }

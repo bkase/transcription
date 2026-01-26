@@ -76,6 +76,7 @@ def run_spm_tests(env: dict[str, str]) -> TestResult:
         "Packages/Features/TimelineFeature", "Packages/Features/RecordingFeature",
         "Packages/Features/SessionDetailFeature", "Packages/Features/AudioPlayerFeature",
         "Packages/Features/PeopleFeature", "Packages/Features/SpeakerPickerFeature",
+        "Packages/Features/ProfileFeature",
     ]
     result = TestResult(phase="SPM")
     outputs = []

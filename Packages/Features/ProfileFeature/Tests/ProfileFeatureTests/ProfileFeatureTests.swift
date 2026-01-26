@@ -250,4 +250,88 @@ struct ProfileFeatureTests {
         await store.send(.backTapped)
         // No state changes or effects expected
     }
+
+    // MARK: - Mock Photo Picker Tests (UI Testing)
+
+    @Test
+    func showMockPhotoPicker() async throws {
+        let store = TestStore(initialState: ProfileFeature.State(profile: testProfile)) {
+            ProfileFeature()
+        }
+
+        await store.send(.showMockPhotoPicker) {
+            $0.isShowingMockPhotoPicker = true
+        }
+    }
+
+    @Test
+    func dismissMockPhotoPicker() async throws {
+        let store = TestStore(initialState: ProfileFeature.State(
+            profile: testProfile,
+            isShowingMockPhotoPicker: true
+        )) {
+            ProfileFeature()
+        }
+
+        await store.send(.dismissMockPhotoPicker) {
+            $0.isShowingMockPhotoPicker = false
+        }
+    }
+
+    @Test
+    func mockPhotoSelectedTriggersPhotoPicked() async throws {
+        let profileStorage = InMemoryProfileStorage(profile: testProfile)
+
+        let store = TestStore(initialState: ProfileFeature.State(
+            profile: testProfile,
+            isShowingMockPhotoPicker: true
+        )) {
+            ProfileFeature()
+        } withDependencies: {
+            $0.userProfileClient = .inMemory(storage: profileStorage)
+            $0.profileImageClient.normalize = { data, _, _ in data } // passthrough
+        }
+
+        // Select mock photo at index 1 (Green Square)
+        await store.send(.mockPhotoSelected(1)) {
+            $0.isShowingMockPhotoPicker = false
+        }
+
+        // Should receive photoPicked with deterministic test data
+        let expectedData = MockPhotoData.imageData(forIndex: 1)
+
+        await store.receive(\.photoPicked) {
+            $0.isSaving = true
+        }
+
+        await store.receive(\.photoProcessed) {
+            $0.profile.avatar = UserProfile.Avatar(imageData: expectedData)
+        }
+
+        await store.receive(\.profileSaved) {
+            $0.isSaving = false
+        }
+
+        await store.receive(\.delegate.didSaveProfile)
+
+        // Verify storage was updated
+        let savedProfile = await profileStorage.load()
+        #expect(savedProfile.avatar.imageData == expectedData)
+    }
+
+    @Test
+    func mockPhotoDataGeneratesDeterministicBytes() {
+        // Test that MockPhotoData generates consistent data for same index
+        let data1 = MockPhotoData.imageData(forIndex: 0)
+        let data2 = MockPhotoData.imageData(forIndex: 0)
+        #expect(data1 == data2)
+
+        // Different indices produce different data
+        let data3 = MockPhotoData.imageData(forIndex: 1)
+        #expect(data1 != data3)
+
+        // Data starts with PNG header
+        let header = Array(data1.prefix(4))
+        #expect(header == [0x89, 0x50, 0x4E, 0x47])
+    }
 }
