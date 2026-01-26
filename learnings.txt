@@ -654,3 +654,8 @@
 - When testing date bucketing, print actual weekday names to verify assumptions about dates
 - January 2026 example: Jan 15 is Thursday, week 3 starts on Jan 11 (Sunday)
 - DateBucket.bucket(for:relativeTo:calendar:) provides deterministic bucketing with injected calendar
+
+## TCA view empty states
+- When adding empty states to TCA views, ensure BOTH the actual View and Preview variants handle it
+- Preview variants are only used for snapshot tests; actual views need their own empty state logic
+- Check `!isLoading` alongside `isEmpty` to avoid showing empty state during initial load

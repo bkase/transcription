@@ -109,10 +109,31 @@ public struct TimelineView: View {
 
     private var groupedSessionsContent: some View {
         LazyVStack(alignment: .leading, spacing: VaporSpacing.xl + VaporSpacing.sm) {
-            ForEach(store.sessionGroups, id: \.bucket) { group in
-                sessionSection(for: group)
+            if store.sessionGroups.isEmpty && !store.isLoading {
+                emptyStateContent
+            } else {
+                ForEach(store.sessionGroups, id: \.bucket) { group in
+                    sessionSection(for: group)
+                }
             }
         }
+    }
+
+    private var emptyStateContent: some View {
+        VStack(spacing: VaporSpacing.lg) {
+            Spacer()
+                .frame(height: VaporSpacing.xl * 4)
+
+            Text("No recordings yet")
+                .vaporTextStyle(.title)
+                .foregroundColor(VaporColor.textSecondary)
+
+            Text("Tap the record button to start capturing")
+                .vaporTextStyle(.body)
+                .foregroundColor(VaporColor.textTertiary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private var searchResultsContent: some View {
