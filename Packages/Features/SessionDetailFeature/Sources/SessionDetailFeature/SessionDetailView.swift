@@ -2,6 +2,7 @@ import ComposableArchitecture
 import DesignSystem
 import Models
 import AudioPlayerFeature
+import Observability
 import SpeakerPickerFeature
 import SwiftUI
 
@@ -84,6 +85,36 @@ public struct SessionDetailView: View {
                 ShareSheet(items: [shareURL])
             }
         }
+        .confirmationDialog(
+            "Delete Recording",
+            isPresented: Binding(
+                get: { store.isShowingDeleteConfirmation },
+                set: { if !$0 { store.send(.deleteCancelled) } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                store.send(.deleteConfirmed)
+            }
+            Button("Cancel", role: .cancel) {
+                store.send(.deleteCancelled)
+            }
+        } message: {
+            Text("This will permanently delete this recording and its transcript. This action cannot be undone.")
+        }
+        .alert(
+            item: Binding(
+                get: { store.alertInfo },
+                set: { if $0 == nil { store.send(.alertDismissed) } }
+            )
+        ) { alertInfo in
+            Alert(
+                title: Text(alertInfo.title),
+                message: Text(alertInfo.message),
+                primaryButton: alertButton(for: alertInfo.primaryButton),
+                secondaryButton: alertInfo.secondaryButton.map { alertButton(for: $0) } ?? .cancel()
+            )
+        }
         #endif
     }
 
@@ -131,9 +162,16 @@ public struct SessionDetailView: View {
                     .opacity(store.isExporting ? 0.5 : 1.0)
                     .disabled(store.isExporting)
 
-                    // More actions button
-                    IconButton(systemName: "ellipsis", style: .transparent, iconColor: VaporColor.textTertiary) {}
-                        .accessibilityIdentifier("moreActionsButton")
+                    // Delete button
+                    IconButton(
+                        systemName: "trash",
+                        style: .transparent,
+                        iconColor: VaporColor.textTertiary
+                    ) {
+                        store.send(.deleteTapped)
+                    }
+                    .accessibilityIdentifier("deleteButton")
+                    .disabled(store.isDeleting)
                 }
 
                 // Metadata row
@@ -262,6 +300,22 @@ public struct SessionDetailView: View {
 
     private func formatTimestamp(_ milliseconds: Int) -> String {
         TranscriptRendering.formatTimestamp(milliseconds)
+    }
+
+    private func alertButton(for button: AlertInfo.AlertButton) -> Alert.Button {
+        if button.isDestructive {
+            return .destructive(Text(button.title)) {
+                store.send(.alertActionTapped(button.action))
+            }
+        } else if button.action == .dismiss {
+            return .cancel(Text(button.title)) {
+                store.send(.alertActionTapped(button.action))
+            }
+        } else {
+            return .default(Text(button.title)) {
+                store.send(.alertActionTapped(button.action))
+            }
+        }
     }
 }
 

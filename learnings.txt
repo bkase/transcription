@@ -739,3 +739,13 @@
 - NavButton component has internal accessibilityIdentifier but outer modifiers don't always override
 - Use helper methods to abstract element finding and make tests more maintainable
 - Profile E2E tests: navigation, name edit, photo change (mock picker), persistence verification
+
+## E2E test for session deletion
+- Delete flow: tap session card -> detail screen -> delete button -> confirmation dialog -> navigate back to timeline
+- Wire up delete button in SessionDetailView with `deleteTapped` action and `confirmationDialog` for confirmation
+- Add `deleteCompleted` handling in AppFeature to pop navigation stack and reload timeline
+- XCUITest automatic alert handling: XCUITest auto-dismisses system alerts (like microphone permission)
+- For explicit handlers: `addUIInterruptionMonitor(withDescription:)` in setUp
+- Confirmation dialogs: Use `app.buttons["Delete"]` to tap the destructive action button
+- `waitForNonExistence(timeout:)` verifies element is gone after navigation
+- In-memory DB for UI tests: each app launch via `app.launch()` creates fresh static store with new in-memory DB

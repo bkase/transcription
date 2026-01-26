@@ -112,6 +112,11 @@ public struct AppFeature {
                 state.userProfile = profile
                 return .none
 
+            case .path(.element(id: _, action: .sessionDetail(.deleteCompleted))):
+                // Pop the navigation stack and reload timeline when session is deleted
+                _ = state.path.popLast()
+                return .send(.timeline(.loadSessions))
+
             case .path:
                 // Other path actions are handled by forEach below
                 return .none
