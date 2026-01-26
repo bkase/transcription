@@ -73,10 +73,18 @@ import Persistence
     // Create database client
     let databaseClient = DatabaseClient.live(dbQueue: dbQueue)
 
+    // Mock audio session client (no-op for tests)
+    let mockAudioSession = AudioSessionClient(
+        startObserving: { AsyncStream { $0.finish() } },
+        stopObserving: { },
+        configureForRecording: { }
+    )
+
     // Run the test with injected dependencies
     let processor = withDependencies {
         $0.audioCaptureClient = mockAudioCapture
         $0.audioFileWriterClient = mockFileWriter
+        $0.audioSessionClient = mockAudioSession
         $0.fluidAudioClient = mockFluidAudio
         $0.databaseClient = databaseClient
         $0.uuid = .incrementing
@@ -177,12 +185,20 @@ import Persistence
         isWriting: { false }
     )
 
+    // Mock audio session client (no-op for tests)
+    let mockAudioSession = AudioSessionClient(
+        startObserving: { AsyncStream { $0.finish() } },
+        stopObserving: { },
+        configureForRecording: { }
+    )
+
     let mockFluidAudio = MockFluidAudioClient.empty
     let databaseClient = DatabaseClient.live(dbQueue: dbQueue)
 
     let processor = withDependencies {
         $0.audioCaptureClient = mockAudioCapture
         $0.audioFileWriterClient = mockFileWriter
+        $0.audioSessionClient = mockAudioSession
         $0.fluidAudioClient = mockFluidAudio
         $0.databaseClient = databaseClient
         $0.uuid = .incrementing
@@ -222,12 +238,20 @@ import Persistence
         isWriting: { false }
     )
 
+    // Mock audio session client (no-op for tests)
+    let mockAudioSession = AudioSessionClient(
+        startObserving: { AsyncStream { $0.finish() } },
+        stopObserving: { },
+        configureForRecording: { }
+    )
+
     let mockFluidAudio = MockFluidAudioClient.empty
     let databaseClient = DatabaseClient.live(dbQueue: dbQueue)
 
     let processor = withDependencies {
         $0.audioCaptureClient = mockAudioCapture
         $0.audioFileWriterClient = mockFileWriter
+        $0.audioSessionClient = mockAudioSession
         $0.fluidAudioClient = mockFluidAudio
         $0.databaseClient = databaseClient
         $0.uuid = .incrementing

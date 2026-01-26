@@ -69,6 +69,7 @@ def run_build(env: dict[str, str]) -> bool:
 def run_spm_tests(env: dict[str, str]) -> TestResult:
     print("spm...", end=" ", flush=True)
     packages = [
+        ".",  # Root-level tests (CoreTests, CoreProcessingTests, ToolsTests)
         "Packages/Core/Models", "Packages/Core/Persistence", "Packages/Core/Audio",
         "Packages/Core/Processing", "Packages/Core/Export", "Packages/Core/Routing",
         "Packages/Core/DesignSystem", "Packages/Core/Observability",
@@ -166,7 +167,9 @@ def main() -> int:
     env = get_env_vars()
     results = []
 
-    if not run_gen(env) or not run_build(env):
+    # Note: gen is now handled by Makefile dependency (test: gen)
+    # so we skip running it here to avoid running twice
+    if not run_build(env):
         return 1
 
     results.append(run_spm_tests(env))

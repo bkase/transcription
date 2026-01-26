@@ -42,6 +42,13 @@ import Persistence
     // Fixed date and incrementing UUIDs for determinism
     let fixedDate = Date(timeIntervalSince1970: 1000)
 
+    // Mock audio session client (no-op for tests)
+    let mockAudioSession = AudioSessionClient(
+        startObserving: { AsyncStream { $0.finish() } },
+        stopObserving: { },
+        configureForRecording: { }
+    )
+
     // Collect events from the recording processor
     var receivedEvents: [RecordingProcessorEvent] = []
 
@@ -49,6 +56,7 @@ import Persistence
     let processor = withDependencies {
         $0.audioCaptureClient = generatedAudioClient
         $0.audioFileWriterClient = mockFileWriter
+        $0.audioSessionClient = mockAudioSession
         $0.fluidAudioClient = mockFluidAudio
         $0.databaseClient = databaseClient
         $0.uuid = .incrementing
@@ -150,11 +158,19 @@ import Persistence
     // Empty transcription - no segments
     let mockFluidAudio = MockFluidAudioClient.empty
 
+    // Mock audio session client (no-op for tests)
+    let mockAudioSession = AudioSessionClient(
+        startObserving: { AsyncStream { $0.finish() } },
+        stopObserving: { },
+        configureForRecording: { }
+    )
+
     var receivedEvents: [RecordingProcessorEvent] = []
 
     let processor = withDependencies {
         $0.audioCaptureClient = generatedAudioClient
         $0.audioFileWriterClient = mockFileWriter
+        $0.audioSessionClient = mockAudioSession
         $0.fluidAudioClient = mockFluidAudio
         $0.databaseClient = databaseClient
         $0.uuid = .incrementing
@@ -215,9 +231,17 @@ import Persistence
     // Script with partial + final segments
     let mockFluidAudio = MockFluidAudioClient.withPartialSegments
 
+    // Mock audio session client (no-op for tests)
+    let mockAudioSession = AudioSessionClient(
+        startObserving: { AsyncStream { $0.finish() } },
+        stopObserving: { },
+        configureForRecording: { }
+    )
+
     let processor = withDependencies {
         $0.audioCaptureClient = generatedAudioClient
         $0.audioFileWriterClient = mockFileWriter
+        $0.audioSessionClient = mockAudioSession
         $0.fluidAudioClient = mockFluidAudio
         $0.databaseClient = databaseClient
         $0.uuid = .incrementing
@@ -280,9 +304,17 @@ import Persistence
 
     let mockFluidAudio = MockFluidAudioClient.empty
 
+    // Mock audio session client (no-op for tests)
+    let mockAudioSession = AudioSessionClient(
+        startObserving: { AsyncStream { $0.finish() } },
+        stopObserving: { },
+        configureForRecording: { }
+    )
+
     let processor = withDependencies {
         $0.audioCaptureClient = generatedAudioClient
         $0.audioFileWriterClient = mockFileWriter
+        $0.audioSessionClient = mockAudioSession
         $0.fluidAudioClient = mockFluidAudio
         $0.databaseClient = databaseClient
         $0.uuid = .incrementing

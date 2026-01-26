@@ -84,6 +84,10 @@ import Dependencies
             createDirectory: { _ in },
             temporaryDirectory: { URL(fileURLWithPath: NSTemporaryDirectory()) }
         )
+        deps.preferencesClient = PreferencesClient(
+            getAudioRetentionMode: { .both },
+            setAudioRetentionMode: { _ in }
+        )
     } operation: {
         // Test DatabaseClient noop
         @Dependency(\.databaseClient) var databaseClient
@@ -125,6 +129,11 @@ import Dependencies
         #expect(!exists, "FileClient.exists should return false by default")
         let tempDir = fileClient.temporaryDirectory()
         #expect(!tempDir.path.isEmpty, "FileClient.temporaryDirectory should return a valid URL")
+
+        // Test PreferencesClient defaults (non-throwing have defaults)
+        @Dependency(\.preferencesClient) var preferencesClient
+        let mode = preferencesClient.getAudioRetentionMode()
+        #expect(mode == .both, "PreferencesClient.getAudioRetentionMode should return .both by default")
     }
 }
 
@@ -139,6 +148,7 @@ import Dependencies
         deps.recordingProcessorClient = .liveValue
         deps.exportClient = .liveValue
         deps.fileClient = .liveValue
+        deps.preferencesClient = .liveValue
     } operation: {
         // If we get here without crashing, live values are instantiable
         @Dependency(\.databaseClient) var databaseClient
@@ -148,6 +158,7 @@ import Dependencies
         @Dependency(\.recordingProcessorClient) var recordingProcessorClient
         @Dependency(\.exportClient) var exportClient
         @Dependency(\.fileClient) var fileClient
+        @Dependency(\.preferencesClient) var preferencesClient
 
         // Verify non-crashing access for clients that have safe defaults
         // Note: DatabaseClient's liveValue requires a configured database, so skip calling its methods here
@@ -157,5 +168,6 @@ import Dependencies
         _ = await recordingProcessorClient.isRecording()
         _ = exportClient.availableFormats()
         _ = fileClient.exists(URL(fileURLWithPath: "/test"))
+        _ = preferencesClient.getAudioRetentionMode()
     }
 }

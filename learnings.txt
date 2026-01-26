@@ -605,3 +605,15 @@
 - Test setup: `$0.uuid = .constant(testUUID)` where testUUID is a file-level constant
 - AlertInfo pattern: `state.alertInfo = AlertInfo(id: uuid().uuidString, title: alertInfo.title, ...)`
 - Recovery actions in alerts: .retry triggers feature-specific reload, .dismiss just clears alert
+
+## PreferencesClient for global settings
+- Create PreferencesClient using @DependencyClient macro for UserDefaults-backed settings
+- AudioRetentionMode enum (.transcriptOnly, .audioOnly, .both) for privacy mode
+- Store enum raw value to UserDefaults string with set/get pattern
+- Test with separate UserDefaults suite to avoid polluting real defaults
+- Add to DependenciesTests when creating new clients to verify noop implementations
+
+## AudioSessionClient mocks in tests
+- Tests using RecordingProcessor need audioSessionClient mock alongside audioCaptureClient, audioFileWriterClient, fluidAudioClient
+- No-op mock: `AudioSessionClient(startObserving: { AsyncStream { $0.finish() } }, stopObserving: { }, configureForRecording: { })`
+- Add to withDependencies block: `$0.audioSessionClient = mockAudioSession`

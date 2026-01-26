@@ -53,7 +53,7 @@ AGENT_SIM_CLONE2 ?= $(error AGENT_SIM_CLONE2 not set - source sim-config.env fir
 AGENT_SIM_CLONE3 ?= $(error AGENT_SIM_CLONE3 not set - source sim-config.env first)
 AGENT_DERIVED_DATA ?= $(error AGENT_DERIVED_DATA not set - source sim-config.env first)
 
-test:
+test: gen
 	@uv run scripts/run-tests.py
 
 # Internal target for parallel package testing
