@@ -250,7 +250,8 @@ public struct SessionDetailFeature {
             case let .sessionLoaded(session, segments, tracks):
                 state.isLoading = false
                 state.session = session
-                state.segments = segments
+                // Merge consecutive same-speaker segments for cleaner display
+                state.segments = TranscriptRendering.mergeConsecutiveSegments(segments)
                 state.speakerTracks = tracks
 
                 // Initialize audio player if session has audio

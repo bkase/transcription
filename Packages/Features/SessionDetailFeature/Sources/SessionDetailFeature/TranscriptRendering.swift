@@ -2,8 +2,81 @@ import DesignSystem
 import SwiftUI
 
 /// Utilities for formatting transcript segments for display.
-/// These functions handle speaker label mapping and timestamp formatting.
+/// These functions handle speaker label mapping, timestamp formatting, and segment merging.
 public enum TranscriptRendering {
+
+    // MARK: - Segment Merging
+
+    /// Merge consecutive transcript segments from the same speaker for cleaner display.
+    ///
+    /// Rules:
+    /// - Consecutive segments with the same `machineSpeakerId` are merged
+    /// - Segments are split when combined text would exceed `maxCharacters`
+    /// - Segments with nil `machineSpeakerId` are never merged (unknown speakers)
+    /// - Merged segments use the earliest `startMs` and latest `endMs`
+    /// - Merged segments use the first segment's `id`
+    ///
+    /// - Parameters:
+    ///   - segments: The transcript segments to merge
+    ///   - maxCharacters: Maximum character length before splitting (default 180)
+    /// - Returns: Array of merged segments
+    public static func mergeConsecutiveSegments(
+        _ segments: [DetailSegment],
+        maxCharacters: Int = 180
+    ) -> [DetailSegment] {
+        guard !segments.isEmpty else { return [] }
+
+        var result: [DetailSegment] = []
+        var currentMerge: DetailSegment? = nil
+
+        for segment in segments {
+            // Never merge segments with nil machineSpeakerId
+            guard let segmentSpeakerId = segment.machineSpeakerId else {
+                // Flush any pending merge
+                if let pending = currentMerge {
+                    result.append(pending)
+                    currentMerge = nil
+                }
+                result.append(segment)
+                continue
+            }
+
+            if let current = currentMerge,
+               let currentSpeakerId = current.machineSpeakerId,
+               currentSpeakerId == segmentSpeakerId {
+                // Same speaker - try to merge
+                let combinedText = current.text + " " + segment.text
+
+                if combinedText.count <= maxCharacters {
+                    // Merge: combine text, extend endMs
+                    currentMerge = DetailSegment(
+                        id: current.id,
+                        machineSpeakerId: current.machineSpeakerId,
+                        startMs: current.startMs,
+                        endMs: segment.endMs,
+                        text: combinedText
+                    )
+                } else {
+                    // Would exceed max - emit current and start new merge
+                    result.append(current)
+                    currentMerge = segment
+                }
+            } else {
+                // Different speaker - flush pending and start new merge
+                if let pending = currentMerge {
+                    result.append(pending)
+                }
+                currentMerge = segment
+            }
+        }
+
+        // Flush any remaining merge
+        if let pending = currentMerge {
+            result.append(pending)
+        }
+
+        return result
+    }
 
     // MARK: - Timestamp Formatting
 

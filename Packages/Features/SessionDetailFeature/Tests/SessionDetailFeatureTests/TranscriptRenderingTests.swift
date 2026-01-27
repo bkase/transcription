@@ -7,6 +7,314 @@ import Models
 @MainActor
 struct TranscriptRenderingTests {
 
+    // MARK: - Segment Merging Tests
+
+    @Test
+    func testMergeConsecutiveSegments_empty() {
+        let result = TranscriptRendering.mergeConsecutiveSegments([])
+        #expect(result.isEmpty)
+    }
+
+    @Test
+    func testMergeConsecutiveSegments_singleSegment() {
+        let segment = DetailSegment(
+            id: TranscriptSegmentID("seg-1"),
+            machineSpeakerId: "spk_0",
+            startMs: 0,
+            endMs: 5000,
+            text: "Hello"
+        )
+
+        let result = TranscriptRendering.mergeConsecutiveSegments([segment])
+
+        #expect(result.count == 1)
+        #expect(result[0].id == segment.id)
+        #expect(result[0].text == "Hello")
+    }
+
+    @Test
+    func testMergeConsecutiveSegments_noMergeWhenSpeakersDiffer() {
+        let segments = [
+            DetailSegment(
+                id: TranscriptSegmentID("seg-1"),
+                machineSpeakerId: "spk_0",
+                startMs: 0,
+                endMs: 5000,
+                text: "Hello"
+            ),
+            DetailSegment(
+                id: TranscriptSegmentID("seg-2"),
+                machineSpeakerId: "spk_1",
+                startMs: 5000,
+                endMs: 10000,
+                text: "Hi there"
+            )
+        ]
+
+        let result = TranscriptRendering.mergeConsecutiveSegments(segments)
+
+        #expect(result.count == 2)
+        #expect(result[0].text == "Hello")
+        #expect(result[1].text == "Hi there")
+    }
+
+    @Test
+    func testMergeConsecutiveSegments_basicMerge() {
+        let segments = [
+            DetailSegment(
+                id: TranscriptSegmentID("seg-1"),
+                machineSpeakerId: "spk_0",
+                startMs: 0,
+                endMs: 5000,
+                text: "Hello"
+            ),
+            DetailSegment(
+                id: TranscriptSegmentID("seg-2"),
+                machineSpeakerId: "spk_0",
+                startMs: 5000,
+                endMs: 10000,
+                text: "world"
+            )
+        ]
+
+        let result = TranscriptRendering.mergeConsecutiveSegments(segments)
+
+        #expect(result.count == 1)
+        #expect(result[0].id == TranscriptSegmentID("seg-1")) // Uses first segment's ID
+        #expect(result[0].text == "Hello world")
+        #expect(result[0].startMs == 0) // Earliest startMs
+        #expect(result[0].endMs == 10000) // Latest endMs
+        #expect(result[0].machineSpeakerId == "spk_0")
+    }
+
+    @Test
+    func testMergeConsecutiveSegments_maxCharSplit() {
+        // Test that segments split when combined text exceeds maxCharacters
+        let longText = String(repeating: "a", count: 100)
+
+        let segments = [
+            DetailSegment(
+                id: TranscriptSegmentID("seg-1"),
+                machineSpeakerId: "spk_0",
+                startMs: 0,
+                endMs: 5000,
+                text: longText
+            ),
+            DetailSegment(
+                id: TranscriptSegmentID("seg-2"),
+                machineSpeakerId: "spk_0",
+                startMs: 5000,
+                endMs: 10000,
+                text: longText // Combined would be 201 chars (100 + space + 100)
+            )
+        ]
+
+        let result = TranscriptRendering.mergeConsecutiveSegments(segments, maxCharacters: 180)
+
+        #expect(result.count == 2)
+        #expect(result[0].text == longText)
+        #expect(result[1].text == longText)
+    }
+
+    @Test
+    func testMergeConsecutiveSegments_nilSpeakersNeverMerge() {
+        let segments = [
+            DetailSegment(
+                id: TranscriptSegmentID("seg-1"),
+                machineSpeakerId: nil,
+                startMs: 0,
+                endMs: 5000,
+                text: "Unknown 1"
+            ),
+            DetailSegment(
+                id: TranscriptSegmentID("seg-2"),
+                machineSpeakerId: nil,
+                startMs: 5000,
+                endMs: 10000,
+                text: "Unknown 2"
+            )
+        ]
+
+        let result = TranscriptRendering.mergeConsecutiveSegments(segments)
+
+        #expect(result.count == 2)
+        #expect(result[0].text == "Unknown 1")
+        #expect(result[1].text == "Unknown 2")
+    }
+
+    @Test
+    func testMergeConsecutiveSegments_nilSpeakerBreaksMerge() {
+        let segments = [
+            DetailSegment(
+                id: TranscriptSegmentID("seg-1"),
+                machineSpeakerId: "spk_0",
+                startMs: 0,
+                endMs: 5000,
+                text: "Hello"
+            ),
+            DetailSegment(
+                id: TranscriptSegmentID("seg-2"),
+                machineSpeakerId: nil,
+                startMs: 5000,
+                endMs: 10000,
+                text: "Unknown"
+            ),
+            DetailSegment(
+                id: TranscriptSegmentID("seg-3"),
+                machineSpeakerId: "spk_0",
+                startMs: 10000,
+                endMs: 15000,
+                text: "Goodbye"
+            )
+        ]
+
+        let result = TranscriptRendering.mergeConsecutiveSegments(segments)
+
+        #expect(result.count == 3)
+        #expect(result[0].text == "Hello")
+        #expect(result[1].text == "Unknown")
+        #expect(result[2].text == "Goodbye")
+    }
+
+    @Test
+    func testMergeConsecutiveSegments_multipleConsecutiveSameSpeaker() {
+        let segments = [
+            DetailSegment(
+                id: TranscriptSegmentID("seg-1"),
+                machineSpeakerId: "spk_0",
+                startMs: 0,
+                endMs: 5000,
+                text: "One"
+            ),
+            DetailSegment(
+                id: TranscriptSegmentID("seg-2"),
+                machineSpeakerId: "spk_0",
+                startMs: 5000,
+                endMs: 10000,
+                text: "two"
+            ),
+            DetailSegment(
+                id: TranscriptSegmentID("seg-3"),
+                machineSpeakerId: "spk_0",
+                startMs: 10000,
+                endMs: 15000,
+                text: "three"
+            )
+        ]
+
+        let result = TranscriptRendering.mergeConsecutiveSegments(segments)
+
+        #expect(result.count == 1)
+        #expect(result[0].id == TranscriptSegmentID("seg-1"))
+        #expect(result[0].text == "One two three")
+        #expect(result[0].startMs == 0)
+        #expect(result[0].endMs == 15000)
+    }
+
+    @Test
+    func testMergeConsecutiveSegments_complexConversation() {
+        // Realistic conversation: A-A-B-A-A-A-B
+        let segments = [
+            DetailSegment(
+                id: TranscriptSegmentID("seg-1"),
+                machineSpeakerId: "spk_0",
+                startMs: 0,
+                endMs: 3000,
+                text: "Hello"
+            ),
+            DetailSegment(
+                id: TranscriptSegmentID("seg-2"),
+                machineSpeakerId: "spk_0",
+                startMs: 3000,
+                endMs: 6000,
+                text: "how are you?"
+            ),
+            DetailSegment(
+                id: TranscriptSegmentID("seg-3"),
+                machineSpeakerId: "spk_1",
+                startMs: 6000,
+                endMs: 9000,
+                text: "I'm good thanks"
+            ),
+            DetailSegment(
+                id: TranscriptSegmentID("seg-4"),
+                machineSpeakerId: "spk_0",
+                startMs: 9000,
+                endMs: 12000,
+                text: "That's great"
+            ),
+            DetailSegment(
+                id: TranscriptSegmentID("seg-5"),
+                machineSpeakerId: "spk_0",
+                startMs: 12000,
+                endMs: 15000,
+                text: "to hear"
+            ),
+            DetailSegment(
+                id: TranscriptSegmentID("seg-6"),
+                machineSpeakerId: "spk_0",
+                startMs: 15000,
+                endMs: 18000,
+                text: "really"
+            ),
+            DetailSegment(
+                id: TranscriptSegmentID("seg-7"),
+                machineSpeakerId: "spk_1",
+                startMs: 18000,
+                endMs: 21000,
+                text: "Thanks"
+            )
+        ]
+
+        let result = TranscriptRendering.mergeConsecutiveSegments(segments)
+
+        // Should produce: A(merged), B, A(merged), B
+        #expect(result.count == 4)
+
+        #expect(result[0].machineSpeakerId == "spk_0")
+        #expect(result[0].text == "Hello how are you?")
+        #expect(result[0].startMs == 0)
+        #expect(result[0].endMs == 6000)
+
+        #expect(result[1].machineSpeakerId == "spk_1")
+        #expect(result[1].text == "I'm good thanks")
+
+        #expect(result[2].machineSpeakerId == "spk_0")
+        #expect(result[2].text == "That's great to hear really")
+        #expect(result[2].startMs == 9000)
+        #expect(result[2].endMs == 18000)
+
+        #expect(result[3].machineSpeakerId == "spk_1")
+        #expect(result[3].text == "Thanks")
+    }
+
+    @Test
+    func testMergeConsecutiveSegments_customMaxCharacters() {
+        let segments = [
+            DetailSegment(
+                id: TranscriptSegmentID("seg-1"),
+                machineSpeakerId: "spk_0",
+                startMs: 0,
+                endMs: 5000,
+                text: "Hello"
+            ),
+            DetailSegment(
+                id: TranscriptSegmentID("seg-2"),
+                machineSpeakerId: "spk_0",
+                startMs: 5000,
+                endMs: 10000,
+                text: "world"
+            )
+        ]
+
+        // "Hello world" is 11 chars, set max to 10
+        let result = TranscriptRendering.mergeConsecutiveSegments(segments, maxCharacters: 10)
+
+        #expect(result.count == 2)
+        #expect(result[0].text == "Hello")
+        #expect(result[1].text == "world")
+    }
+
     // MARK: - Timestamp Formatting Tests
 
     @Test

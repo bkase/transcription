@@ -861,3 +861,23 @@
 - Use VaporAnimation.breatheCurve.animation(duration: VaporAnimation.breatheDuration).repeatForever(autoreverses: true)
 - Active segment determined by: `index == segments.count - 1 && isListening`
 - Only most recent segment during live recording should be active
+
+## TitleGeneratorClient with @available iOS 26+
+- Apple Foundation Models requires iOS 26+ (@available(iOS 26.0, *) guard)
+- Create TitleGeneratorClient dependency with generateTitle(text) and isAvailable() closures
+- Use #if os(iOS) + @available combo for live implementation; return .unavailableClient() fallback otherwise
+- Trigger title generation after 15 seconds of transcript (check segment.endMs >= 15_000)
+- Accumulate transcript text in handleSegment, track titleGenerationTriggered flag to ensure once-per-session
+- Title generation runs in detached Task to avoid blocking segment processing
+- Check session.title == nil before updating (respect user-set titles)
+- Silent failure: catch errors in title generation task, log but don't crash
+- Tests need explicit titleGeneratorClient mock: `TitleGeneratorClient(generateTitle: { _ in nil }, isAvailable: { false })`
+- @DependencyClient testValue returns unimplemented stubs; for tests that don't exercise title generation, mock with no-op
+- Complex inline DatabaseClient initialization can cause Swift type-check timeout; simplify or extract helper functions
+
+## TranscriptRendering segment merging
+- mergeConsecutiveSegments() in TranscriptRendering.swift merges consecutive same-speaker segments
+- Nil machineSpeakerId segments are never merged (unknown speakers preserved as separate)
+- Uses first segment's ID, earliest startMs, latest endMs when merging
+- Splits when combined text exceeds maxCharacters (default 180)
+- Apply in SessionDetailFeature.sessionLoaded before storing segments in state
