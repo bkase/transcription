@@ -34,6 +34,8 @@ let package = Package(
             name: "TimelineFeatureTests",
             dependencies: [
                 "TimelineFeature",
+                "Persistence",
+                "DesignSystem",
                 "Observability",
                 "Export",
                 "Processing",
