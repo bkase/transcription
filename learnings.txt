@@ -833,3 +833,9 @@
 - SessionDetailView uses StatusBanner for .partial state (segments exist but incomplete)
 - SessionDetailViewPreview.DisplayMode enum: .normal, .transcribing, .retrying, .failed, .partial(segments:)
 - XcodeGen project.yml needs Processing target added to SessionDetailFeature dependencies
+
+## RecordingViewPreview header status patterns
+- RecordingHeaderPreview supports status enum: .recording, .paused, .processingFailed, .transcriptionUnavailable
+- RecordingViewPreview ContentState enum extended with .transcriptionUnavailable(message:) and .processingError(segments:)
+- effectiveHeaderStatus computed property maps contentState to appropriate header status
+- Processing error state shows captured segments + ErrorStateView with retry/save buttons

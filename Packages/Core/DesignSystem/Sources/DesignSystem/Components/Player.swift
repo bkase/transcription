@@ -241,14 +241,59 @@ public struct RecordingHeader: View {
     }
 }
 
+/// Status variants for recording header preview
+public enum RecordingHeaderStatus: Equatable, Sendable {
+    case recording
+    case paused
+    case processingFailed
+    case transcriptionUnavailable
+
+    var label: String {
+        switch self {
+        case .recording:
+            return "RECORDING"
+        case .paused:
+            return "PAUSED"
+        case .processingFailed:
+            return "PROCESSING FAILED"
+        case .transcriptionUnavailable:
+            return "AUDIO ONLY"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .recording, .processingFailed:
+            return VaporColor.recording
+        case .paused:
+            return VaporColor.sky
+        case .transcriptionUnavailable:
+            return VaporColor.textSecondary
+        }
+    }
+
+    var timerOpacity: Double {
+        switch self {
+        case .recording:
+            return 0.8
+        case .paused, .transcriptionUnavailable:
+            return 0.5
+        case .processingFailed:
+            return 0.5
+        }
+    }
+}
+
 /// Non-interactive preview variant for snapshot testing (no animations)
 public struct RecordingHeaderPreview: View {
     private let elapsedTime: String
     private let dotOpacity: Double
+    private let status: RecordingHeaderStatus
 
-    public init(elapsedTime: String, dotOpacity: Double = 1.0) {
+    public init(elapsedTime: String, dotOpacity: Double = 1.0, status: RecordingHeaderStatus = .recording) {
         self.elapsedTime = elapsedTime
         self.dotOpacity = dotOpacity
+        self.status = status
     }
 
     public var body: some View {
@@ -256,14 +301,14 @@ public struct RecordingHeaderPreview: View {
             // Recording status
             HStack(spacing: 12) {
                 Circle()
-                    .fill(VaporColor.recording)
+                    .fill(status.color)
                     .frame(width: 8, height: 8)
                     .opacity(dotOpacity)
 
-                Text("RECORDING")
+                Text(status.label)
                     .font(.system(size: 14, weight: .light))
                     .tracking(2)
-                    .foregroundColor(VaporColor.recording)
+                    .foregroundColor(status.color)
             }
 
             Spacer()
@@ -273,7 +318,7 @@ public struct RecordingHeaderPreview: View {
                 .font(.system(size: 20, weight: .light))
                 .tracking(2)
                 .foregroundColor(VaporColor.textPrimary)
-                .opacity(0.8)
+                .opacity(status.timerOpacity)
         }
         .padding(.vertical, 16)
         .padding(.horizontal, 24)

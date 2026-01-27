@@ -367,23 +367,44 @@ public struct RecordingViewPreview: View {
         case error(String)
         case permissionDenied(String)
         case liveSegments([LiveSegmentData])
+        case transcriptionUnavailable(message: String?)
+        case processingError(segments: [LiveSegmentData])
     }
 
     private let elapsedTime: String
     private let isRecording: Bool
     private let isPaused: Bool
     private let contentState: ContentState
+    private let headerStatus: RecordingHeaderStatus?
 
     public init(
         elapsedTime: String = "00:00",
         isRecording: Bool = true,
         isPaused: Bool = false,
-        contentState: ContentState = .listening
+        contentState: ContentState = .listening,
+        headerStatus: RecordingHeaderStatus? = nil
     ) {
         self.elapsedTime = elapsedTime
         self.isRecording = isRecording
         self.isPaused = isPaused
         self.contentState = contentState
+        self.headerStatus = headerStatus
+    }
+
+    private var effectiveHeaderStatus: RecordingHeaderStatus {
+        if let headerStatus = headerStatus {
+            return headerStatus
+        }
+        switch contentState {
+        case .paused:
+            return .paused
+        case .processingError:
+            return .processingFailed
+        case .transcriptionUnavailable:
+            return .transcriptionUnavailable
+        default:
+            return .recording
+        }
     }
 
     public var body: some View {
@@ -399,7 +420,7 @@ public struct RecordingViewPreview: View {
             .padding(.bottom, VaporSpacing.md)
 
             // Recording header (non-animated)
-            RecordingHeaderPreview(elapsedTime: elapsedTime)
+            RecordingHeaderPreview(elapsedTime: elapsedTime, status: effectiveHeaderStatus)
 
             // Content area
             switch contentState {
@@ -480,6 +501,66 @@ public struct RecordingViewPreview: View {
                     }
                     .padding(.horizontal, VaporSpacing.lg)
                     .padding(.top, VaporSpacing.md)
+                }
+
+            case .transcriptionUnavailable(let message):
+                VStack(spacing: VaporSpacing.sm) {
+                    Spacer()
+                    Text("Recording audio...")
+                        .font(.system(size: 20, weight: .thin))
+                        .tracking(1)
+                        .foregroundColor(VaporColor.textSecondary)
+
+                    Text("Live transcription unavailable")
+                        .font(.system(size: 14, weight: .light))
+                        .foregroundColor(VaporColor.textTertiary)
+
+                    if let message = message {
+                        Text(message)
+                            .font(.system(size: 12, weight: .light))
+                            .foregroundColor(VaporColor.textTertiary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, VaporSpacing.xl)
+                    } else {
+                        Text("Transcription will run when recording stops")
+                            .font(.system(size: 12, weight: .light))
+                            .foregroundColor(VaporColor.textTertiary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, VaporSpacing.xl)
+                    }
+                    Spacer()
+                }
+
+            case .processingError(let segments):
+                VStack(spacing: 0) {
+                    // Show existing segments if any
+                    if !segments.isEmpty {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: VaporSpacing.lg) {
+                                ForEach(Array(segments.enumerated()), id: \.offset) { _, segment in
+                                    TranscriptSegmentPreview(
+                                        speaker: segment.speaker,
+                                        timestamp: segment.timestamp,
+                                        text: segment.text
+                                    )
+                                }
+                            }
+                            .padding(.horizontal, VaporSpacing.lg)
+                            .padding(.top, VaporSpacing.md)
+                        }
+                        .frame(maxHeight: 200)
+                    }
+
+                    // Error state view
+                    ErrorStateView(
+                        type: .transcriptionFailed,
+                        primaryLabel: "Retry Processing",
+                        primaryAction: {},
+                        secondaryLabel: "Save Without Transcript",
+                        secondaryAction: {}
+                    )
+
+                    Spacer()
                 }
             }
 
