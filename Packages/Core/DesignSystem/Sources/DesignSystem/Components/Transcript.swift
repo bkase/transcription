@@ -238,8 +238,10 @@ public struct TranscriptSegmentPreview: View {
 // MARK: - Live Indicator
 
 /// Indicator shown at the end of live transcript during recording.
-/// Displays "Listening..." with a subtle animation effect.
+/// Displays "Listening..." with a subtle breathing animation effect.
 public struct TranscriptLiveIndicator: View {
+    @State private var breatheOpacity: Double = 0.4
+
     public init() {}
 
     public var body: some View {
@@ -249,10 +251,18 @@ public struct TranscriptLiveIndicator: View {
                 .font(.system(size: 14, weight: .light))
                 .italic()
                 .foregroundColor(VaporColor.textTertiary)
-                .opacity(0.4)
+                .opacity(breatheOpacity)
             Spacer()
         }
         .padding(.vertical, 20)
+        .onAppear {
+            withAnimation(
+                VaporAnimation.breatheCurve.animation(duration: VaporAnimation.breatheDuration)
+                    .repeatForever(autoreverses: true)
+            ) {
+                breatheOpacity = 0.7
+            }
+        }
     }
 }
 
