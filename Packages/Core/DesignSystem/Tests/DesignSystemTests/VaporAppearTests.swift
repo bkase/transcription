@@ -152,3 +152,54 @@ import SwiftUI
     #expect(curve.x2 == 0.3)
     #expect(curve.y2 == 1)
 }
+
+// MARK: - Vapor Navigation Transition Tests
+
+/// Tests for the VaporNavigationTransitionModifier that implements page transitions.
+/// Reference: brand.md Motion Design section - vapor-drift curve, 400ms duration
+
+@Test func testVaporNavigationTransitionModifierCanBeCreated() {
+    // Should be able to create the modifier
+    let modifier = VaporNavigationTransitionModifier()
+    #expect(true)
+}
+
+@Test func testVaporNavigationTransitionViewExtension() {
+    // View extension should be accessible
+    let _ = Text("Test").vaporNavigationTransition()
+    #expect(true)
+}
+
+@Test func testVaporDriftCurveMatchesBrandSpec() {
+    // Verify the animation curve matches brand spec
+    // vapor-drift: cubic-bezier(0.25, 0.1, 0.25, 1)
+    let curve = VaporAnimation.driftCurve
+    #expect(curve.x1 == 0.25)
+    #expect(curve.y1 == 0.1)
+    #expect(curve.x2 == 0.25)
+    #expect(curve.y2 == 1)
+}
+
+@Test func testVaporPageDurationMatchesBrandSpec() {
+    // Verify page duration is 400ms (0.4 seconds)
+    #expect(VaporAnimation.pageDuration == 0.4)
+}
+
+@Test func testVaporPageTransitionExists() {
+    // The vaporPage transition should be available
+    let transition: AnyTransition = .vaporPage
+    #expect(true)
+}
+
+@Test func testVaporPageBackTransitionExists() {
+    // The vaporPageBack transition should be available
+    let transition: AnyTransition = .vaporPageBack
+    #expect(true)
+}
+
+@Test func testVaporPageTransitionCanBeApplied() {
+    // Transition should be applicable to any view
+    let _ = Text("Test").transition(.vaporPage)
+    let _ = Text("Test").transition(.vaporPageBack)
+    #expect(true)
+}

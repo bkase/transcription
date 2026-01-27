@@ -9,6 +9,7 @@ import Dependencies
 import Audio
 import Processing
 import Persistence
+import DesignSystem
 
 @main
 struct VaporApp: App {
@@ -94,9 +95,11 @@ struct AppView: View {
                     case let .sessionDetail(sessionDetailStore):
                         SessionDetailView(store: sessionDetailStore)
                             .navigationBarHidden(true)
+                            .vaporNavigationTransition()
                     case let .profile(profileStore):
                         ProfileView(store: profileStore)
                             .navigationBarHidden(true)
+                            .vaporNavigationTransition()
                     }
                 }
                 .tabItem {
@@ -120,6 +123,7 @@ struct AppView: View {
                 RecordingView(store: recordingStore) {
                     store.send(.dismissRecording)
                 }
+                .vaporNavigationTransition()
             }
         }
     }

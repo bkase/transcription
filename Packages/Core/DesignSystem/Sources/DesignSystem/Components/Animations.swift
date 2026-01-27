@@ -167,6 +167,107 @@ extension View {
     public func vaporExit(isPresented: Binding<Bool>) -> some View {
         modifier(VaporExitModifier(isPresented: isPresented))
     }
+
+    /// Applies vapor-drift animation timing to navigation transitions.
+    /// This modifier overrides the default navigation animation with the brand-standard
+    /// vapor-drift curve (400ms, cubic-bezier 0.25, 0.1, 0.25, 1).
+    ///
+    /// Apply this to NavigationStack destinations for consistent page transitions:
+    /// ```swift
+    /// NavigationStack(path: $path) {
+    ///     RootView()
+    /// } destination: { route in
+    ///     DestinationView(route: route)
+    ///         .vaporNavigationTransition()
+    /// }
+    /// ```
+    /// - Returns: A view with vapor-drift navigation animation timing.
+    public func vaporNavigationTransition() -> some View {
+        modifier(VaporNavigationTransitionModifier())
+    }
+}
+
+// MARK: - Vapor Navigation Transition Modifier
+
+/// A view modifier that applies the vapor-drift timing curve to navigation transitions.
+/// Implements the brand animation specification for page transitions:
+/// - Duration: 400ms
+/// - Curve: vapor-drift (cubic-bezier 0.25, 0.1, 0.25, 1) - Positional movement
+///
+/// This modifier overrides the default SwiftUI navigation animation by intercepting
+/// the transaction and replacing it with the vapor-drift timing curve.
+public struct VaporNavigationTransitionModifier: ViewModifier {
+    public init() {}
+
+    public func body(content: Content) -> some View {
+        content
+            .transaction { transaction in
+                // Override navigation animation with vapor-drift curve
+                transaction.animation = VaporAnimation.driftCurve.animation(
+                    duration: VaporAnimation.pageDuration
+                )
+            }
+    }
+}
+
+// MARK: - Vapor Page Transition
+
+/// A custom transition that applies the vapor-drift animation for page-level navigation.
+/// Uses opacity and horizontal slide with vapor-drift timing.
+///
+/// Example:
+/// ```swift
+/// if showDetail {
+///     DetailView()
+///         .transition(.vaporPage)
+/// }
+/// ```
+public extension AnyTransition {
+    /// A transition for page-level navigation that slides horizontally with fade.
+    /// - Insertion: slides in from right, fades in
+    /// - Removal: slides out to left, fades out
+    /// Uses vapor-drift timing curve.
+    static var vaporPage: AnyTransition {
+        .asymmetric(
+            insertion: .modifier(
+                active: VaporPageTransitionModifier(offset: 50, opacity: 0),
+                identity: VaporPageTransitionModifier(offset: 0, opacity: 1)
+            ),
+            removal: .modifier(
+                active: VaporPageTransitionModifier(offset: -50, opacity: 0),
+                identity: VaporPageTransitionModifier(offset: 0, opacity: 1)
+            )
+        )
+    }
+
+    /// A transition for page-level navigation that slides back (opposite of vaporPage).
+    /// - Insertion: slides in from left, fades in
+    /// - Removal: slides out to right, fades out
+    /// Uses vapor-drift timing curve.
+    static var vaporPageBack: AnyTransition {
+        .asymmetric(
+            insertion: .modifier(
+                active: VaporPageTransitionModifier(offset: -50, opacity: 0),
+                identity: VaporPageTransitionModifier(offset: 0, opacity: 1)
+            ),
+            removal: .modifier(
+                active: VaporPageTransitionModifier(offset: 50, opacity: 0),
+                identity: VaporPageTransitionModifier(offset: 0, opacity: 1)
+            )
+        )
+    }
+}
+
+/// Internal modifier used by the vaporPage transition.
+private struct VaporPageTransitionModifier: ViewModifier {
+    let offset: CGFloat
+    let opacity: Double
+
+    func body(content: Content) -> some View {
+        content
+            .offset(x: offset)
+            .opacity(opacity)
+    }
 }
 
 // MARK: - Previews
