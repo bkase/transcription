@@ -214,6 +214,7 @@ public actor RecordingProcessor {
     @Dependency(\.fluidAudioClient) var fluidAudioClient
     @Dependency(\.databaseClient) var databaseClient
     @Dependency(\.preferencesClient) var preferencesClient
+    @Dependency(\.titleGeneratorClient) var titleGeneratorClient
     @Dependency(\.uuid) var uuid
     @Dependency(\.date) var date
 
@@ -225,6 +226,10 @@ public actor RecordingProcessor {
     private var seenSpeakers: Set<String> = []
     private var eventContinuation: AsyncStream<RecordingProcessorEvent>.Continuation?
     private var audioSessionTask: Task<Void, Never>?
+
+    // Title generation state
+    private var accumulatedTranscriptText: String = ""
+    private var titleGenerationTriggered: Bool = false
 
     public init() {}
 
@@ -239,6 +244,8 @@ public actor RecordingProcessor {
 
         isRecording = true
         seenSpeakers = []
+        accumulatedTranscriptText = ""
+        titleGenerationTriggered = false
 
         // Create event stream
         let (stream, continuation) = AsyncStream.makeStream(of: RecordingProcessorEvent.self)
@@ -584,6 +591,39 @@ public actor RecordingProcessor {
             // Segment may already exist (partial update), try updating
             try? await databaseClient.updateTranscriptSegment(segmentRecord)
             eventContinuation?.yield(.didAppendSegment(segment.id))
+        }
+
+        // Accumulate text for title generation
+        accumulatedTranscriptText += (accumulatedTranscriptText.isEmpty ? "" : " ") + segment.text
+
+        // Trigger title generation after 15 seconds of transcript
+        if !titleGenerationTriggered && segment.endMs >= 15_000 {
+            titleGenerationTriggered = true
+            let textSnapshot = accumulatedTranscriptText
+            let sessionIdSnapshot = sessionId
+
+            Task { [databaseClient, titleGeneratorClient, date] in
+                guard titleGeneratorClient.isAvailable() else { return }
+
+                do {
+                    guard let title = try await titleGeneratorClient.generateTitle(textSnapshot) else { return }
+                    let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+                        .replacingOccurrences(of: "\"", with: "")
+                    guard !trimmedTitle.isEmpty else { return }
+
+                    // Update session title if not already set by user
+                    if var session = try await databaseClient.fetchSession(sessionIdSnapshot),
+                       session.title == nil {
+                        session.title = trimmedTitle
+                        session.updatedAt = date.now
+                        try await databaseClient.updateSession(session)
+                        NSLog("[TitleGeneration] Auto-generated title: '%@' for session %@", trimmedTitle, sessionIdSnapshot.rawValue)
+                    }
+                } catch {
+                    NSLog("[TitleGeneration] Failed to generate title: %@", error.localizedDescription)
+                    // Silent failure - title generation is best-effort
+                }
+            }
         }
     }
 

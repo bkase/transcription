@@ -90,6 +90,12 @@ import Persistence
         setAudioRetentionMode: { _ in }
     )
 
+    // Mock title generator (no-op for tests)
+    let mockTitleGenerator = TitleGeneratorClient(
+        generateTitle: { _ in nil },
+        isAvailable: { false }
+    )
+
     // Create the RecordingProcessorClient with injected dependencies
     let client = withDependencies {
         $0.audioCaptureClient = mockAudioCapture
@@ -98,6 +104,7 @@ import Persistence
         $0.fluidAudioClient = mockFluidAudio
         $0.databaseClient = databaseClient
         $0.preferencesClient = mockPreferences
+        $0.titleGeneratorClient = mockTitleGenerator
         $0.uuid = .incrementing
         $0.date = .constant(Date(timeIntervalSince1970: 1000))
     } operation: {
@@ -207,6 +214,12 @@ import Persistence
         setAudioRetentionMode: { _ in }
     )
 
+    // Mock title generator (no-op for tests)
+    let mockTitleGenerator = TitleGeneratorClient(
+        generateTitle: { _ in nil },
+        isAvailable: { false }
+    )
+
     let client = withDependencies {
         $0.audioCaptureClient = mockAudioCapture
         $0.audioFileWriterClient = mockFileWriter
@@ -214,6 +227,7 @@ import Persistence
         $0.fluidAudioClient = mockFluidAudio
         $0.databaseClient = databaseClient
         $0.preferencesClient = mockPreferences
+        $0.titleGeneratorClient = mockTitleGenerator
         $0.uuid = .incrementing
         $0.date = .constant(Date(timeIntervalSince1970: 1000))
     } operation: {
@@ -273,6 +287,12 @@ import Persistence
         setAudioRetentionMode: { _ in }
     )
 
+    // Mock title generator (no-op for tests)
+    let mockTitleGenerator = TitleGeneratorClient(
+        generateTitle: { _ in nil },
+        isAvailable: { false }
+    )
+
     let client = withDependencies {
         $0.audioCaptureClient = mockAudioCapture
         $0.audioFileWriterClient = mockFileWriter
@@ -280,6 +300,7 @@ import Persistence
         $0.fluidAudioClient = mockFluidAudio
         $0.databaseClient = databaseClient
         $0.preferencesClient = mockPreferences
+        $0.titleGeneratorClient = mockTitleGenerator
         $0.uuid = .incrementing
         $0.date = .constant(Date(timeIntervalSince1970: 1000))
     } operation: {

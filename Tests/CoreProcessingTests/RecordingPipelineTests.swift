@@ -66,6 +66,7 @@ import Persistence
         $0.fluidAudioClient = mockFluidAudio
         $0.databaseClient = databaseClient
         $0.preferencesClient = mockPreferences
+        $0.titleGeneratorClient = TitleGeneratorClient(generateTitle: { _ in nil }, isAvailable: { false })
         $0.uuid = .incrementing
         $0.date = .constant(fixedDate)
     } operation: {
@@ -187,6 +188,7 @@ import Persistence
         $0.fluidAudioClient = mockFluidAudio
         $0.databaseClient = databaseClient
         $0.preferencesClient = mockPreferences
+        $0.titleGeneratorClient = TitleGeneratorClient(generateTitle: { _ in nil }, isAvailable: { false })
         $0.uuid = .incrementing
         $0.date = .constant(Date(timeIntervalSince1970: 2000))
     } operation: {
@@ -265,6 +267,7 @@ import Persistence
         $0.fluidAudioClient = mockFluidAudio
         $0.databaseClient = databaseClient
         $0.preferencesClient = mockPreferences
+        $0.titleGeneratorClient = TitleGeneratorClient(generateTitle: { _ in nil }, isAvailable: { false })
         $0.uuid = .incrementing
         $0.date = .constant(Date(timeIntervalSince1970: 3000))
     } operation: {
@@ -345,6 +348,7 @@ import Persistence
         $0.fluidAudioClient = mockFluidAudio
         $0.databaseClient = databaseClient
         $0.preferencesClient = mockPreferences
+        $0.titleGeneratorClient = TitleGeneratorClient(generateTitle: { _ in nil }, isAvailable: { false })
         $0.uuid = .incrementing
         $0.date = .constant(Date(timeIntervalSince1970: 4000))
     } operation: {
