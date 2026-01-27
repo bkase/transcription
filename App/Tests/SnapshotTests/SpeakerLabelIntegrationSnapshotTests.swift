@@ -20,17 +20,17 @@ struct SpeakerLabelIntegrationSnapshotTests {
     /// speaker track data and person assignments.
     @Test func testSpeakerLabelsInTranscript() {
         // Test transcript with mixed speaker types:
-        // - User (displayOrder 1, no personName)
-        // - Guest (displayOrder 2, no personName)
+        // - Unassigned Speaker 1 (displayOrder 1, no personName)
+        // - Unassigned Speaker 2 (displayOrder 2, no personName)
         // - Named speaker with assigned person
         let segments: [LiveSegmentData] = [
             LiveSegmentData(
-                speaker: .user,
+                speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
                 timestamp: "00:02",
                 text: "Let's review the design decisions we made yesterday."
             ),
             LiveSegmentData(
-                speaker: .guest,
+                speaker: .unassigned(displayOrder: 2, color: SpeakerColor.forIndex(1).color),
                 timestamp: "00:08",
                 text: "Sure. I think the vapor aesthetic is working well."
             ),
@@ -58,31 +58,31 @@ struct SpeakerLabelIntegrationSnapshotTests {
     // MARK: - testUnassignedSpeakersInRecording
 
     /// Tests that unassigned speakers (without person names) display correctly
-    /// using the default user/guest labels based on display order.
+    /// using chip styling with "Speaker N" labels based on display order.
     @Test func testUnassignedSpeakersInRecording() {
         // All speakers are unassigned (no personName)
-        // displayOrder 1 -> user
-        // displayOrder > 1 -> guest
+        // displayOrder 1 -> "Speaker 1" chip
+        // displayOrder 2 -> "Speaker 2" chip
         let segments: [LiveSegmentData] = [
             LiveSegmentData(
-                speaker: .user,
+                speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
                 timestamp: "00:00",
-                text: "This is the primary speaker, shown as YOU."
+                text: "This is Speaker 1, shown as a chip with user-plus icon."
             ),
             LiveSegmentData(
-                speaker: .guest,
+                speaker: .unassigned(displayOrder: 2, color: SpeakerColor.forIndex(1).color),
                 timestamp: "00:05",
-                text: "This is a secondary speaker, shown as GUEST."
+                text: "This is Speaker 2, also shown as a chip."
             ),
             LiveSegmentData(
-                speaker: .user,
+                speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
                 timestamp: "00:10",
-                text: "Back to the primary speaker."
+                text: "Back to Speaker 1."
             ),
             LiveSegmentData(
-                speaker: .guest,
+                speaker: .unassigned(displayOrder: 2, color: SpeakerColor.forIndex(1).color),
                 timestamp: "00:15",
-                text: "And the guest responds."
+                text: "And Speaker 2 responds."
             )
         ]
 

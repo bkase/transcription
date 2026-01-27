@@ -355,7 +355,7 @@ struct TranscriptRenderingTests {
     // MARK: - Speaker Type Resolution Tests
 
     @Test
-    func testSpeakerType_noMachineSpeakerId_returnsGuest() {
+    func testSpeakerType_noMachineSpeakerId_returnsUnassigned() {
         let segment = DetailSegment(
             id: TranscriptSegmentID("seg-1"),
             machineSpeakerId: nil,
@@ -367,11 +367,16 @@ struct TranscriptRenderingTests {
 
         let result = TranscriptRendering.speakerType(for: segment, speakerTracks: tracks)
 
-        #expect(result == .guest)
+        // Should return unassigned with displayOrder 1 and sky color
+        if case let .unassigned(displayOrder, _) = result {
+            #expect(displayOrder == 1)
+        } else {
+            Issue.record("Expected .unassigned but got \(result)")
+        }
     }
 
     @Test
-    func testSpeakerType_noMatchingTrack_returnsGuest() {
+    func testSpeakerType_noMatchingTrack_returnsUnassigned() {
         let segment = DetailSegment(
             id: TranscriptSegmentID("seg-1"),
             machineSpeakerId: "spk_unknown",
@@ -391,7 +396,12 @@ struct TranscriptRenderingTests {
 
         let result = TranscriptRendering.speakerType(for: segment, speakerTracks: tracks)
 
-        #expect(result == .guest)
+        // Should return unassigned with displayOrder 1 (default)
+        if case let .unassigned(displayOrder, _) = result {
+            #expect(displayOrder == 1)
+        } else {
+            Issue.record("Expected .unassigned but got \(result)")
+        }
     }
 
     @Test
@@ -424,7 +434,7 @@ struct TranscriptRenderingTests {
     }
 
     @Test
-    func testSpeakerType_trackWithoutPersonName_displayOrder1_returnsUser() {
+    func testSpeakerType_trackWithoutPersonName_displayOrder1_returnsUnassigned() {
         let segment = DetailSegment(
             id: TranscriptSegmentID("seg-1"),
             machineSpeakerId: "spk_0",
@@ -444,11 +454,16 @@ struct TranscriptRenderingTests {
 
         let result = TranscriptRendering.speakerType(for: segment, speakerTracks: tracks)
 
-        #expect(result == .user)
+        // Should return unassigned with displayOrder 1 and sky color
+        if case let .unassigned(displayOrder, _) = result {
+            #expect(displayOrder == 1)
+        } else {
+            Issue.record("Expected .unassigned but got \(result)")
+        }
     }
 
     @Test
-    func testSpeakerType_trackWithoutPersonName_displayOrder2_returnsGuest() {
+    func testSpeakerType_trackWithoutPersonName_displayOrder2_returnsUnassigned() {
         let segment = DetailSegment(
             id: TranscriptSegmentID("seg-1"),
             machineSpeakerId: "spk_1",
@@ -475,7 +490,12 @@ struct TranscriptRenderingTests {
 
         let result = TranscriptRendering.speakerType(for: segment, speakerTracks: tracks)
 
-        #expect(result == .guest)
+        // Should return unassigned with displayOrder 2 and lavender color
+        if case let .unassigned(displayOrder, _) = result {
+            #expect(displayOrder == 2)
+        } else {
+            Issue.record("Expected .unassigned but got \(result)")
+        }
     }
 
     @Test
@@ -526,8 +546,12 @@ struct TranscriptRenderingTests {
             Issue.record("Expected .speaker for Alice but got \(result1)")
         }
 
-        // Unassigned displayOrder 2 should be .guest
-        #expect(result2 == .guest)
+        // Unassigned displayOrder 2 should be .unassigned with displayOrder 2
+        if case let .unassigned(displayOrder, _) = result2 {
+            #expect(displayOrder == 2)
+        } else {
+            Issue.record("Expected .unassigned for unassigned speaker but got \(result2)")
+        }
     }
 
     @Test
@@ -663,16 +687,24 @@ struct TranscriptRenderingTests {
         }
         #expect(timestamp1 == "00:12")
 
-        // Segment 2: Guest (unassigned displayOrder 2) at 00:18
+        // Segment 2: Unassigned (displayOrder 2) at 00:18
         let speaker2 = TranscriptRendering.speakerType(for: segments[1], speakerTracks: tracks)
         let timestamp2 = TranscriptRendering.formatTimestamp(segments[1].startMs)
-        #expect(speaker2 == .guest)
+        if case let .unassigned(displayOrder, _) = speaker2 {
+            #expect(displayOrder == 2)
+        } else {
+            Issue.record("Expected .unassigned for segment 2 but got \(speaker2)")
+        }
         #expect(timestamp2 == "00:18")
 
-        // Segment 3: Guest (no machine speaker ID) at 00:35
+        // Segment 3: Unassigned (no machine speaker ID, default to displayOrder 1) at 00:35
         let speaker3 = TranscriptRendering.speakerType(for: segments[2], speakerTracks: tracks)
         let timestamp3 = TranscriptRendering.formatTimestamp(segments[2].startMs)
-        #expect(speaker3 == .guest)
+        if case let .unassigned(displayOrder, _) = speaker3 {
+            #expect(displayOrder == 1)
+        } else {
+            Issue.record("Expected .unassigned for segment 3 but got \(speaker3)")
+        }
         #expect(timestamp3 == "00:35")
 
         // Segment 4: Alice at 01:15

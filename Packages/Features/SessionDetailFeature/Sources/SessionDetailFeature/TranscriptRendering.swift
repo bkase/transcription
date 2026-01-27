@@ -96,12 +96,10 @@ public enum TranscriptRendering {
     /// Determine the speaker type for a segment based on speaker tracks.
     ///
     /// Resolution logic:
-    /// 1. If segment has no machineSpeakerId → `.guest`
+    /// 1. If segment has no machineSpeakerId → `.unassigned(displayOrder: 1, color:)` (default to Speaker 1)
     /// 2. If segment's machineSpeakerId matches a track with personName → `.speaker(name:color:)`
-    /// 3. If track exists but no personName:
-    ///    - displayOrder == 1 → `.user` (primary speaker)
-    ///    - otherwise → `.guest`
-    /// 4. If no matching track found → `.guest`
+    /// 3. If track exists but no personName → `.unassigned(displayOrder:color:)` using track's displayOrder
+    /// 4. If no matching track found → `.unassigned(displayOrder: 1, color:)` (default)
     ///
     /// - Parameters:
     ///   - segment: The transcript segment to resolve
@@ -112,24 +110,22 @@ public enum TranscriptRendering {
         speakerTracks: [DetailSpeakerTrack]
     ) -> SpeakerType {
         guard let machineSpeakerId = segment.machineSpeakerId else {
-            return .guest
+            // Unknown speaker - default to Speaker 1
+            return .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color)
         }
 
         // Find the speaker track for this segment
         if let track = speakerTracks.first(where: { $0.machineSpeakerId == machineSpeakerId }) {
+            let color = SpeakerColor.forIndex(track.displayOrder - 1).color
             if let personName = track.personName {
-                let color = SpeakerColor.forIndex(track.displayOrder - 1).color
                 return .speaker(name: personName, color: color)
             } else {
-                // For unassigned speakers, use displayOrder to label
-                if track.displayOrder == 1 {
-                    return .user
-                } else {
-                    return .guest
-                }
+                // Unassigned speaker with display order
+                return .unassigned(displayOrder: track.displayOrder, color: color)
             }
         }
 
-        return .guest
+        // No matching track - default to Speaker 1
+        return .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color)
     }
 }

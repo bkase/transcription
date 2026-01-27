@@ -745,27 +745,27 @@ struct SessionDetailView_Previews: PreviewProvider {
             duration: "42:10",
             segments: [
                 .init(
-                    speaker: .user,
+                    speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
                     timestamp: "00:12",
                     text: "So we're looking at the Vapor direction."
                 ),
                 .init(
-                    speaker: .guest,
+                    speaker: .unassigned(displayOrder: 2, color: SpeakerColor.forIndex(1).color),
                     timestamp: "00:18",
                     text: "Exactly. It needs to feel like breath on glass. Nothing solid until it's saved."
                 ),
                 .init(
-                    speaker: .user,
+                    speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
                     timestamp: "00:35",
                     text: "I love that metaphor. The UI should barely be there. Just the words floating in space."
                 ),
                 .init(
-                    speaker: .guest,
+                    speaker: .unassigned(displayOrder: 2, color: SpeakerColor.forIndex(1).color),
                     timestamp: "00:52",
                     text: "Right, and when we look at the transcript, it shouldn't feel like a messaging app. It should feel like a script. A record."
                 ),
                 .init(
-                    speaker: .user,
+                    speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
                     timestamp: "01:15",
                     text: "Agreed. Let's tighten up the spacing. No bubbles, just text."
                 )

@@ -19,11 +19,11 @@ final class SpeakerAssignmentE2ETests: XCTestCase {
     }
 
     /// Test that assigning a speaker persists when viewing the session.
-    /// Flow: Timeline -> Record -> Stop -> Open session -> Tap speaker label -> Assign person -> Verify label changed
+    /// Flow: Timeline -> Record -> Stop -> Open session -> Tap speaker chip -> Assign person -> Verify label changed
     func testAssignSpeakerPersists() throws {
-        // Skip: Speaker picker modal not appearing after transcript segment tap
-        // TODO: Investigate fullScreenCover/modal accessibility issues in UI tests
-        throw XCTSkip("Speaker picker modal accessibility issue - not found after segment tap")
+        // Skip: Session card doesn't appear in timeline after recording stops
+        // TODO: Investigate why recorded session doesn't appear in timeline
+        throw XCTSkip("Session card not appearing in timeline after recording - needs investigation")
 
         // 1. Launch the app
         app.launch()
@@ -68,11 +68,11 @@ final class SpeakerAssignmentE2ETests: XCTestCase {
         let sessionDetailSegments = app.descendants(matching: .any).matching(sessionDetailSegmentPredicate)
         XCTAssertTrue(sessionDetailSegments.firstMatch.waitForExistence(timeout: 10), "Transcript segments should appear in session detail")
 
-        // 9. Tap the transcript segment to open the speaker picker
-        // Since the speaker label button is nested inside the TranscriptSegment,
-        // XCUITest detects the entire segment as a button. Tap near the top-left
-        // where the speaker label is located.
-        sessionDetailSegments.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.1)).tap()
+        // 9. Tap the unassigned speaker chip to open the speaker picker
+        let speakerChipPredicate = NSPredicate(format: "identifier == 'speakerUnassignedChip'")
+        let speakerChips = app.descendants(matching: .any).matching(speakerChipPredicate)
+        XCTAssertTrue(speakerChips.firstMatch.waitForExistence(timeout: 5), "Unassigned speaker chip should exist")
+        speakerChips.firstMatch.tap()
 
         // 10. Verify speaker picker modal appears
         let addNewPersonOption = app.buttons["addNewPersonOption"]

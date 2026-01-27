@@ -881,3 +881,12 @@
 - Uses first segment's ID, earliest startMs, latest endMs when merging
 - Splits when combined text exceeds maxCharacters (default 180)
 - Apply in SessionDetailFeature.sessionLoaded before storing segments in state
+
+## SpeakerType enum for speaker assignment UI
+- SpeakerType has two cases: `.unassigned(displayOrder:color:)` and `.speaker(name:color:)`
+- Unassigned speakers render as bordered chip with person.badge.plus icon
+- Assigned speakers render as minimal dot + uppercase name
+- `isUnassigned` computed property helps UI differentiate between chip and dot+name styles
+- TranscriptRendering and RecordingSpeakerRendering both use consistent speaker type resolution
+- Accessibility identifier: `speakerUnassignedChip` for unassigned, `speakerLabel` for assigned
+- Speaker labels can have optional `onSpeakerTap` callback for triggering assignment picker

@@ -11,34 +11,34 @@ import SwiftUI
 struct SessionDetailSnapshotTests {
 
     @Test func testSessionDetailDefault() {
-        // Default state: session with transcript and audio player
+        // Default state: session with transcript and audio player (unassigned speakers)
         let view = SessionDetailViewPreview(
             title: "Architecture Review",
             time: "9:41 AM",
             duration: "42:10",
             segments: [
                 .init(
-                    speaker: .user,
+                    speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
                     timestamp: "00:12",
                     text: "So we're looking at the Vapor direction."
                 ),
                 .init(
-                    speaker: .guest,
+                    speaker: .unassigned(displayOrder: 2, color: SpeakerColor.forIndex(1).color),
                     timestamp: "00:18",
                     text: "Exactly. It needs to feel like breath on glass. Nothing solid until it's saved."
                 ),
                 .init(
-                    speaker: .user,
+                    speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
                     timestamp: "00:35",
                     text: "I love that metaphor. The UI should barely be there. Just the words floating in space."
                 ),
                 .init(
-                    speaker: .guest,
+                    speaker: .unassigned(displayOrder: 2, color: SpeakerColor.forIndex(1).color),
                     timestamp: "00:52",
                     text: "Right, and when we look at the transcript, it shouldn't feel like a messaging app. It should feel like a script. A record."
                 ),
                 .init(
-                    speaker: .user,
+                    speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
                     timestamp: "01:15",
                     text: "Agreed. Let's tighten up the spacing. No bubbles, just text."
                 )
@@ -95,7 +95,7 @@ struct SessionDetailSnapshotTests {
             duration: nil,
             segments: [
                 .init(
-                    speaker: .user,
+                    speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
                     timestamp: "00:00",
                     text: "Just a quick thought about the project timeline..."
                 )
@@ -107,14 +107,14 @@ struct SessionDetailSnapshotTests {
     }
 
     @Test func testSessionDetailLongTranscript() {
-        // Session with long transcript (many segments) and audio player visible
+        // Session with long transcript (many segments) and audio player visible (mix of assigned and unassigned)
         let view = SessionDetailViewPreview(
             title: "Product Planning Session",
             time: "2:00 PM",
             duration: "1:23:45",
             segments: [
                 .init(
-                    speaker: .user,
+                    speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
                     timestamp: "00:00",
                     text: "Welcome everyone to the product planning session. Today we'll be discussing our roadmap for the next quarter."
                 ),
@@ -129,7 +129,7 @@ struct SessionDetailSnapshotTests {
                     text: "Before we dive in, can we align on our key metrics? I want to make sure we're all optimizing for the same outcomes."
                 ),
                 .init(
-                    speaker: .user,
+                    speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
                     timestamp: "00:48",
                     text: "Great point. Our primary metrics are user retention, daily active users, and time spent in app."
                 ),
@@ -149,7 +149,7 @@ struct SessionDetailSnapshotTests {
                     text: "It's actually the permission request screen. Users are hesitant to grant microphone access upfront."
                 ),
                 .init(
-                    speaker: .user,
+                    speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
                     timestamp: "02:02",
                     text: "We should consider progressive disclosure. Only ask for permissions when the user actually needs them."
                 ),
@@ -164,7 +164,7 @@ struct SessionDetailSnapshotTests {
                     text: "I can mock up some flows for this. We should also A/B test the copy on the permission dialog."
                 ),
                 .init(
-                    speaker: .user,
+                    speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
                     timestamp: "02:52",
                     text: "Perfect. Let's add this to the sprint. Alex, can you set up the analytics events for tracking?"
                 ),
@@ -179,7 +179,7 @@ struct SessionDetailSnapshotTests {
                     text: "Moving on to the next item - we need to discuss the export feature. Users have been requesting more format options."
                 ),
                 .init(
-                    speaker: .user,
+                    speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
                     timestamp: "03:42",
                     text: "Yes, markdown export has been our most requested feature for three months now."
                 ),
@@ -254,12 +254,12 @@ struct SessionDetailSnapshotTests {
         // Session with partial transcript (some segments available)
         let partialSegments: [SessionDetailViewPreview.SegmentData] = [
             .init(
-                speaker: .user,
+                speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
                 timestamp: "00:12",
                 text: "So we're looking at the Vapor direction."
             ),
             .init(
-                speaker: .guest,
+                speaker: .unassigned(displayOrder: 2, color: SpeakerColor.forIndex(1).color),
                 timestamp: "00:18",
                 text: "Exactly. It needs to feel like breath on glass."
             )

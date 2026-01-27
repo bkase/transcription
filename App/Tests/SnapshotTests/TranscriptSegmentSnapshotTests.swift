@@ -11,29 +11,29 @@ struct TranscriptSegmentSnapshotTests {
 
     @Test func testTranscriptSegment() {
         let view = VStack(alignment: .leading, spacing: 24) {
-            // User segment
+            // Unassigned Speaker 1 segment
             VStack(alignment: .leading, spacing: 8) {
-                CaptionText("User Segment")
+                CaptionText("Unassigned Speaker 1 (Chip)")
                 TranscriptSegment(
-                    speaker: .user,
+                    speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
                     timestamp: "00:12",
                     text: "So we're looking at the Vapor direction."
                 )
             }
 
-            // Guest segment
+            // Unassigned Speaker 2 segment
             VStack(alignment: .leading, spacing: 8) {
-                CaptionText("Guest Segment")
+                CaptionText("Unassigned Speaker 2 (Chip)")
                 TranscriptSegment(
-                    speaker: .guest,
+                    speaker: .unassigned(displayOrder: 2, color: SpeakerColor.forIndex(1).color),
                     timestamp: "00:18",
                     text: "Exactly. It needs to feel like breath on glass. Nothing solid until it's saved."
                 )
             }
 
-            // Custom speaker
+            // Assigned speaker
             VStack(alignment: .leading, spacing: 8) {
-                CaptionText("Custom Speaker")
+                CaptionText("Assigned Speaker (Dot + Name)")
                 TranscriptSegment(
                     speaker: .speaker(name: "Alex", color: VaporColor.deep),
                     timestamp: "01:45",
@@ -49,34 +49,34 @@ struct TranscriptSegmentSnapshotTests {
     }
 
     @Test func testTranscriptConversation() {
-        // A realistic conversation flow
+        // A realistic conversation flow with unassigned speakers
         let view = VStack(alignment: .leading, spacing: 16) {
             TranscriptSegment(
-                speaker: .user,
+                speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
                 timestamp: "00:12",
                 text: "So we're looking at the Vapor direction."
             )
 
             TranscriptSegment(
-                speaker: .guest,
+                speaker: .unassigned(displayOrder: 2, color: SpeakerColor.forIndex(1).color),
                 timestamp: "00:18",
                 text: "Exactly. It needs to feel like breath on glass. Nothing solid until it's saved."
             )
 
             TranscriptSegment(
-                speaker: .user,
+                speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
                 timestamp: "00:35",
                 text: "I love that metaphor. The UI should barely be there. Just the words floating in space."
             )
 
             TranscriptSegment(
-                speaker: .guest,
+                speaker: .unassigned(displayOrder: 2, color: SpeakerColor.forIndex(1).color),
                 timestamp: "00:52",
                 text: "Right, and when we look at the transcript, it shouldn't feel like a messaging app. It should feel like a script. A record."
             )
 
             TranscriptSegment(
-                speaker: .user,
+                speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
                 timestamp: "01:10",
                 text: "Agreed. Let's tighten up the spacing. No bubbles, just text."
             )
@@ -134,19 +134,19 @@ struct TranscriptSegmentSnapshotTests {
             // Transcript content
             VStack(alignment: .leading, spacing: 16) {
                 TranscriptSegment(
-                    speaker: .user,
+                    speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
                     timestamp: "00:12",
                     text: "So we're looking at the Vapor direction."
                 )
 
                 TranscriptSegment(
-                    speaker: .guest,
+                    speaker: .unassigned(displayOrder: 2, color: SpeakerColor.forIndex(1).color),
                     timestamp: "00:18",
                     text: "Exactly. It needs to feel like breath on glass. Nothing solid until it's saved."
                 )
 
                 TranscriptSegment(
-                    speaker: .user,
+                    speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
                     timestamp: "00:35",
                     text: "I love that metaphor. The UI should barely be there. Just the words floating in space."
                 )
@@ -167,14 +167,14 @@ struct TranscriptSegmentSnapshotTests {
         let view = VStack(alignment: .leading, spacing: 16) {
             // Previous segments (not active)
             TranscriptSegment(
-                speaker: .user,
+                speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
                 timestamp: "00:12",
                 text: "So we're looking at the Vapor direction.",
                 isActive: false
             )
 
             TranscriptSegment(
-                speaker: .guest,
+                speaker: .unassigned(displayOrder: 2, color: SpeakerColor.forIndex(1).color),
                 timestamp: "00:18",
                 text: "Exactly. It needs to feel like breath on glass.",
                 isActive: false
@@ -182,7 +182,7 @@ struct TranscriptSegmentSnapshotTests {
 
             // Current active segment (most recent, has breathing animation)
             TranscriptSegment(
-                speaker: .user,
+                speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
                 timestamp: "00:35",
                 text: "I love that metaphor. The UI should barely be there.",
                 isActive: true

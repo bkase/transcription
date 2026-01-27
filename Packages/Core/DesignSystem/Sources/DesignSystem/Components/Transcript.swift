@@ -4,17 +4,16 @@ import SwiftUI
 
 /// Represents different speaker types in a transcript.
 public enum SpeakerType: Sendable, Equatable {
-    case user
-    case guest
+    /// Unassigned speaker with display order and color
+    case unassigned(displayOrder: Int, color: Color)
+    /// Assigned speaker with name and color
     case speaker(name: String, color: Color)
 
     /// Display label for the speaker
     public var label: String {
         switch self {
-        case .user:
-            return "YOU"
-        case .guest:
-            return "GUEST"
+        case .unassigned(let displayOrder, _):
+            return "Speaker \(displayOrder)"
         case .speaker(let name, _):
             return name.uppercased()
         }
@@ -23,12 +22,20 @@ public enum SpeakerType: Sendable, Equatable {
     /// Color for the speaker label
     public var color: Color {
         switch self {
-        case .user:
-            return VaporColor.sky
-        case .guest:
-            return VaporColor.lavender
+        case .unassigned(_, let color):
+            return color
         case .speaker(_, let color):
             return color
+        }
+    }
+
+    /// Whether this speaker is unassigned
+    public var isUnassigned: Bool {
+        switch self {
+        case .unassigned:
+            return true
+        case .speaker:
+            return false
         }
     }
 }
@@ -128,23 +135,54 @@ public struct TranscriptSegment: View {
     private var speakerLabel: some View {
         if let onTap = onSpeakerTap {
             Button(action: onTap) {
-                Text(speaker.label)
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(1)
-                    .foregroundColor(speaker.color)
+                speakerLabelContent
             }
             .buttonStyle(SpeakerLabelButtonStyle())
-            .accessibilityIdentifier("speakerLabel")
+            .accessibilityIdentifier(speaker.isUnassigned ? "speakerUnassignedChip" : "speakerLabel")
         } else {
             speakerLabelContent
         }
     }
 
+    @ViewBuilder
     private var speakerLabelContent: some View {
-        Text(speaker.label)
-            .font(.system(size: 10, weight: .semibold))
-            .tracking(1)
-            .foregroundColor(speaker.color)
+        switch speaker {
+        case .unassigned(_, let color):
+            // Bordered chip with icon for unassigned speakers
+            HStack(spacing: 6) {
+                Image(systemName: "person.badge.plus")
+                    .font(.system(size: 12))
+                    .foregroundColor(color)
+
+                Text(speaker.label)
+                    .font(.system(size: 10, weight: .medium))
+                    .tracking(0.5)
+                    .foregroundColor(color)
+            }
+            .padding(.vertical, 4)
+            .padding(.horizontal, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(color.opacity(0.12))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(color, lineWidth: 1)
+            )
+
+        case .speaker(_, let color):
+            // Minimal dot + name for assigned speakers
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(color)
+                    .frame(width: 6, height: 6)
+
+                Text(speaker.label)
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(1)
+                    .foregroundColor(color)
+            }
+        }
     }
 }
 
@@ -244,23 +282,23 @@ public struct TranscriptEndIndicator: View {
 struct TranscriptSegment_Previews: PreviewProvider {
     static var previews: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // User segment
+            // Unassigned Speaker 1
             TranscriptSegment(
-                speaker: .user,
+                speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
                 timestamp: "00:12",
                 text: "So we're looking at the Vapor direction."
             )
 
-            // Guest segment
+            // Unassigned Speaker 2
             TranscriptSegment(
-                speaker: .guest,
+                speaker: .unassigned(displayOrder: 2, color: SpeakerColor.forIndex(1).color),
                 timestamp: "00:18",
                 text: "Exactly. It needs to feel like breath on glass. Nothing solid until it's saved."
             )
 
-            // Another user segment
+            // Assigned speaker
             TranscriptSegment(
-                speaker: .user,
+                speaker: .speaker(name: "Sarah", color: SpeakerColor.forIndex(0).color),
                 timestamp: "00:35",
                 text: "I love that metaphor. The UI should barely be there. Just the words floating in space."
             )

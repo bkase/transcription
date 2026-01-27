@@ -47,17 +47,17 @@ struct RecordingViewSnapshotTests {
         // Live segments state: recording with live transcript (speakers unset)
         let segments: [LiveSegmentData] = [
             LiveSegmentData(
-                speaker: .user,
+                speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
                 timestamp: "00:02",
                 text: "Conversations are like breath—ephemeral unless captured."
             ),
             LiveSegmentData(
-                speaker: .guest,
+                speaker: .unassigned(displayOrder: 2, color: SpeakerColor.forIndex(1).color),
                 timestamp: "00:04",
                 text: "The Vapor brand treats speech as something delicate."
             ),
             LiveSegmentData(
-                speaker: .user,
+                speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
                 timestamp: "00:06",
                 text: "It preserves without intruding. It's barely there."
             )
@@ -121,12 +121,12 @@ struct RecordingViewSnapshotTests {
         // Processing error: recording finished but transcription failed
         let segments: [LiveSegmentData] = [
             LiveSegmentData(
-                speaker: .user,
+                speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
                 timestamp: "00:02",
                 text: "Conversations are like breath—ephemeral unless captured."
             ),
             LiveSegmentData(
-                speaker: .guest,
+                speaker: .unassigned(displayOrder: 2, color: SpeakerColor.forIndex(1).color),
                 timestamp: "00:04",
                 text: "The Vapor brand treats speech as something delicate."
             )
