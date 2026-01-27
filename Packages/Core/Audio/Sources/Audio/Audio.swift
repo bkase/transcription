@@ -27,6 +27,9 @@ public struct AudioCaptureClient: Sendable {
     public var stopCapture: @Sendable () async -> Void
     /// Check if currently capturing
     public var isCapturing: @Sendable () async -> Bool = { false }
+    /// Get the input format (sample rate, channels) from the microphone
+    /// Must be called after audio session is configured
+    public var getInputFormat: @Sendable () -> AudioFormatConfig = { .recording }
 }
 
 extension AudioCaptureClient: DependencyKey {

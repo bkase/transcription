@@ -140,6 +140,7 @@ public struct SessionDetailFeature {
         case sessionLoaded(SessionRecord?, [DetailSegment], [DetailSpeakerTrack])
         case loadFailed(String)
         case pollTranscriptionStatus
+        case processingStatusUpdated(SessionRecord?)
         case backTapped
         case audioPlayer(AudioPlayerFeature.Action)
         case speakerLabelTapped(segmentId: TranscriptSegmentID, machineSpeakerId: String?)
@@ -261,8 +262,32 @@ public struct SessionDetailFeature {
                 return .none
 
             case .pollTranscriptionStatus:
-                // Reload session to check transcription status (which will start another poll if still transcribing)
-                return .send(.loadSession)
+                // Lightweight poll - only fetch session, don't reload everything with loading indicator
+                return .run { [sessionID = state.sessionID, databaseClient] send in
+                    let session = try? await databaseClient.fetchSession(sessionID)
+                    await send(.processingStatusUpdated(session))
+                }
+
+            case let .processingStatusUpdated(session):
+                // Update session without showing loading indicator
+                if let session = session {
+                    state.session = session
+
+                    // If transcription is complete, do a full reload to get segments
+                    if session.processingState == .processed || session.processingState == .partial {
+                        return .send(.loadSession)
+                    }
+
+                    // If still transcribing, continue polling
+                    if session.processingState == .transcribing {
+                        return .run { send in
+                            try? await Task.sleep(for: .seconds(2))
+                            await send(.pollTranscriptionStatus)
+                        }
+                        .cancellable(id: CancelID.transcriptionPolling, cancelInFlight: true)
+                    }
+                }
+                return .none
 
             case let .loadFailed(errorMessage):
                 state.isLoading = false

@@ -27,7 +27,8 @@ import Persistence
             }
         },
         stopCapture: { },
-        isCapturing: { false }
+        isCapturing: { false },
+        getInputFormat: { .recording }
     )
 
     // Mock audio file writer
@@ -181,7 +182,8 @@ import Persistence
             AsyncStream { _ in }
         },
         stopCapture: { },
-        isCapturing: { true }
+        isCapturing: { true },
+        getInputFormat: { .recording }
     )
 
     let mockFileWriter = AudioFileWriterClient(
@@ -241,7 +243,8 @@ import Persistence
     let mockAudioCapture = AudioCaptureClient(
         startCapture: { AsyncStream { _ in } },
         stopCapture: { },
-        isCapturing: { false }
+        isCapturing: { false },
+        getInputFormat: { .recording }
     )
 
     let mockFileWriter = AudioFileWriterClient(
@@ -325,7 +328,8 @@ import Persistence
     let mockAudioCapture = AudioCaptureClient(
         startCapture: { AsyncStream { _ in } },
         stopCapture: { await captureState.incrementStopCount() },
-        isCapturing: { false }
+        isCapturing: { false },
+        getInputFormat: { .recording }
     )
 
     let mockFileWriter = AudioFileWriterClient(
@@ -440,7 +444,8 @@ import Persistence
             return AsyncStream { _ in }
         },
         stopCapture: { await captureState.incrementStopCount() },
-        isCapturing: { false }
+        isCapturing: { false },
+        getInputFormat: { .recording }
     )
 
     let mockFileWriter = AudioFileWriterClient(
@@ -555,7 +560,8 @@ import Persistence
             return AsyncStream { _ in }
         },
         stopCapture: { await captureState.incrementStopCount() },
-        isCapturing: { false }
+        isCapturing: { false },
+        getInputFormat: { .recording }
     )
 
     let mockFileWriter = AudioFileWriterClient(
@@ -667,7 +673,8 @@ import Persistence
             return AsyncStream { _ in }
         },
         stopCapture: { await captureState.incrementStopCount() },
-        isCapturing: { false }
+        isCapturing: { false },
+        getInputFormat: { .recording }
     )
 
     let mockFileWriter = AudioFileWriterClient(

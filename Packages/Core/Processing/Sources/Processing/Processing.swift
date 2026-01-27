@@ -254,10 +254,13 @@ public actor RecordingProcessor {
         // Configure audio session for recording (required on iOS before AVAudioEngine can access mic)
         try await audioSessionClient.configureForRecording()
 
-        // Start audio file writing
+        // Get the actual input format from the microphone (must be after audio session is configured)
+        let inputFormat = audioCaptureClient.getInputFormat()
+
+        // Start audio file writing with the actual microphone format
         let audioPath = audioDirectory.appendingPathComponent("\(sessionId.rawValue).caf")
         self.currentAudioFileURL = audioPath
-        try await audioFileWriterClient.startWriting(audioPath, .recording)
+        try await audioFileWriterClient.startWriting(audioPath, inputFormat)
 
         // Start audio capture
         let audioStream = try await audioCaptureClient.startCapture()

@@ -30,7 +30,8 @@ import Persistence
             let started = await stateTracker.isCaptureStarted
             let stopped = await stateTracker.isCaptureStopped
             return started && !stopped
-        }
+        },
+        getInputFormat: { .recording }
     )
 
     // Mock audio file writer
@@ -178,7 +179,8 @@ import Persistence
     let mockAudioCapture = AudioCaptureClient(
         startCapture: { AsyncStream { _ in } },
         stopCapture: { },
-        isCapturing: { false }
+        isCapturing: { false },
+        getInputFormat: { .recording }
     )
 
     let mockFileWriter = AudioFileWriterClient(
@@ -243,7 +245,8 @@ import Persistence
     let mockAudioCapture = AudioCaptureClient(
         startCapture: { AsyncStream { _ in } },
         stopCapture: { },
-        isCapturing: { true }
+        isCapturing: { true },
+        getInputFormat: { .recording }
     )
 
     let mockFileWriter = AudioFileWriterClient(

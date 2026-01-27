@@ -147,7 +147,14 @@ extension AudioCaptureClient {
         return Self(
             startCapture: { await capture.startCapture() },
             stopCapture: { await capture.stopCapture() },
-            isCapturing: { await capture.isCapturing }
+            isCapturing: { await capture.isCapturing },
+            getInputFormat: {
+                AudioFormatConfig(
+                    sampleRate: config.sampleRate,
+                    channels: 1,
+                    isFloat: true
+                )
+            }
         )
     }
 }

@@ -90,6 +90,18 @@ public final class LiveMicrophoneCapture: @unchecked Sendable {
         defer { lock.unlock() }
         return _isCapturing
     }
+
+    /// Get the input format from the microphone
+    /// Returns the actual sample rate and channel count from the audio engine's input node
+    public func getInputFormat() -> AudioFormatConfig {
+        let inputNode = engine.audioInputNode
+        let format = inputNode.outputFormat(0)
+        return AudioFormatConfig(
+            sampleRate: format.sampleRate,
+            channels: UInt32(format.channelCount),
+            isFloat: true
+        )
+    }
 }
 
 // MARK: - AudioCaptureClient.live
@@ -102,7 +114,8 @@ extension AudioCaptureClient {
         return Self(
             startCapture: { try capture.startCapture() },
             stopCapture: { capture.stopCapture() },
-            isCapturing: { capture.isCapturing }
+            isCapturing: { capture.isCapturing },
+            getInputFormat: { capture.getInputFormat() }
         )
     }
 }

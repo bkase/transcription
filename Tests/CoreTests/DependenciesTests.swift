@@ -46,7 +46,8 @@ import Dependencies
         deps.audioCaptureClient = AudioCaptureClient(
             startCapture: { AsyncStream { _ in } },
             stopCapture: { },
-            isCapturing: { false }
+            isCapturing: { false },
+            getInputFormat: { .recording }
         )
         deps.audioPlayerClient = AudioPlayerClient(
             play: { _ in },

@@ -28,7 +28,8 @@ import Persistence
             }
         },
         stopCapture: { },
-        isCapturing: { false }
+        isCapturing: { false },
+        getInputFormat: { .recording }
     )
 
     // Track written audio file
@@ -155,7 +156,8 @@ import Persistence
             }
         },
         stopCapture: { },
-        isCapturing: { false }
+        isCapturing: { false },
+        getInputFormat: { .recording }
     )
 
     actor WrittenFile {
@@ -249,7 +251,8 @@ import Persistence
             }
         },
         stopCapture: { },
-        isCapturing: { false }
+        isCapturing: { false },
+        getInputFormat: { .recording }
     )
 
     actor WrittenFile {
