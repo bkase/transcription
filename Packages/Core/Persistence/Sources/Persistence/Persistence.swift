@@ -8,6 +8,7 @@ import GRDB
 
 public enum ProcessingState: String, Codable, Sendable, DatabaseValueConvertible {
     case recording
+    case transcribing
     case partial
     case processed
     case failed

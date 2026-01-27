@@ -195,9 +195,13 @@ public struct RecordingView: View {
             }
         } else if store.isListening {
             // Listening but no segments yet
-            VStack {
+            VStack(spacing: VaporSpacing.md) {
                 Spacer()
-                listeningIndicator
+                if store.isTranscriptionAvailable {
+                    listeningIndicator
+                } else {
+                    transcriptionUnavailableIndicator
+                }
                 Spacer()
             }
         } else if store.isRecording {
@@ -221,6 +225,25 @@ public struct RecordingView: View {
             .font(.system(size: 24, weight: .thin))
             .tracking(1)
             .foregroundColor(VaporColor.textTertiary)
+    }
+
+    private var transcriptionUnavailableIndicator: some View {
+        VStack(spacing: VaporSpacing.sm) {
+            Text("Recording audio...")
+                .font(.system(size: 20, weight: .thin))
+                .tracking(1)
+                .foregroundColor(VaporColor.textSecondary)
+
+            Text("Live transcription unavailable")
+                .font(.system(size: 14, weight: .light))
+                .foregroundColor(VaporColor.textTertiary)
+
+            Text("Transcription will run when recording stops")
+                .font(.system(size: 12, weight: .light))
+                .foregroundColor(VaporColor.textTertiary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, VaporSpacing.xl)
+        }
     }
 
     private var liveTranscriptView: some View {

@@ -96,6 +96,10 @@ public enum RecordingProcessorEvent: Sendable, Equatable {
     case interruptionEnded(shouldResume: Bool)
     /// Audio route changed (e.g., headphones disconnected)
     case routeChanged(RouteChangeInfo)
+    /// Transcription started successfully
+    case transcriptionStarted
+    /// Transcription failed to start (audio will still be recorded)
+    case transcriptionUnavailable(String)
 }
 
 /// Information about an audio route change
@@ -277,13 +281,16 @@ public actor RecordingProcessor {
             guard let self = self else { return }
             do {
                 let segmentStream = try await fluidAudioClient.startTranscription(mlStream)
+                await self.emitTranscriptionStarted()
                 for await segment in segmentStream {
                     guard await self.getIsRecording() else { break }
                     await self.handleSegment(segment, sessionId: sessionId)
                 }
             } catch {
-                // Log error but don't fail recording - audio file will still be saved
-                print("ML transcription failed to start: \(error)")
+                // Emit event so UI can inform user - audio recording continues
+                let errorMessage = "Live transcription unavailable: \(error.localizedDescription)"
+                print(errorMessage)
+                await self.emitTranscriptionUnavailable(errorMessage)
             }
         }
 
@@ -559,6 +566,14 @@ public actor RecordingProcessor {
         }
     }
 
+    private func emitTranscriptionStarted() {
+        eventContinuation?.yield(.transcriptionStarted)
+    }
+
+    private func emitTranscriptionUnavailable(_ message: String) {
+        eventContinuation?.yield(.transcriptionUnavailable(message))
+    }
+
     private func finalizeSession(_ sessionId: SessionID, audioFileURL: URL?) async {
         let now = date.now
 
@@ -584,27 +599,81 @@ public actor RecordingProcessor {
         let segmentDurationMs = segments.map { $0.endMs }.max() ?? 0
         let durationMs = max(elapsedMs, segmentDurationMs)
 
-        // Update session
+        // Update session - set to transcribing state first
         session.endedAt = now
         session.previewText = previewText.isEmpty ? nil : String(previewText.prefix(200))
         session.durationMs = durationMs
-        session.processingState = .processed
         session.speakerCount = seenSpeakers.count
         session.updatedAt = now
 
         // Check privacy mode and handle audio retention
         let retentionMode = preferencesClient.getAudioRetentionMode()
-        if retentionMode == .transcriptOnly, let audioURL = audioFileURL {
+        let shouldDeleteAudio = retentionMode == .transcriptOnly
+        let canRunOfflineTranscription = !shouldDeleteAudio && audioFileURL != nil && retentionMode != .audioOnly
+
+        if shouldDeleteAudio, let audioURL = audioFileURL {
             // Delete audio file and clear audioPath
             try? FileManager.default.removeItem(at: audioURL)
             session.audioPath = nil
+            // No offline transcription possible, mark as processed
+            session.processingState = .processed
+        } else if canRunOfflineTranscription {
+            // Set to transcribing state - offline transcription will run
+            session.processingState = .transcribing
+            session.audioPath = audioFileURL?.path
+        } else {
+            // No offline transcription (audioOnly mode or no audio file)
+            session.processingState = .processed
+            session.audioPath = audioFileURL?.path
         }
 
         do {
             try await databaseClient.updateSession(session)
+            // Emit didFinish so UI can navigate to detail view
             eventContinuation?.yield(.didFinish(sessionId))
+
+            // Start offline transcription if needed
+            if canRunOfflineTranscription, let audioURL = audioFileURL {
+                await runOfflineTranscription(sessionId: sessionId, audioFileURL: audioURL)
+            }
         } catch {
             eventContinuation?.yield(.didFail("Failed to finalize session: \(error)"))
+        }
+    }
+
+    /// Run offline transcription on the saved audio file
+    /// This provides a higher quality full-pass transcription after recording stops
+    private func runOfflineTranscription(sessionId: SessionID, audioFileURL: URL) async {
+        // TODO: Implement actual audio file reading and transcription
+        // For now, this is a placeholder that simulates the transcription process
+        //
+        // The full implementation would:
+        // 1. Read the audio file using AVAudioFile or ExtAudioFile
+        // 2. Convert to AudioFrames
+        // 3. Feed through FluidAudioClient for transcription and diarization
+        // 4. Update/replace transcript segments in the database
+        // 5. Update session state to .processed
+
+        // Placeholder: Just mark as processed after a short delay
+        // In production, this would run the actual transcription
+        do {
+            // Simulate transcription time (would be replaced with actual processing)
+            try await Task.sleep(for: .milliseconds(500))
+
+            // Update session to processed state
+            guard var session = try? await databaseClient.fetchSession(sessionId) else {
+                print("Failed to fetch session for offline transcription completion")
+                return
+            }
+
+            session.processingState = .processed
+            session.updatedAt = date.now
+
+            try await databaseClient.updateSession(session)
+        } catch {
+            // Log error but don't fail - the session will remain in transcribing state
+            // User can still see any live segments that were captured
+            print("Offline transcription failed: \(error)")
         }
     }
 

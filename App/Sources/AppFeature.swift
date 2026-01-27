@@ -158,8 +158,16 @@ public struct AppFeature {
 
             // MARK: - Recording Actions
 
-            case .recording(.presented(.processorEvent(.didFinish))):
-                // Recording finished - dismiss and reload timeline
+            case let .recording(.presented(.processorEvent(.didFinish(sessionID)))):
+                // Recording finished - navigate to session detail view
+                state.recording = nil
+                // Push session detail onto navigation stack
+                state.path.append(.sessionDetail(SessionDetailFeature.State(sessionID: sessionID)))
+                // Also reload timeline in background so it's up to date when user goes back
+                return .send(.timeline(.loadSessions))
+
+            case .recording(.presented(.processorEvent(.didDiscard(_)))):
+                // Recording discarded - dismiss and reload timeline
                 state.recording = nil
                 return .send(.timeline(.loadSessions))
 

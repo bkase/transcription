@@ -98,6 +98,10 @@ public struct RecordingFeature {
         public var isShowingActionsMenu: Bool = false
         /// Current audio retention mode (privacy setting)
         public var audioRetentionMode: AudioRetentionMode = .both
+        /// Whether live transcription is available (may be unavailable if models failed to load)
+        public var isTranscriptionAvailable: Bool = true
+        /// Message explaining why transcription is unavailable
+        public var transcriptionUnavailableMessage: String?
 
         public init(
             isRecording: Bool = false,
@@ -113,7 +117,9 @@ public struct RecordingFeature {
             isShowingDiscardConfirmation: Bool = false,
             alertInfo: AlertInfo? = nil,
             isShowingActionsMenu: Bool = false,
-            audioRetentionMode: AudioRetentionMode = .both
+            audioRetentionMode: AudioRetentionMode = .both,
+            isTranscriptionAvailable: Bool = true,
+            transcriptionUnavailableMessage: String? = nil
         ) {
             self.isRecording = isRecording
             self.isPaused = isPaused
@@ -129,6 +135,8 @@ public struct RecordingFeature {
             self.alertInfo = alertInfo
             self.isShowingActionsMenu = isShowingActionsMenu
             self.audioRetentionMode = audioRetentionMode
+            self.isTranscriptionAvailable = isTranscriptionAvailable
+            self.transcriptionUnavailableMessage = transcriptionUnavailableMessage
         }
     }
 
@@ -445,6 +453,18 @@ public struct RecordingFeature {
                     // Audio route changed (headphones disconnected, etc.)
                     // The processor handles restarting capture if needed
                     // No UI state change needed
+                    return .none
+
+                case .transcriptionStarted:
+                    // Transcription is working - clear any previous unavailable state
+                    state.isTranscriptionAvailable = true
+                    state.transcriptionUnavailableMessage = nil
+                    return .none
+
+                case let .transcriptionUnavailable(message):
+                    // Transcription failed to start - audio recording continues
+                    state.isTranscriptionAvailable = false
+                    state.transcriptionUnavailableMessage = message
                     return .none
                 }
 

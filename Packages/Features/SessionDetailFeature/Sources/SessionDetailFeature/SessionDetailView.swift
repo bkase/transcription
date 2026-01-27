@@ -59,6 +59,9 @@ public struct SessionDetailView: View {
         .onAppear {
             store.send(.onAppear)
         }
+        .onDisappear {
+            store.send(.onDisappear)
+        }
         #if os(iOS)
         .fullScreenCover(
             item: $store.scope(state: \.speakerPicker, action: \.speakerPicker)
@@ -164,24 +167,73 @@ public struct SessionDetailView: View {
             VStack(alignment: .leading, spacing: VaporSpacing.xs) {
                 // Title row with action buttons
                 HStack(alignment: .top) {
-                    Text(session.title ?? "Untitled")
-                        .font(.system(size: 28, weight: .thin))
-                        .tracking(-0.5)
-                        .foregroundColor(VaporColor.textPrimary)
+                    if store.isEditingTitle {
+                        // Editing mode - show text field
+                        HStack(spacing: VaporSpacing.sm) {
+                            TextField(
+                                "Session title",
+                                text: Binding(
+                                    get: { store.editedTitle },
+                                    set: { store.send(.titleChanged($0)) }
+                                )
+                            )
+                            .font(.system(size: 28, weight: .thin))
+                            .tracking(-0.5)
+                            .foregroundColor(VaporColor.textPrimary)
+                            .textFieldStyle(.plain)
+                            .submitLabel(.done)
+                            .onSubmit {
+                                store.send(.saveTitle)
+                            }
+                            .accessibilityIdentifier("titleTextField")
+
+                            // Cancel button
+                            Button {
+                                store.send(.cancelTitleEdit)
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(VaporColor.textTertiary)
+                            }
+                            .accessibilityIdentifier("cancelTitleEdit")
+
+                            // Save button
+                            Button {
+                                store.send(.saveTitle)
+                            } label: {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(VaporColor.sky)
+                            }
+                            .accessibilityIdentifier("saveTitleEdit")
+                        }
+                    } else {
+                        // Display mode - tappable title
+                        Text(session.title ?? "Untitled")
+                            .font(.system(size: 28, weight: .thin))
+                            .tracking(-0.5)
+                            .foregroundColor(VaporColor.textPrimary)
+                            .onTapGesture {
+                                store.send(.titleTapped)
+                            }
+                            .accessibilityIdentifier("sessionTitle")
+                    }
 
                     Spacer()
 
-                    // More actions button (ellipsis)
-                    IconButton(
-                        systemName: "ellipsis",
-                        style: .transparent,
-                        iconColor: VaporColor.textTertiary
-                    ) {
-                        store.send(.moreButtonTapped)
+                    // More actions button (ellipsis) - hidden during title edit
+                    if !store.isEditingTitle {
+                        IconButton(
+                            systemName: "ellipsis",
+                            style: .transparent,
+                            iconColor: VaporColor.textTertiary
+                        ) {
+                            store.send(.moreButtonTapped)
+                        }
+                        .accessibilityIdentifier("moreButton")
+                        .opacity(store.isExporting || store.isDeleting ? 0.5 : 1.0)
+                        .disabled(store.isExporting || store.isDeleting)
                     }
-                    .accessibilityIdentifier("moreButton")
-                    .opacity(store.isExporting || store.isDeleting ? 0.5 : 1.0)
-                    .disabled(store.isExporting || store.isDeleting)
                 }
 
                 // Metadata row
@@ -237,6 +289,39 @@ public struct SessionDetailView: View {
                             .frame(height: 48)
                     }
                 }
+            }
+        } else if let session = store.session, session.processingState == .transcribing {
+            // Processing state - transcription in progress
+            VStack(spacing: VaporSpacing.md) {
+                ProgressView()
+                    .scaleEffect(1.2)
+                    .tint(VaporColor.sky)
+
+                Text("Processing transcription...")
+                    .font(.system(size: 14, weight: .light))
+                    .foregroundColor(VaporColor.textSecondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, VaporSpacing.xxl)
+
+            // Still show any segments that have been transcribed so far
+            if !store.segments.isEmpty {
+                LazyVStack(alignment: .leading, spacing: VaporSpacing.xl) {
+                    ForEach(store.segments) { segment in
+                        TranscriptSegment(
+                            speaker: speakerType(for: segment),
+                            timestamp: formatTimestamp(segment.startMs),
+                            text: segment.text,
+                            onSpeakerTap: {
+                                store.send(.speakerLabelTapped(
+                                    segmentId: segment.id,
+                                    machineSpeakerId: segment.machineSpeakerId
+                                ))
+                            }
+                        )
+                    }
+                }
+                .padding(.top, VaporSpacing.xl)
             }
         } else if store.segments.isEmpty && store.session != nil {
             // Empty state

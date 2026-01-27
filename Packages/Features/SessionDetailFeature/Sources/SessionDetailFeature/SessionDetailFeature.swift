@@ -65,6 +65,10 @@ public struct SessionDetailFeature {
     @Dependency(\.fileClient) var fileClient
     @Dependency(\.uuid) var uuid
 
+    private enum CancelID {
+        case transcriptionPolling
+    }
+
     @ObservableState
     public struct State: Equatable {
         public var sessionID: SessionID
@@ -88,6 +92,10 @@ public struct SessionDetailFeature {
         public var isDeleting: Bool = false
         public var alertInfo: AlertInfo?
 
+        // Title editing state
+        public var isEditingTitle: Bool = false
+        public var editedTitle: String = ""
+
         public init(
             sessionID: SessionID,
             session: SessionRecord? = nil,
@@ -102,7 +110,9 @@ public struct SessionDetailFeature {
             isShowingActionsMenu: Bool = false,
             isShowingDeleteConfirmation: Bool = false,
             isDeleting: Bool = false,
-            alertInfo: AlertInfo? = nil
+            alertInfo: AlertInfo? = nil,
+            isEditingTitle: Bool = false,
+            editedTitle: String = ""
         ) {
             self.sessionID = sessionID
             self.session = session
@@ -118,18 +128,30 @@ public struct SessionDetailFeature {
             self.isShowingDeleteConfirmation = isShowingDeleteConfirmation
             self.isDeleting = isDeleting
             self.alertInfo = alertInfo
+            self.isEditingTitle = isEditingTitle
+            self.editedTitle = editedTitle
         }
     }
 
     public enum Action: Equatable, Sendable {
         case onAppear
+        case onDisappear
         case loadSession
         case sessionLoaded(SessionRecord?, [DetailSegment], [DetailSpeakerTrack])
         case loadFailed(String)
+        case pollTranscriptionStatus
         case backTapped
         case audioPlayer(AudioPlayerFeature.Action)
         case speakerLabelTapped(segmentId: TranscriptSegmentID, machineSpeakerId: String?)
         case speakerPicker(PresentationAction<SpeakerPickerFeature.Action>)
+
+        // Title editing
+        case titleTapped
+        case titleChanged(String)
+        case saveTitle
+        case cancelTitleEdit
+        case titleSaved
+        case titleSaveFailed(String)
 
         // Actions menu
         case moreButtonTapped
@@ -160,6 +182,10 @@ public struct SessionDetailFeature {
                     return .none
                 }
                 return .send(.loadSession)
+
+            case .onDisappear:
+                // Cancel polling when view disappears
+                return .cancel(id: CancelID.transcriptionPolling)
 
             case .loadSession:
                 state.isLoading = true
@@ -222,7 +248,21 @@ public struct SessionDetailFeature {
                         duration: durationSeconds
                     )
                 }
+
+                // Start polling if session is being transcribed
+                if session?.processingState == .transcribing {
+                    return .run { send in
+                        // Poll every 2 seconds
+                        try? await Task.sleep(for: .seconds(2))
+                        await send(.pollTranscriptionStatus)
+                    }
+                    .cancellable(id: CancelID.transcriptionPolling, cancelInFlight: true)
+                }
                 return .none
+
+            case .pollTranscriptionStatus:
+                // Reload session to check transcription status (which will start another poll if still transcribing)
+                return .send(.loadSession)
 
             case let .loadFailed(errorMessage):
                 state.isLoading = false
@@ -232,6 +272,46 @@ public struct SessionDetailFeature {
             case .backTapped:
                 // Navigation intent - handled by parent
                 return .none
+
+            // MARK: - Title Editing
+
+            case .titleTapped:
+                guard !state.isEditingTitle else { return .none }
+                state.isEditingTitle = true
+                state.editedTitle = state.session?.title ?? ""
+                return .none
+
+            case let .titleChanged(newTitle):
+                state.editedTitle = newTitle
+                return .none
+
+            case .saveTitle:
+                guard state.isEditingTitle, var session = state.session else { return .none }
+                let trimmedTitle = state.editedTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                session.title = trimmedTitle.isEmpty ? nil : trimmedTitle
+                state.session = session
+                state.isEditingTitle = false
+
+                return .run { [databaseClient, session] send in
+                    try await databaseClient.updateSession(session)
+                    await send(.titleSaved)
+                } catch: { error, send in
+                    await send(.titleSaveFailed(error.localizedDescription))
+                }
+
+            case .cancelTitleEdit:
+                state.isEditingTitle = false
+                state.editedTitle = ""
+                return .none
+
+            case .titleSaved:
+                // Title saved successfully, nothing more to do
+                return .none
+
+            case let .titleSaveFailed(errorMessage):
+                // Revert the title in state on error
+                state.error = errorMessage
+                return .send(.loadSession)
 
             case .audioPlayer:
                 // Handled by child reducer

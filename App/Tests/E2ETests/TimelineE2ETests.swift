@@ -52,7 +52,7 @@ final class TimelineE2ETests: XCTestCase {
     }
 
     /// Test that completing a recording creates a session that appears in the timeline.
-    /// Flow: Timeline -> Tap Record -> Recording starts -> Stop recording -> Session appears in timeline
+    /// Flow: Timeline -> Tap Record -> Recording starts -> Stop recording -> Session Detail -> Back -> Session appears in timeline
     func testRecordCreatesTimelineSession() {
         // 1. Launch the app
         app.launch()
@@ -84,11 +84,20 @@ final class TimelineE2ETests: XCTestCase {
         // 7. Stop the recording
         stopRecordingButton.tap()
 
-        // 8. Wait for recording to finish and timeline to reappear
-        // The recording should dismiss and show timeline with the new session
-        XCTAssertTrue(timelineTab.waitForExistence(timeout: 10), "Should return to timeline after recording stops")
+        // 8. Wait for recording to finish and session detail view to appear
+        // After recording stops, the app navigates to session detail view
+        let sessionTitle = app.staticTexts["sessionTitle"]
+        XCTAssertTrue(sessionTitle.waitForExistence(timeout: 10), "Should navigate to session detail after recording stops")
 
-        // 9. Verify the session card appears in the timeline
+        // 9. Navigate back to timeline
+        let backButton = app.buttons["backButton"]
+        XCTAssertTrue(backButton.waitForExistence(timeout: 5), "Back button should exist on session detail")
+        backButton.tap()
+
+        // 10. Wait for timeline to appear
+        XCTAssertTrue(timelineTab.waitForExistence(timeout: 10), "Should return to timeline after tapping back")
+
+        // 11. Verify the session card appears in the timeline
         // Use a predicate query to find any session card
         let sessionCardsAfter = app.descendants(matching: .any).matching(sessionCardsPredicate)
         let sessionCardExists = sessionCardsAfter.firstMatch.waitForExistence(timeout: 10)
