@@ -42,6 +42,7 @@ public struct TranscriptSegment: View {
     private let timestamp: String
     private let text: String
     private let isActive: Bool
+    private let animateTextReveal: Bool
     private let onSpeakerTap: (() -> Void)?
 
     @State private var breatheScale: CGFloat = 0.98
@@ -52,18 +53,21 @@ public struct TranscriptSegment: View {
     ///   - timestamp: Timestamp string (e.g., "00:12")
     ///   - text: The transcript text content
     ///   - isActive: Whether this segment is the currently active/speaking segment (applies breathing animation)
+    ///   - animateTextReveal: Whether to animate the text reveal with staggered word blur effect (default false)
     ///   - onSpeakerTap: Optional callback when speaker label is tapped
     public init(
         speaker: SpeakerType,
         timestamp: String,
         text: String,
         isActive: Bool = false,
+        animateTextReveal: Bool = false,
         onSpeakerTap: (() -> Void)? = nil
     ) {
         self.speaker = speaker
         self.timestamp = timestamp
         self.text = text
         self.isActive = isActive
+        self.animateTextReveal = animateTextReveal
         self.onSpeakerTap = onSpeakerTap
     }
 
@@ -79,11 +83,20 @@ public struct TranscriptSegment: View {
                     .foregroundColor(VaporColor.overcast)
             }
 
-            // Transcript text
-            Text(text)
-                .font(.system(size: 16, weight: .light))
-                .lineSpacing(6)
-                .foregroundColor(VaporColor.textPrimary)
+            // Transcript text - animated or static based on flag
+            if animateTextReveal {
+                StaggeredTextRevealView(
+                    text: text,
+                    font: .system(size: 16, weight: .light),
+                    foregroundColor: VaporColor.textPrimary,
+                    lineSpacing: 6
+                )
+            } else {
+                Text(text)
+                    .font(.system(size: 16, weight: .light))
+                    .lineSpacing(6)
+                    .foregroundColor(VaporColor.textPrimary)
+            }
         }
         .scaleEffect(isActive ? breatheScale : 1.0)
         .accessibilityIdentifier("transcriptSegment")
@@ -157,17 +170,20 @@ public struct TranscriptSegmentPreview: View {
     private let timestamp: String
     private let text: String
     private let isActive: Bool
+    private let animateTextReveal: Bool
 
     public init(
         speaker: SpeakerType,
         timestamp: String,
         text: String,
-        isActive: Bool = false
+        isActive: Bool = false,
+        animateTextReveal: Bool = false
     ) {
         self.speaker = speaker
         self.timestamp = timestamp
         self.text = text
         self.isActive = isActive
+        self.animateTextReveal = animateTextReveal
     }
 
     public var body: some View {
@@ -175,7 +191,8 @@ public struct TranscriptSegmentPreview: View {
             speaker: speaker,
             timestamp: timestamp,
             text: text,
-            isActive: isActive
+            isActive: isActive,
+            animateTextReveal: animateTextReveal
         )
     }
 }
