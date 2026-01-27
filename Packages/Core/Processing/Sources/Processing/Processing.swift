@@ -998,7 +998,7 @@ extension RecoveryRoutineClient: DependencyKey {
         return Self(
             run: {
                 // Start trace for recovery operation
-                let traceId = await loggingClient.startTrace()
+                _ = await loggingClient.startTrace()
 
                 await loggingClient.info(
                     "Starting recovery routine",

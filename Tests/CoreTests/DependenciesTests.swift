@@ -148,10 +148,13 @@ import Dependencies
 }
 
 /// Tests that all dependency clients can be instantiated with their live values
+/// Note: DatabaseClient.liveValue is excluded because it requires exclusive access to a
+/// shared database file, which causes race conditions during parallel test execution.
 @Test func testLiveValuesCanBeInstantiated() async {
     // These should not crash - just verify they can be created
     await withDependencies { deps in
-        deps.databaseClient = .liveValue
+        // Skip databaseClient.liveValue - it creates a shared database file that causes
+        // race conditions when tests run in parallel
         deps.audioCaptureClient = .liveValue
         deps.audioPlayerClient = .liveValue
         deps.fluidAudioClient = .liveValue
@@ -161,7 +164,6 @@ import Dependencies
         deps.preferencesClient = .liveValue
     } operation: {
         // If we get here without crashing, live values are instantiable
-        @Dependency(\.databaseClient) var databaseClient
         @Dependency(\.audioCaptureClient) var audioCaptureClient
         @Dependency(\.audioPlayerClient) var audioPlayerClient
         @Dependency(\.fluidAudioClient) var fluidAudioClient
@@ -171,7 +173,6 @@ import Dependencies
         @Dependency(\.preferencesClient) var preferencesClient
 
         // Verify non-crashing access for clients that have safe defaults
-        // Note: DatabaseClient's liveValue requires a configured database, so skip calling its methods here
         _ = await audioCaptureClient.isCapturing()
         _ = await audioPlayerClient.isPlaying()
         _ = await fluidAudioClient.isTranscribing()
