@@ -45,7 +45,7 @@ public struct RecordButton: View {
     private let size: Size
     private let action: () -> Void
 
-    @State private var breatheScale: CGFloat = 1.0
+    @State private var breatheScale: CGFloat = 0.98
 
     public init(
         isRecording: Bool,
@@ -116,11 +116,13 @@ public struct RecordButton: View {
     }
 
     private func startBreathingAnimation() {
+        // Reset to animation start value first
+        breatheScale = 0.98
         withAnimation(
             VaporAnimation.breatheCurve.animation(duration: VaporAnimation.breatheDuration)
                 .repeatForever(autoreverses: true)
         ) {
-            breatheScale = 1.04
+            breatheScale = 1.02
         }
     }
 }
