@@ -404,10 +404,12 @@ public struct DatabaseClient: Sendable {
     public var fetchSpeakerTracks: @Sendable (_ sessionId: SessionID) async throws -> [SpeakerTrackRecord] = { _ in [] }
     public var createSpeakerTrack: @Sendable (_ record: SpeakerTrackRecord) async throws -> Void
     public var updateSpeakerTrack: @Sendable (_ record: SpeakerTrackRecord) async throws -> Void
+    public var deleteSpeakerTracksForSession: @Sendable (_ sessionId: SessionID) async throws -> Void
 
     public var fetchTranscriptSegments: @Sendable (_ sessionId: SessionID) async throws -> [TranscriptSegmentRecord] = { _ in [] }
     public var createTranscriptSegment: @Sendable (_ record: TranscriptSegmentRecord) async throws -> Void
     public var updateTranscriptSegment: @Sendable (_ record: TranscriptSegmentRecord) async throws -> Void
+    public var deleteTranscriptSegmentsForSession: @Sendable (_ sessionId: SessionID) async throws -> Void
 
     public var fetchSpeakerSegments: @Sendable (_ sessionId: SessionID) async throws -> [SpeakerSegmentRecord] = { _ in [] }
     public var createSpeakerSegment: @Sendable (_ record: SpeakerSegmentRecord) async throws -> Void
@@ -424,6 +426,8 @@ public struct DatabaseClient: Sendable {
     public var fetchStaleRecordings: @Sendable () async throws -> [SessionRecord] = { [] }
     // Recovery: mark stale recordings as partial with endedAt set
     public var reconcileStaleRecordings: @Sendable (_ sessionIds: [SessionID], _ now: Date) async throws -> Int = { _, _ in 0 }
+    // Recovery: mark sessions stuck in transcribing state as processed
+    public var recoverStuckTranscriptions: @Sendable (_ olderThan: Date) async throws -> Int = { _ in 0 }
 }
 
 extension DatabaseClient: DependencyKey {
@@ -497,6 +501,13 @@ extension DatabaseClient: DependencyKey {
                     try record.update(db)
                 }
             },
+            deleteSpeakerTracksForSession: { sessionId in
+                try await dbQueue.write { db in
+                    _ = try SpeakerTrackRecord
+                        .filter(Column("sessionId") == sessionId.rawValue)
+                        .deleteAll(db)
+                }
+            },
             fetchTranscriptSegments: { sessionId in
                 try await dbQueue.read { db in
                     try TranscriptSegmentRecord
@@ -513,6 +524,13 @@ extension DatabaseClient: DependencyKey {
             updateTranscriptSegment: { record in
                 try await dbQueue.write { db in
                     try record.update(db)
+                }
+            },
+            deleteTranscriptSegmentsForSession: { sessionId in
+                try await dbQueue.write { db in
+                    _ = try TranscriptSegmentRecord
+                        .filter(Column("sessionId") == sessionId.rawValue)
+                        .deleteAll(db)
                 }
             },
             fetchSpeakerSegments: { sessionId in
@@ -640,6 +658,29 @@ extension DatabaseClient: DependencyKey {
                         count += db.changesCount
                     }
                     return count
+                }
+            },
+            recoverStuckTranscriptions: { olderThan in
+                try await dbQueue.write { db in
+                    // Find sessions stuck in 'transcribing' state that started before the cutoff
+                    // These are sessions where transcription was interrupted
+                    let updateSQL = """
+                        UPDATE sessions
+                        SET processingState = ?,
+                            updatedAt = ?
+                        WHERE processingState = ?
+                        AND startedAt < ?
+                        """
+                    try db.execute(
+                        sql: updateSQL,
+                        arguments: [
+                            ProcessingState.processed.rawValue,
+                            Date(),
+                            ProcessingState.transcribing.rawValue,
+                            olderThan
+                        ]
+                    )
+                    return db.changesCount
                 }
             }
         )

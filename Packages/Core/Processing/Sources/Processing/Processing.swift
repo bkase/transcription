@@ -63,6 +63,8 @@ public struct FluidAudioClient: Sendable {
     public var stopTranscription: @Sendable () async -> Void
     /// Check if currently transcribing
     public var isTranscribing: @Sendable () async -> Bool = { false }
+    /// Transcribe an entire audio file (offline processing). Returns all segments.
+    public var transcribeFile: @Sendable (_ audioFileURL: URL) async throws -> [TranscriptSegment] = { _ in [] }
 }
 
 extension FluidAudioClient: DependencyKey {
@@ -283,16 +285,25 @@ public actor RecordingProcessor {
         Task { [weak self, fluidAudioClient] in
             guard let self = self else { return }
             do {
+                NSLog("[RecordingProcessor] Starting transcription...")
                 let segmentStream = try await fluidAudioClient.startTranscription(mlStream)
+                NSLog("[RecordingProcessor] Transcription started, emitting event")
                 await self.emitTranscriptionStarted()
+                var segmentCount = 0
                 for await segment in segmentStream {
-                    guard await self.getIsRecording() else { break }
+                    guard await self.getIsRecording() else {
+                        NSLog("[RecordingProcessor] Recording stopped, breaking segment loop")
+                        break
+                    }
+                    segmentCount += 1
+                    NSLog("[RecordingProcessor] Received segment \(segmentCount): '\(segment.text)'")
                     await self.handleSegment(segment, sessionId: sessionId)
                 }
+                NSLog("[RecordingProcessor] Segment stream ended after \(segmentCount) segments")
             } catch {
                 // Emit event so UI can inform user - audio recording continues
                 let errorMessage = "Live transcription unavailable: \(error.localizedDescription)"
-                print(errorMessage)
+                NSLog("[RecordingProcessor] Transcription error: \(errorMessage)")
                 await self.emitTranscriptionUnavailable(errorMessage)
             }
         }
@@ -631,15 +642,22 @@ public actor RecordingProcessor {
         }
 
         do {
+            NSLog("[Finalize] Updating session state to: %@", session.processingState.rawValue)
             try await databaseClient.updateSession(session)
+            NSLog("[Finalize] Session updated, emitting didFinish event")
             // Emit didFinish so UI can navigate to detail view
             eventContinuation?.yield(.didFinish(sessionId))
 
             // Start offline transcription if needed
             if canRunOfflineTranscription, let audioURL = audioFileURL {
+                NSLog("[Finalize] Starting offline transcription...")
                 await runOfflineTranscription(sessionId: sessionId, audioFileURL: audioURL)
+                NSLog("[Finalize] Offline transcription completed")
+            } else {
+                NSLog("[Finalize] Skipping offline transcription (canRun=%d, hasAudio=%d)", canRunOfflineTranscription ? 1 : 0, audioFileURL != nil ? 1 : 0)
             }
         } catch {
+            NSLog("[Finalize] ERROR: %@", String(describing: error))
             eventContinuation?.yield(.didFail("Failed to finalize session: \(error)"))
         }
     }
@@ -647,36 +665,122 @@ public actor RecordingProcessor {
     /// Run offline transcription on the saved audio file
     /// This provides a higher quality full-pass transcription after recording stops
     private func runOfflineTranscription(sessionId: SessionID, audioFileURL: URL) async {
-        // TODO: Implement actual audio file reading and transcription
-        // For now, this is a placeholder that simulates the transcription process
-        //
-        // The full implementation would:
-        // 1. Read the audio file using AVAudioFile or ExtAudioFile
-        // 2. Convert to AudioFrames
-        // 3. Feed through FluidAudioClient for transcription and diarization
-        // 4. Update/replace transcript segments in the database
-        // 5. Update session state to .processed
+        NSLog("[OfflineTranscription] Starting for session \(sessionId.rawValue)")
+        NSLog("[OfflineTranscription] Audio file URL: \(audioFileURL.path)")
 
-        // Placeholder: Just mark as processed after a short delay
-        // In production, this would run the actual transcription
+        // Check if audio file exists
+        let fileExists = FileManager.default.fileExists(atPath: audioFileURL.path)
+        NSLog("[OfflineTranscription] Audio file exists: \(fileExists)")
+
+        guard fileExists else {
+            NSLog("[OfflineTranscription] ERROR: Audio file does not exist, keeping live transcription")
+            // Just mark as processed, keep live transcription
+            do {
+                if var session = try await databaseClient.fetchSession(sessionId) {
+                    session.processingState = .processed
+                    session.updatedAt = date.now
+                    try await databaseClient.updateSession(session)
+                }
+            } catch {
+                NSLog("[OfflineTranscription] ERROR updating session: \(error)")
+            }
+            return
+        }
+
         do {
-            // Simulate transcription time (would be replaced with actual processing)
-            try await Task.sleep(for: .milliseconds(500))
+            // Run offline transcription on the saved audio file
+            // Do this BEFORE deleting live segments so we don't lose them on failure
+            NSLog("[OfflineTranscription] Calling transcribeFile...")
+            let segments = try await fluidAudioClient.transcribeFile(audioFileURL)
+            NSLog("[OfflineTranscription] Got \(segments.count) segments from file")
 
-            // Update session to processed state
-            guard var session = try? await databaseClient.fetchSession(sessionId) else {
-                print("Failed to fetch session for offline transcription completion")
+            // If offline transcription returned no segments, keep the live transcription
+            guard !segments.isEmpty else {
+                NSLog("[OfflineTranscription] No segments from offline transcription, keeping live transcription")
+                if var session = try await databaseClient.fetchSession(sessionId) {
+                    session.processingState = .processed
+                    session.updatedAt = date.now
+                    try await databaseClient.updateSession(session)
+                }
                 return
             }
 
-            session.processingState = .processed
-            session.updatedAt = date.now
+            // Only delete existing segments AFTER we successfully got offline segments
+            try await databaseClient.deleteTranscriptSegmentsForSession(sessionId)
+            NSLog("[OfflineTranscription] Deleted existing transcript segments")
 
-            try await databaseClient.updateSession(session)
+            // Track speakers for this session
+            var offlineSeenSpeakers: Set<String> = []
+
+            // Delete existing speaker tracks and recreate them based on offline results
+            try await databaseClient.deleteSpeakerTracksForSession(sessionId)
+
+            let now = date.now
+
+            // Insert new segments from offline transcription
+            for segment in segments {
+                // Create speaker track if this is a new speaker
+                if let speakerId = segment.speakerId, !offlineSeenSpeakers.contains(speakerId) {
+                    offlineSeenSpeakers.insert(speakerId)
+                    let displayOrder = offlineSeenSpeakers.count
+                    let trackId = uuid().uuidString
+
+                    let speakerTrack = SpeakerTrackRecord(
+                        id: trackId,
+                        sessionId: sessionId.rawValue,
+                        machineSpeakerId: speakerId,
+                        displayOrder: displayOrder
+                    )
+                    try await databaseClient.createSpeakerTrack(speakerTrack)
+                }
+
+                // Create transcript segment
+                let segmentRecord = TranscriptSegmentRecord(
+                    id: segment.id.rawValue,
+                    sessionId: sessionId.rawValue,
+                    startMs: Int(segment.startMs),
+                    endMs: Int(segment.endMs),
+                    machineSpeakerId: segment.speakerId,
+                    text: segment.text,
+                    isFinal: segment.isFinal,
+                    createdAt: now,
+                    updatedAt: now
+                )
+                try await databaseClient.createTranscriptSegment(segmentRecord)
+            }
+            NSLog("[OfflineTranscription] Inserted \(segments.count) new segments")
+
+            // Update session to processed state
+            if var session = try await databaseClient.fetchSession(sessionId) {
+                // Recompute preview text from offline segments
+                let previewText = segments
+                    .filter { $0.isFinal }
+                    .prefix(3)
+                    .map { $0.text }
+                    .joined(separator: " ")
+
+                session.previewText = previewText.isEmpty ? nil : String(previewText.prefix(200))
+                session.speakerCount = offlineSeenSpeakers.count
+                session.processingState = .processed
+                session.updatedAt = date.now
+                try await databaseClient.updateSession(session)
+                NSLog("[OfflineTranscription] Session marked as processed")
+            }
         } catch {
-            // Log error but don't fail - the session will remain in transcribing state
-            // User can still see any live segments that were captured
-            print("Offline transcription failed: \(error)")
+            NSLog("[OfflineTranscription] ERROR: \(String(describing: error))")
+            NSLog("[OfflineTranscription] ERROR localizedDescription: \(error.localizedDescription)")
+            // Mark session as processed anyway so it doesn't stay stuck
+            // The live transcription results should still be there (we only delete after success)
+            do {
+                if var session = try await databaseClient.fetchSession(sessionId) {
+                    session.processingState = .processed
+                    session.updatedAt = date.now
+                    try await databaseClient.updateSession(session)
+                    NSLog("[OfflineTranscription] Session marked as processed after error")
+                }
+            } catch {
+                // Silent failure - recovery routine will clean up
+            }
         }
     }
 
@@ -749,10 +853,23 @@ extension RecoveryRoutineClient: DependencyKey {
                 if staleRecordings.isEmpty {
                     await loggingClient.info(
                         "No stale recordings found",
-                        event: "recovery_complete"
+                        event: "recovery_stale_none"
                     )
+
+                    // Still check for stuck transcriptions
+                    let cutoffDate = date.now.addingTimeInterval(-60)
+                    let transcriptionRecovered = try await databaseClient.recoverStuckTranscriptions(cutoffDate)
+
+                    if transcriptionRecovered > 0 {
+                        await loggingClient.warning(
+                            "Recovered \(transcriptionRecovered) stuck transcription(s)",
+                            event: "recovery_transcription_complete",
+                            metadata: ["recovered": "\(transcriptionRecovered)"]
+                        )
+                    }
+
                     await loggingClient.endTrace()
-                    return .empty
+                    return RecoveryResult(staleSessionIds: [], reconciledCount: transcriptionRecovered)
                 }
 
                 let staleIds = staleRecordings.map { SessionID($0.id) }
@@ -770,13 +887,26 @@ extension RecoveryRoutineClient: DependencyKey {
 
                 await loggingClient.info(
                     "Reconciled \(reconciledCount) stale recording(s) to partial state",
-                    event: "recovery_complete",
+                    event: "recovery_stale_complete",
                     metadata: ["reconciled": "\(reconciledCount)"]
                 )
 
+                // Also recover sessions stuck in transcribing state
+                // Consider anything older than 5 minutes as stuck
+                let cutoffDate = date.now.addingTimeInterval(-60)
+                let transcriptionRecovered = try await databaseClient.recoverStuckTranscriptions(cutoffDate)
+
+                if transcriptionRecovered > 0 {
+                    await loggingClient.warning(
+                        "Recovered \(transcriptionRecovered) stuck transcription(s)",
+                        event: "recovery_transcription_complete",
+                        metadata: ["recovered": "\(transcriptionRecovered)"]
+                    )
+                }
+
                 await loggingClient.endTrace()
 
-                return RecoveryResult(staleSessionIds: staleIds, reconciledCount: reconciledCount)
+                return RecoveryResult(staleSessionIds: staleIds, reconciledCount: reconciledCount + transcriptionRecovered)
             }
         )
     }

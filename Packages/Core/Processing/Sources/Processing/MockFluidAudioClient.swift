@@ -241,6 +241,10 @@ public struct MockFluidAudioClient {
             },
             isTranscribing: {
                 await actor.getIsTranscribing()
+            },
+            transcribeFile: { _ in
+                // Mock returns empty array for offline transcription
+                []
             }
         )
     }

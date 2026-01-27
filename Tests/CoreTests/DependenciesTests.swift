@@ -31,9 +31,11 @@ import Dependencies
             fetchSpeakerTracks: { _ in [] },
             createSpeakerTrack: { _ in },
             updateSpeakerTrack: { _ in },
+            deleteSpeakerTracksForSession: { _ in },
             fetchTranscriptSegments: { _ in [] },
             createTranscriptSegment: { _ in },
             updateTranscriptSegment: { _ in },
+            deleteTranscriptSegmentsForSession: { _ in },
             fetchSpeakerSegments: { _ in [] },
             createSpeakerSegment: { _ in },
             searchSessions: { _ in [] },
@@ -41,7 +43,8 @@ import Dependencies
             fetchSessionsGroupedByDate: { _ in [] },
             fetchPersonConversationCounts: { [:] },
             fetchStaleRecordings: { [] },
-            reconcileStaleRecordings: { _, _ in 0 }
+            reconcileStaleRecordings: { _, _ in 0 },
+            recoverStuckTranscriptions: { _ in 0 }
         )
         deps.audioCaptureClient = AudioCaptureClient(
             startCapture: { AsyncStream { _ in } },
@@ -62,7 +65,8 @@ import Dependencies
             modelStatus: { .ready },
             startTranscription: { _ in AsyncStream { _ in } },
             stopTranscription: { },
-            isTranscribing: { false }
+            isTranscribing: { false },
+            transcribeFile: { _ in [] }
         )
         deps.recordingProcessorClient = RecordingProcessorClient(
             startRecording: { _ in AsyncStream { _ in } },
