@@ -11,6 +11,7 @@ public struct SessionCard: View {
     private let speakerCount: Int?
     private let duration: String?
     private let showMetadata: Bool
+    private let statusPillType: StatusPillType?
 
     /// Create a session card.
     /// - Parameters:
@@ -20,13 +21,15 @@ public struct SessionCard: View {
     ///   - speakerCount: Number of speakers for metadata badge (nil to hide)
     ///   - duration: Duration string for metadata badge (nil to hide)
     ///   - showMetadata: Whether to show metadata badges (hover state)
+    ///   - statusPillType: Optional status pill to display processing state
     public init(
         title: String,
         time: String,
         previewText: String,
         speakerCount: Int? = nil,
         duration: String? = nil,
-        showMetadata: Bool = false
+        showMetadata: Bool = false,
+        statusPillType: StatusPillType? = nil
     ) {
         self.title = title
         self.time = time
@@ -34,11 +37,12 @@ public struct SessionCard: View {
         self.speakerCount = speakerCount
         self.duration = duration
         self.showMetadata = showMetadata
+        self.statusPillType = statusPillType
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: showMetadata ? 12 : 8) {
-            // Header: title + time
+            // Header: title + time + optional status
             HStack {
                 Text(title)
                     .font(.system(size: 18, weight: .light))
@@ -46,6 +50,11 @@ public struct SessionCard: View {
                     .foregroundColor(VaporColor.textPrimary)
 
                 Spacer()
+
+                // Status pill (when processing state is notable)
+                if let pillType = statusPillType {
+                    StatusPill(type: pillType)
+                }
 
                 Text(time)
                     .font(.system(size: 10))
@@ -109,6 +118,7 @@ public struct SessionCardPreview: View {
     private let speakerCount: Int?
     private let duration: String?
     private let showMetadata: Bool
+    private let statusPillType: StatusPillType?
 
     public init(
         title: String,
@@ -116,7 +126,8 @@ public struct SessionCardPreview: View {
         previewText: String,
         speakerCount: Int? = nil,
         duration: String? = nil,
-        showMetadata: Bool = false
+        showMetadata: Bool = false,
+        statusPillType: StatusPillType? = nil
     ) {
         self.title = title
         self.time = time
@@ -124,6 +135,7 @@ public struct SessionCardPreview: View {
         self.speakerCount = speakerCount
         self.duration = duration
         self.showMetadata = showMetadata
+        self.statusPillType = statusPillType
     }
 
     public var body: some View {
@@ -133,7 +145,8 @@ public struct SessionCardPreview: View {
             previewText: previewText,
             speakerCount: speakerCount,
             duration: duration,
-            showMetadata: showMetadata
+            showMetadata: showMetadata,
+            statusPillType: statusPillType
         )
     }
 }

@@ -24,6 +24,13 @@ public struct TimelineView: View {
                 // Header with avatar
                 headerSection
 
+                // Status banner (when sessions exist but model prep failed)
+                if let bannerType = statusBannerType {
+                    StatusBanner(type: bannerType) {
+                        store.send(.prepareModels)
+                    }
+                }
+
                 // Search row
                 searchSection
 
@@ -71,6 +78,22 @@ public struct TimelineView: View {
             return .default(Text(button.title)) {
                 store.send(.alertActionTapped(button.action))
             }
+        }
+    }
+
+    // MARK: - Status Banner
+
+    /// Show status banner when sessions exist but model preparation failed.
+    /// This covers the case where the user has past sessions but can't start new recordings.
+    private var statusBannerType: StatusBannerType? {
+        // Only show banner when there are sessions (not in empty state)
+        guard !store.sessionGroups.isEmpty else { return nil }
+
+        switch store.modelPreparationState {
+        case .failed:
+            return .downloadError
+        case .idle, .downloading, .ready:
+            return nil
         }
     }
 
@@ -208,7 +231,8 @@ public struct TimelineView: View {
             time: viewModel.time,
             previewText: viewModel.previewText,
             speakerCount: viewModel.speakerCount,
-            duration: viewModel.duration
+            duration: viewModel.duration,
+            statusPillType: viewModel.statusPillType
         )
     }
 
@@ -366,6 +390,7 @@ public struct TimelineViewPreview: View {
         public let speakerCount: Int?
         public let duration: String?
         public let showMetadata: Bool
+        public let statusPillType: StatusPillType?
 
         public init(
             id: String = UUID().uuidString,
@@ -374,7 +399,8 @@ public struct TimelineViewPreview: View {
             previewText: String,
             speakerCount: Int? = nil,
             duration: String? = nil,
-            showMetadata: Bool = false
+            showMetadata: Bool = false,
+            statusPillType: StatusPillType? = nil
         ) {
             self.id = id
             self.title = title
@@ -383,6 +409,7 @@ public struct TimelineViewPreview: View {
             self.speakerCount = speakerCount
             self.duration = duration
             self.showMetadata = showMetadata
+            self.statusPillType = statusPillType
         }
     }
 
@@ -412,6 +439,10 @@ public struct TimelineViewPreview: View {
         case empty
         /// Search results mode
         case searchResults(results: [SessionData])
+        /// Sessions with download error banner
+        case sessionsWithDownloadError(sections: [SectionData])
+        /// Sessions with connection error banner
+        case sessionsWithConnectionError(sections: [SectionData])
     }
 
     private let sections: [SectionData]
@@ -434,6 +465,8 @@ public struct TimelineViewPreview: View {
             self.sections = []
         case .searchResults:
             self.sections = []
+        case .sessionsWithDownloadError(let sections), .sessionsWithConnectionError(let sections):
+            self.sections = sections
         }
     }
 
@@ -449,6 +482,11 @@ public struct TimelineViewPreview: View {
                 .padding(.top, 56)
                 .padding(.horizontal, VaporSpacing.lg)
                 .padding(.bottom, VaporSpacing.md)
+
+                // Status banner (for sessions with error states)
+                if let bannerType = statusBannerType {
+                    StatusBanner(type: bannerType, onRetry: nil)
+                }
 
                 // Search
                 SearchFieldPreview(text: searchText)
@@ -467,6 +505,17 @@ public struct TimelineViewPreview: View {
             fabSection
         }
         .background(VaporColor.mist)
+    }
+
+    private var statusBannerType: StatusBannerType? {
+        switch displayMode {
+        case .sessionsWithDownloadError:
+            return .downloadError
+        case .sessionsWithConnectionError:
+            return .connectionError
+        default:
+            return nil
+        }
     }
 
     private var fabSection: some View {
@@ -488,6 +537,8 @@ public struct TimelineViewPreview: View {
         case .emptyReady, .grouped, .searchResults:
             return true
         case .emptyDownloading, .emptyError, .empty:
+            return false
+        case .sessionsWithDownloadError, .sessionsWithConnectionError:
             return false
         }
     }
@@ -516,6 +567,8 @@ public struct TimelineViewPreview: View {
             TimelineEmptyStateView(variant: .error)
         case .searchResults(let results):
             searchResultsContent(results: results)
+        case .sessionsWithDownloadError, .sessionsWithConnectionError:
+            groupedContent
         }
     }
 
@@ -533,7 +586,8 @@ public struct TimelineViewPreview: View {
                                 previewText: session.previewText,
                                 speakerCount: session.speakerCount,
                                 duration: session.duration,
-                                showMetadata: session.showMetadata
+                                showMetadata: session.showMetadata,
+                                statusPillType: session.statusPillType
                             )
                         }
                     }
@@ -557,7 +611,8 @@ public struct TimelineViewPreview: View {
                             previewText: session.previewText,
                             speakerCount: session.speakerCount,
                             duration: session.duration,
-                            showMetadata: session.showMetadata
+                            showMetadata: session.showMetadata,
+                            statusPillType: session.statusPillType
                         )
                     }
                 }

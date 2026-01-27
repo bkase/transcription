@@ -809,3 +809,17 @@
 - OfflineTranscriptionBehavior enum (.success, .empty, .failure(String)) in mock actor controls transcribeFile behavior
 - Tests with `.incrementing` UUID need to pre-create expected audio file for offline transcription path to trigger
 - RecordingProcessorClient gains retryOfflineTranscription closure - update ALL explicit mock initializations
+
+## DesignSystem status components
+- StatusBanner: full-width error banner - use red theme colors (#FEF2F2 bg, #991B1B/#B91C1C text)
+- StatusPill: compact indicators - use semantic colors per type (amber for partial, red for failed, green for ready)
+- ErrorStateView: centered error with CTA - 48px icon at 0.6 opacity, 260px text width, sky button style
+- ProcessingStatusIndicator: dot + label with tracking for header status display
+- All status components need accessibility identifiers for XCUITest automation
+
+## Timeline with sessions + model status banner
+- When sessions exist but model prep failed, show StatusBanner between header and search (not empty state)
+- TimelineViewPreview DisplayMode needs `sessionsWithDownloadError(sections:)` and `sessionsWithConnectionError(sections:)` cases
+- Per-session status: SessionCardViewModel.statusPillType maps ProcessingState to StatusPillType (.transcribing/.partial/.failed/nil)
+- SessionCard displays StatusPill between title and time when statusPillType is non-nil
+- PreviewVariant structs (like SessionData) need parallel statusPillType parameter for snapshot testing

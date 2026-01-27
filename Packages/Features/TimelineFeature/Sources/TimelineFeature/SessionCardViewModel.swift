@@ -1,3 +1,4 @@
+import DesignSystem
 import Foundation
 import Persistence
 
@@ -12,6 +13,8 @@ public struct SessionCardViewModel: Equatable, Sendable {
     public let speakerCount: Int?
     public let duration: String?
     public let isTranscribed: Bool
+    /// Optional status pill type for displaying session processing state
+    public let statusPillType: StatusPillType?
 
     public init(
         title: String,
@@ -19,7 +22,8 @@ public struct SessionCardViewModel: Equatable, Sendable {
         previewText: String,
         speakerCount: Int?,
         duration: String?,
-        isTranscribed: Bool
+        isTranscribed: Bool,
+        statusPillType: StatusPillType? = nil
     ) {
         self.title = title
         self.time = time
@@ -27,6 +31,7 @@ public struct SessionCardViewModel: Equatable, Sendable {
         self.speakerCount = speakerCount
         self.duration = duration
         self.isTranscribed = isTranscribed
+        self.statusPillType = statusPillType
     }
 }
 
@@ -48,8 +53,24 @@ extension SessionCardViewModel {
             previewText: session.previewText ?? "",
             speakerCount: session.speakerCount > 0 ? session.speakerCount : nil,
             duration: session.durationMs.map { formatDuration($0) },
-            isTranscribed: session.processingState == .processed
+            isTranscribed: session.processingState == .processed,
+            statusPillType: statusPillType(for: session.processingState)
         )
+    }
+
+    /// Map processing state to status pill type.
+    /// Returns nil for states that don't need a status indicator.
+    private static func statusPillType(for state: ProcessingState) -> StatusPillType? {
+        switch state {
+        case .transcribing:
+            return .transcribing
+        case .partial:
+            return .partial
+        case .failed:
+            return .failed
+        case .processed, .recording:
+            return nil
+        }
     }
 
     /// Default time formatter using "h:mm a" format (e.g., "9:41 AM").

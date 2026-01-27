@@ -73,7 +73,8 @@ import Foundation
 
     // Check for migration names
     #expect(schemaContent.contains("v1_initial_schema"), "SCHEMA.md should document v1 migration")
-    #expect(schemaContent.contains("v2_fts5_search"), "SCHEMA.md should document v2 migration")
+    #expect(schemaContent.contains("v2_processing_error"), "SCHEMA.md should document v2 migration")
+    #expect(schemaContent.contains("v3_fts5_search"), "SCHEMA.md should document v3 migration")
 
     // Check for FTS table
     #expect(schemaContent.contains("transcript_fts"), "SCHEMA.md should document FTS table")

@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import Persistence
+import DesignSystem
 @testable import TimelineFeature
 
 struct TimelineCardViewModelTests {
@@ -218,5 +219,87 @@ struct TimelineCardViewModelTests {
         let viewModel = SessionCardViewModel.from(session: session)
 
         #expect(viewModel.isTranscribed == false)
+    }
+
+    // MARK: - Status Pill Type Mapping
+
+    @Test
+    func testStatusPillTypeNilWhenProcessed() {
+        let mockDate = Date(timeIntervalSince1970: 1000000)
+        let session = SessionRecord(
+            id: "session-1",
+            startedAt: mockDate,
+            processingState: .processed,
+            speakerCount: 1,
+            updatedAt: mockDate
+        )
+
+        let viewModel = SessionCardViewModel.from(session: session)
+
+        #expect(viewModel.statusPillType == nil)
+    }
+
+    @Test
+    func testStatusPillTypeNilWhenRecording() {
+        let mockDate = Date(timeIntervalSince1970: 1000000)
+        let session = SessionRecord(
+            id: "session-1",
+            startedAt: mockDate,
+            processingState: .recording,
+            speakerCount: 0,
+            updatedAt: mockDate
+        )
+
+        let viewModel = SessionCardViewModel.from(session: session)
+
+        #expect(viewModel.statusPillType == nil)
+    }
+
+    @Test
+    func testStatusPillTypeTranscribingWhenTranscribing() {
+        let mockDate = Date(timeIntervalSince1970: 1000000)
+        let session = SessionRecord(
+            id: "session-1",
+            startedAt: mockDate,
+            processingState: .transcribing,
+            speakerCount: 1,
+            updatedAt: mockDate
+        )
+
+        let viewModel = SessionCardViewModel.from(session: session)
+
+        #expect(viewModel.statusPillType == .transcribing)
+    }
+
+    @Test
+    func testStatusPillTypePartialWhenPartial() {
+        let mockDate = Date(timeIntervalSince1970: 1000000)
+        let session = SessionRecord(
+            id: "session-1",
+            startedAt: mockDate,
+            processingState: .partial,
+            speakerCount: 1,
+            updatedAt: mockDate
+        )
+
+        let viewModel = SessionCardViewModel.from(session: session)
+
+        #expect(viewModel.statusPillType == .partial)
+    }
+
+    @Test
+    func testStatusPillTypeFailedWhenFailed() {
+        let mockDate = Date(timeIntervalSince1970: 1000000)
+        let session = SessionRecord(
+            id: "session-1",
+            startedAt: mockDate,
+            processingState: .failed,
+            speakerCount: 0,
+            updatedAt: mockDate
+        )
+
+        let viewModel = SessionCardViewModel.from(session: session)
+
+        #expect(viewModel.statusPillType == .failed)
     }
 }
