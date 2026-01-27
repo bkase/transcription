@@ -169,8 +169,9 @@ public struct TimelineView: View {
                 DateHeader("RESULTS")
 
                 VStack(spacing: VaporSpacing.sm) {
-                    ForEach(store.searchResults, id: \.id) { session in
+                    ForEach(Array(store.searchResults.enumerated()), id: \.element.id) { index, session in
                         sessionCard(for: session)
+                            .vaporAppear(index: index)
                             .onTapGesture {
                                 store.send(.sessionTapped(SessionID(rawValue: session.id)))
                             }
@@ -197,8 +198,9 @@ public struct TimelineView: View {
 
             // Session cards
             VStack(spacing: VaporSpacing.sm) {
-                ForEach(group.sessions, id: \.id) { session in
+                ForEach(Array(group.sessions.enumerated()), id: \.element.id) { index, session in
                     sessionCard(for: session)
+                        .vaporAppear(index: index)
                         .onTapGesture {
                             store.send(.sessionTapped(SessionID(rawValue: session.id)))
                         }

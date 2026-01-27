@@ -40,6 +40,7 @@ public struct SessionDetailView: View {
                         // End indicator
                         if store.session != nil && !store.segments.isEmpty {
                             TranscriptEndIndicator()
+                                .vaporAppear(delay: Double(store.segments.count) * 0.05)
                                 .padding(.horizontal, VaporSpacing.lg)
                         }
 
@@ -369,7 +370,7 @@ public struct SessionDetailView: View {
     @ViewBuilder
     private var transcriptSegmentsList: some View {
         LazyVStack(alignment: .leading, spacing: VaporSpacing.xl) {
-            ForEach(store.segments) { segment in
+            ForEach(Array(store.segments.enumerated()), id: \.element.id) { index, segment in
                 TranscriptSegment(
                     speaker: speakerType(for: segment),
                     timestamp: formatTimestamp(segment.startMs),
@@ -381,6 +382,7 @@ public struct SessionDetailView: View {
                         ))
                     }
                 )
+                .vaporAppear(index: index)
             }
         }
     }
@@ -398,6 +400,7 @@ public struct SessionDetailView: View {
             ) {
                 store.send(.audioPlayer(.playPauseTapped))
             }
+            .vaporAppear()
             .padding(.horizontal, VaporSpacing.lg)
             .padding(.bottom, VaporSpacing.lg)
         }

@@ -250,18 +250,20 @@ public struct RecordingView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: VaporSpacing.lg) {
-                    ForEach(store.liveSegments, id: \.id) { segment in
+                    ForEach(Array(store.liveSegments.enumerated()), id: \.element.id) { index, segment in
                         TranscriptSegment(
                             speaker: speakerType(for: segment),
                             timestamp: formatTimestamp(segment.startMs),
                             text: segment.text
                         )
+                        .vaporAppear(index: index)
                         .id(segment.id)
                     }
 
                     // Show listening indicator at the end when recording
                     if store.isListening {
                         TranscriptLiveIndicator()
+                            .vaporAppear()
                             .id("live-indicator")
                     }
                 }

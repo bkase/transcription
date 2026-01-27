@@ -848,3 +848,9 @@
 - Partial state shows StatusBanner with retry button (not ErrorStateView), and displays transcript segments below
 - Empty timeline + model failure shows "Unable to connect" variant of empty state with disabled record button
 - E2E tests use predicates: `NSPredicate(format: "identifier == 'partialBanner'")` with `waitForExistence(timeout:)`
+
+## SwiftUI vapor-appear animation modifier
+- VaporAppearModifier applies: opacity 0→1, scale 0.98→1, blur 4→0 over 300ms using VaporAnimation.appearCurve
+- View extension: `.vaporAppear()` or `.vaporAppear(delay:)` for single elements
+- Staggered list animation: `.vaporAppear(index: i)` with default 50ms stagger delay between items
+- ForEach with index: `ForEach(Array(items.enumerated()), id: \.element.id) { index, item in ... }`
