@@ -42,6 +42,103 @@ public struct VaporAppearModifier: ViewModifier {
     }
 }
 
+// MARK: - Vapor Exit Modifier
+
+/// A view modifier that applies the vapor-exit animation when a view disappears.
+/// Implements the brand animation specification for exit animations:
+/// - Start: opacity 1, scale 1, blur 0px
+/// - End: opacity 0, scale 0.98, blur 4px
+/// - Duration: 300ms
+/// - Curve: vapor-exit (cubic-bezier 0.7, 0, 0.84, 0)
+///
+/// Use this modifier when you have a view controlled by an `isPresented` binding
+/// and want it to animate out gracefully when dismissed.
+public struct VaporExitModifier: ViewModifier {
+    @Binding var isPresented: Bool
+    @State private var isVisible: Bool
+
+    /// Create a vapor exit modifier.
+    /// - Parameter isPresented: Binding to the presentation state. When this becomes false,
+    ///   the exit animation plays before the view is removed.
+    public init(isPresented: Binding<Bool>) {
+        self._isPresented = isPresented
+        // Start visible when presented
+        self._isVisible = State(initialValue: isPresented.wrappedValue)
+    }
+
+    public func body(content: Content) -> some View {
+        content
+            .opacity(isVisible ? 1 : 0)
+            .scaleEffect(isVisible ? 1 : 0.98)
+            .blur(radius: isVisible ? 0 : 4)
+            .onChange(of: isPresented) { _, newValue in
+                if newValue {
+                    // Appearing - animate in
+                    withAnimation(VaporAnimation.appearCurve.animation(duration: VaporAnimation.normalDuration)) {
+                        isVisible = true
+                    }
+                } else {
+                    // Disappearing - animate out with exit curve
+                    withAnimation(VaporAnimation.exitCurve.animation(duration: VaporAnimation.normalDuration)) {
+                        isVisible = false
+                    }
+                }
+            }
+            .onAppear {
+                // Handle initial appearance if starting presented
+                if isPresented && !isVisible {
+                    withAnimation(VaporAnimation.appearCurve.animation(duration: VaporAnimation.normalDuration)) {
+                        isVisible = true
+                    }
+                }
+            }
+    }
+}
+
+// MARK: - Vapor Exit Transition
+
+/// A custom transition that applies the vapor-exit animation.
+/// Use with conditional views (if/else) to animate their insertion/removal.
+///
+/// Example:
+/// ```swift
+/// if showContent {
+///     MyView()
+///         .transition(.vaporExit)
+/// }
+/// ```
+public extension AnyTransition {
+    /// A transition that fades in/out with scale and blur, using vapor timing curves.
+    /// - Insertion: opacity 0→1, scale 0.98→1, blur 4→0, using vapor-appear curve
+    /// - Removal: opacity 1→0, scale 1→0.98, blur 0→4, using vapor-exit curve
+    static var vaporExit: AnyTransition {
+        .asymmetric(
+            insertion: .modifier(
+                active: VaporTransitionModifier(opacity: 0, scale: 0.98, blur: 4),
+                identity: VaporTransitionModifier(opacity: 1, scale: 1, blur: 0)
+            ),
+            removal: .modifier(
+                active: VaporTransitionModifier(opacity: 0, scale: 0.98, blur: 4),
+                identity: VaporTransitionModifier(opacity: 1, scale: 1, blur: 0)
+            )
+        )
+    }
+}
+
+/// Internal modifier used by the vaporExit transition.
+private struct VaporTransitionModifier: ViewModifier {
+    let opacity: Double
+    let scale: CGFloat
+    let blur: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(opacity)
+            .scaleEffect(scale)
+            .blur(radius: blur)
+    }
+}
+
 // MARK: - View Extension
 
 extension View {
@@ -61,6 +158,14 @@ extension View {
     /// - Returns: A view that animates in with staggered timing.
     public func vaporAppear(index: Int, staggerDelay: Double = 0.05) -> some View {
         modifier(VaporAppearModifier(delay: Double(index) * staggerDelay))
+    }
+
+    /// Applies the vapor-exit animation controlled by an isPresented binding.
+    /// The view animates in when isPresented becomes true, and animates out when it becomes false.
+    /// - Parameter isPresented: Binding to the presentation state.
+    /// - Returns: A view that animates with the vapor effect based on presentation state.
+    public func vaporExit(isPresented: Binding<Bool>) -> some View {
+        modifier(VaporExitModifier(isPresented: isPresented))
     }
 }
 
@@ -236,6 +341,44 @@ struct VaporAppearModifier_Previews: PreviewProvider {
         }
         .padding()
         .background(VaporColor.mist)
+    }
+}
+
+struct VaporExitModifier_Previews: PreviewProvider {
+    struct PreviewContainer: View {
+        @State private var isPresented = true
+
+        var body: some View {
+            VStack(spacing: 24) {
+                Button(isPresented ? "Hide Content" : "Show Content") {
+                    isPresented.toggle()
+                }
+                .buttonStyle(.borderedProminent)
+
+                if isPresented {
+                    VStack(spacing: 12) {
+                        Text("This content will fade out")
+                            .font(.headline)
+                        Text("Using the vapor-exit animation")
+                            .font(.caption)
+                            .foregroundColor(VaporColor.textSecondary)
+                    }
+                    .padding()
+                    .background(VaporColor.haze)
+                    .cornerRadius(VaporRadius.md)
+                    .transition(.vaporExit)
+                }
+
+                Spacer()
+            }
+            .animation(VaporAnimation.exitCurve.animation(duration: VaporAnimation.normalDuration), value: isPresented)
+            .padding()
+            .background(VaporColor.mist)
+        }
+    }
+
+    static var previews: some View {
+        PreviewContainer()
     }
 }
 

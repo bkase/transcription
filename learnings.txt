@@ -890,3 +890,15 @@
 - TranscriptRendering and RecordingSpeakerRendering both use consistent speaker type resolution
 - Accessibility identifier: `speakerUnassignedChip` for unassigned, `speakerLabel` for assigned
 - Speaker labels can have optional `onSpeakerTap` callback for triggering assignment picker
+
+## SwiftUI breathing animation pattern
+- Use `@State` property with `onAppear` and `withAnimation(...repeatForever(autoreverses: true))`
+- VaporAnimation.breatheCurve + breatheDuration (2.0s) for subtle vapor-style breathing
+- Animation triggers on view appear, auto-repeats without additional state management
+
+## SwiftUI exit transitions
+- VaporExitModifier: use with `isPresented` binding for views that need animated appearance/disappearance
+- AnyTransition.vaporExit: use with `.transition(.vaporExit)` on conditionally rendered views
+- Exit animation: opacity 1→0, scale 1→0.98, blur 0→4px, VaporAnimation.exitCurve (300ms)
+- Must wrap content state changes in `withAnimation(VaporAnimation.exitCurve.animation(duration:))` to trigger transition
+- System alerts and confirmation dialogs use their own animations - can't customize with vapor transitions

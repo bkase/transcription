@@ -15,6 +15,49 @@ import SwiftUI
     #expect(true)
 }
 
+// MARK: - Vapor Exit Animation Tests
+
+/// Tests for the VaporExitModifier that implements the brand's exit animation spec.
+/// Reference: brand.md Motion Design section - vapor-exit curve
+
+@Test func testVaporExitModifierCanBeCreated() {
+    // Should accept a binding to isPresented
+    var isPresented = true
+    let binding = Binding(get: { isPresented }, set: { isPresented = $0 })
+    let modifier = VaporExitModifier(isPresented: binding)
+    #expect(true)
+}
+
+@Test func testVaporExitViewExtension() {
+    // View extension should be accessible
+    var isPresented = true
+    let binding = Binding(get: { isPresented }, set: { isPresented = $0 })
+    let _ = Text("Test").vaporExit(isPresented: binding)
+    #expect(true)
+}
+
+@Test func testVaporExitUsesCorrectAnimationCurve() {
+    // Verify the animation curve matches brand spec
+    // vapor-exit: cubic-bezier(0.7, 0, 0.84, 0)
+    let curve = VaporAnimation.exitCurve
+    #expect(curve.x1 == 0.7)
+    #expect(curve.y1 == 0)
+    #expect(curve.x2 == 0.84)
+    #expect(curve.y2 == 0)
+}
+
+@Test func testVaporExitTransitionExists() {
+    // The vaporExit transition should be available
+    let transition: AnyTransition = .vaporExit
+    #expect(true)
+}
+
+@Test func testVaporExitTransitionCanBeApplied() {
+    // Transition should be applicable to any view
+    let _ = Text("Test").transition(.vaporExit)
+    #expect(true)
+}
+
 @Test func testVaporAppearModifierWithDelay() {
     // Should accept custom delay values
     let modifier = VaporAppearModifier(delay: 0.5)
