@@ -81,4 +81,62 @@ struct InputSnapshotTests {
 
         SnapshotHarness.assertSnapshot(of: view, named: "search_field_states")
     }
+
+    @Test func testFocusBlurEffect() {
+        // Test the blur effect on background content when search is focused
+        let view = VStack(spacing: 24) {
+            // Normal state (no blur)
+            VStack(spacing: 8) {
+                CaptionText("Unfocused (sharp)")
+                VStack(spacing: 8) {
+                    cardContent
+                }
+                .vaporFocusBlur(isFocused: false)
+            }
+
+            // Focused state (blurred)
+            VStack(spacing: 8) {
+                CaptionText("Focused (2px blur)")
+                VStack(spacing: 8) {
+                    cardContent
+                }
+                .vaporFocusBlur(isFocused: true)
+            }
+
+            // Strong blur (4px)
+            VStack(spacing: 8) {
+                CaptionText("Focused (4px blur)")
+                VStack(spacing: 8) {
+                    cardContent
+                }
+                .vaporFocusBlur(isFocused: true, blurRadius: 4)
+            }
+        }
+        .padding(32)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(VaporColor.mist)
+
+        SnapshotHarness.assertSnapshot(of: view, named: "focus_blur_effect")
+    }
+
+    // Helper view for blur tests
+    private var cardContent: some View {
+        HStack {
+            Circle()
+                .fill(VaporColor.sky)
+                .frame(width: 32, height: 32)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Session Title")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(VaporColor.textPrimary)
+                Text("Preview text content here...")
+                    .font(.system(size: 12, weight: .light))
+                    .foregroundColor(VaporColor.textSecondary)
+            }
+            Spacer()
+        }
+        .padding()
+        .background(VaporColor.cloud)
+        .cornerRadius(12)
+    }
 }

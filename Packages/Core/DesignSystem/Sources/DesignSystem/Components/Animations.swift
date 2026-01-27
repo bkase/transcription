@@ -139,6 +139,40 @@ private struct VaporTransitionModifier: ViewModifier {
     }
 }
 
+// MARK: - Vapor Focus Blur Modifier
+
+/// A view modifier that applies a blur effect when focus state changes.
+/// Implements the brand's blur focus transition:
+/// - Focused: blur 2px (background content becomes slightly blurred)
+/// - Unfocused: blur 0px (background content is sharp)
+/// - Duration: 500ms
+/// - Curve: vapor-appear
+///
+/// Use this modifier on content that should blur when a search field,
+/// modal, or other interactive element gains focus.
+public struct VaporFocusBlurModifier: ViewModifier {
+    private let isFocused: Bool
+    private let blurRadius: CGFloat
+
+    /// Create a vapor focus blur modifier.
+    /// - Parameters:
+    ///   - isFocused: Whether the focus state is active.
+    ///   - blurRadius: The blur radius when focused (default 2px for subtle effect).
+    public init(isFocused: Bool, blurRadius: CGFloat = 2) {
+        self.isFocused = isFocused
+        self.blurRadius = blurRadius
+    }
+
+    public func body(content: Content) -> some View {
+        content
+            .blur(radius: isFocused ? blurRadius : 0)
+            .animation(
+                VaporAnimation.appearCurve.animation(duration: VaporAnimation.blurDuration),
+                value: isFocused
+            )
+    }
+}
+
 // MARK: - View Extension
 
 extension View {
@@ -148,6 +182,24 @@ extension View {
     /// - Returns: A view that animates in with the vapor-appear effect.
     public func vaporAppear(delay: Double = 0) -> some View {
         modifier(VaporAppearModifier(delay: delay))
+    }
+
+    /// Applies a blur effect when focus state changes.
+    /// Implements the brand's blur focus transition with 500ms duration.
+    ///
+    /// Use this on background content that should blur when a search field or modal is active:
+    /// ```swift
+    /// ScrollView {
+    ///     content
+    /// }
+    /// .vaporFocusBlur(isFocused: isSearchFocused)
+    /// ```
+    /// - Parameters:
+    ///   - isFocused: Whether the focus state is active (blur when true, sharp when false).
+    ///   - blurRadius: The blur radius when focused (default 2px for subtle effect, use 4px for stronger effect).
+    /// - Returns: A view that blurs based on focus state.
+    public func vaporFocusBlur(isFocused: Bool, blurRadius: CGFloat = 2) -> some View {
+        modifier(VaporFocusBlurModifier(isFocused: isFocused, blurRadius: blurRadius))
     }
 
     /// Applies the vapor-appear animation with staggered delay based on index.
@@ -496,6 +548,70 @@ struct StaggeredTextRevealView_Previews: PreviewProvider {
         }
         .padding(24)
         .background(VaporColor.cloud)
+    }
+}
+
+struct VaporFocusBlurModifier_Previews: PreviewProvider {
+    struct PreviewContainer: View {
+        @State private var isFocused = false
+
+        var body: some View {
+            VStack(spacing: 24) {
+                // Control button
+                Button(isFocused ? "Release Focus" : "Focus Search") {
+                    withAnimation {
+                        isFocused.toggle()
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+
+                // Simulated search field
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                    Text(isFocused ? "Type here..." : "Search transcripts...")
+                        .foregroundColor(VaporColor.textTertiary)
+                    Spacer()
+                }
+                .padding()
+                .background(VaporColor.cloud)
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder(isFocused ? VaporColor.sky : VaporColor.fog, lineWidth: 1)
+                )
+
+                // Background content that blurs when search is focused
+                VStack(spacing: 12) {
+                    ForEach(0..<3, id: \.self) { index in
+                        HStack {
+                            Circle()
+                                .fill(VaporColor.sky)
+                                .frame(width: 40, height: 40)
+                            VStack(alignment: .leading) {
+                                Text("Session \(index + 1)")
+                                    .font(.headline)
+                                Text("Content that blurs when search is active")
+                                    .font(.caption)
+                                    .foregroundColor(VaporColor.textSecondary)
+                            }
+                            Spacer()
+                        }
+                        .padding()
+                        .background(VaporColor.cloud)
+                        .cornerRadius(12)
+                    }
+                }
+                .vaporFocusBlur(isFocused: isFocused)
+
+                Spacer()
+            }
+            .padding()
+            .background(VaporColor.mist)
+        }
+    }
+
+    static var previews: some View {
+        PreviewContainer()
     }
 }
 #endif

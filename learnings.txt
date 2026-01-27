@@ -911,3 +911,9 @@
 - vapor-drift curve: cubic-bezier(0.25, 0.1, 0.25, 1) for positional movement
 - Page duration: 400ms (VaporAnimation.pageDuration)
 - Custom `.vaporPage` and `.vaporPageBack` transitions for conditional views using offset + opacity
+
+## VaporFocusBlurModifier for focus blur transitions
+- `.vaporFocusBlur(isFocused:blurRadius:)` applies blur to background content when focus state is active
+- Uses VaporAnimation.blurDuration (500ms) and VaporAnimation.appearCurve for timing
+- Default blur radius is 2px (subtle), can increase to 4px for stronger effect
+- Use on content behind search fields or modals that should recede when focus is active
