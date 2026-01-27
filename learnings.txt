@@ -797,3 +797,15 @@
 - TimelineViewPreview DisplayMode enum extends to support all empty state variants for snapshot testing
 - SF Symbols for cloud icons: `icloud.and.arrow.down` (downloading), `icloud.slash` (error), `mic` (ready)
 - Fixed-width text frames (220-260pt) ensure consistent line wrapping across states
+
+## Offline transcription failure tracking and retry
+- Add `processingError: String?` to SessionRecord for storing transcription failure messages
+- Migration: `db.alter(table:) { t.add(column:) }` adds nullable column to existing table
+- Failure states: `.partial` when live segments exist but offline failed, `.failed` when no segments at all
+- runOfflineTranscription only deletes live segments AFTER successful offline results (keeps live as fallback)
+- retryOfflineTranscription: verify state (.failed/.partial), check audio file exists, run transcription, update state
+- RecordingProcessorError enum with cases for retry validation: sessionNotFound, noAudioFile, audioFileNotFound, invalidStateForRetry
+- MockFluidAudioClient.offlineFailure() and .offlineEmpty() helpers for testing offline transcription error paths
+- OfflineTranscriptionBehavior enum (.success, .empty, .failure(String)) in mock actor controls transcribeFile behavior
+- Tests with `.incrementing` UUID need to pre-create expected audio file for offline transcription path to trigger
+- RecordingProcessorClient gains retryOfflineTranscription closure - update ALL explicit mock initializations

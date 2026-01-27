@@ -29,6 +29,8 @@ public struct SessionRecord: Codable, FetchableRecord, PersistableRecord, Sendab
     public var processingState: ProcessingState
     public var speakerCount: Int
     public var updatedAt: Date
+    /// Error message when processingState is .failed (e.g., transcription error)
+    public var processingError: String?
 
     public init(
         id: String,
@@ -40,7 +42,8 @@ public struct SessionRecord: Codable, FetchableRecord, PersistableRecord, Sendab
         audioPath: String? = nil,
         processingState: ProcessingState = .recording,
         speakerCount: Int = 0,
-        updatedAt: Date
+        updatedAt: Date,
+        processingError: String? = nil
     ) {
         self.id = id
         self.startedAt = startedAt
@@ -52,6 +55,7 @@ public struct SessionRecord: Codable, FetchableRecord, PersistableRecord, Sendab
         self.processingState = processingState
         self.speakerCount = speakerCount
         self.updatedAt = updatedAt
+        self.processingError = processingError
     }
 }
 
@@ -316,7 +320,14 @@ public enum AppMigrations {
             try db.create(index: "idx_speaker_segments_sessionId", on: "speaker_segments", columns: ["sessionId"])
         }
 
-        migrator.registerMigration("v2_fts5_search") { db in
+        migrator.registerMigration("v2_processing_error") { db in
+            // Add processingError column to track transcription failure messages
+            try db.alter(table: "sessions") { t in
+                t.add(column: "processingError", .text)
+            }
+        }
+
+        migrator.registerMigration("v3_fts5_search") { db in
             // Create FTS5 virtual table for transcript search
             // NOT using external content table because the column mapping differs (segmentId vs id)
             // We use triggers to keep it in sync manually

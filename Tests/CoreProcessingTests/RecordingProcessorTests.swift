@@ -753,3 +753,356 @@ import Persistence
     await processor.stopRecording()
     collectTask.cancel()
 }
+
+// MARK: - Offline Transcription Failure Tests
+
+@Test func testOfflineTranscriptionFailureKeepsLiveSegments() async throws {
+    // This test verifies that when offline transcription fails, live segments are preserved
+    // and the session is marked as .partial (since live segments exist)
+
+    let dbQueue = try makeDatabase(configuration: .inMemory)
+
+    // Set up temp directory and create a dummy audio file
+    // The incrementing UUID starts with 00000000-0000-0000-0000-000000000000
+    let tempDir = FileManager.default.temporaryDirectory
+    let expectedSessionId = "00000000-0000-0000-0000-000000000000"
+    let expectedAudioPath = tempDir.appendingPathComponent("\(expectedSessionId).caf")
+
+    // Create dummy audio file so offline transcription is triggered
+    FileManager.default.createFile(atPath: expectedAudioPath.path, contents: Data(repeating: 0, count: 1024), attributes: nil)
+
+    // Mock audio capture that emits frames then finishes
+    let mockAudioCapture = AudioCaptureClient(
+        startCapture: {
+            AsyncStream { continuation in
+                continuation.yield(AudioFrame(data: Data(repeating: 0, count: 1024), timestamp: 0))
+                continuation.finish()
+            }
+        },
+        stopCapture: { },
+        isCapturing: { false },
+        getInputFormat: { .recording }
+    )
+
+    let mockFileWriter = AudioFileWriterClient(
+        startWriting: { _, _ in },
+        appendFrame: { _ in },
+        finishWriting: { 1024 },
+        cancelWriting: { },
+        isWriting: { false }
+    )
+
+    let mockAudioSession = AudioSessionClient(
+        startObserving: { AsyncStream { $0.finish() } },
+        stopObserving: { },
+        configureForRecording: { }
+    )
+
+    // Mock FluidAudio that emits live segments but fails offline transcription
+    let mockFluidAudio = MockFluidAudioClient.offlineFailure(
+        script: .twoSpeakerConversation,
+        errorMessage: "Simulated offline transcription failure"
+    )
+
+    let databaseClient = DatabaseClient.live(dbQueue: dbQueue)
+
+    let mockPreferences = PreferencesClient(
+        getAudioRetentionMode: { .both },
+        setAudioRetentionMode: { _ in }
+    )
+
+    let processor = withDependencies {
+        $0.audioCaptureClient = mockAudioCapture
+        $0.audioFileWriterClient = mockFileWriter
+        $0.audioSessionClient = mockAudioSession
+        $0.fluidAudioClient = mockFluidAudio
+        $0.databaseClient = databaseClient
+        $0.preferencesClient = mockPreferences
+        $0.uuid = .incrementing
+        $0.date = .constant(Date(timeIntervalSince1970: 1000))
+    } operation: {
+        RecordingProcessor()
+    }
+
+    // Start recording
+    let eventStream = try await processor.startRecording(audioDirectory: tempDir)
+
+    // Collect events
+    let collectTask = Task {
+        var events: [RecordingProcessorEvent] = []
+        for await event in eventStream {
+            events.append(event)
+        }
+        return events
+    }
+
+    // Wait for live segments to be processed
+    try await Task.sleep(for: .milliseconds(100))
+
+    // Stop recording (triggers offline transcription which will fail)
+    await processor.stopRecording()
+
+    // Wait for collection to complete
+    try await Task.sleep(for: .milliseconds(200))
+    collectTask.cancel()
+
+    // Verify session is marked as partial (live segments exist, but offline failed)
+    let sessions = try await databaseClient.fetchSessions()
+    #expect(sessions.count == 1)
+
+    let session = sessions[0]
+    #expect(session.processingState == .partial, "Session should be .partial when offline fails but live segments exist")
+    #expect(session.processingError != nil, "Session should have an error message")
+    #expect(session.processingError?.contains("Offline transcription failed") == true)
+
+    // Verify live segments are still in database (not deleted)
+    let sessionId = SessionID(rawValue: session.id)
+    let segments = try await databaseClient.fetchTranscriptSegments(sessionId)
+    #expect(segments.count == 3, "Live segments should be preserved when offline transcription fails")
+
+    // Clean up
+    try? FileManager.default.removeItem(at: expectedAudioPath)
+}
+
+@Test func testRetryOfflineTranscriptionSuccess() async throws {
+    // This test verifies that retrying offline transcription on a failed/partial session
+    // succeeds and marks the session as .processed
+
+    let dbQueue = try makeDatabase(configuration: .inMemory)
+    let databaseClient = DatabaseClient.live(dbQueue: dbQueue)
+
+    // Create a session in failed state with an audio file
+    let tempDir = FileManager.default.temporaryDirectory
+    let audioPath = tempDir.appendingPathComponent("retry-test.caf").path
+
+    // Create a dummy audio file
+    FileManager.default.createFile(atPath: audioPath, contents: Data(repeating: 0, count: 1024), attributes: nil)
+
+    let failedSession = SessionRecord(
+        id: "retry-test-session",
+        startedAt: Date(timeIntervalSince1970: 1000),
+        endedAt: Date(timeIntervalSince1970: 1100),
+        audioPath: audioPath,
+        processingState: .failed,
+        speakerCount: 0,
+        updatedAt: Date(timeIntervalSince1970: 1100),
+        processingError: "Previous transcription failed"
+    )
+    try await databaseClient.createSession(failedSession)
+
+    // Add some old (failed) transcript segments to verify they get replaced
+    let oldSegment = TranscriptSegmentRecord(
+        id: "old-segment-1",
+        sessionId: "retry-test-session",
+        startMs: 0,
+        endMs: 1000,
+        machineSpeakerId: "old_spk",
+        text: "Old failed segment",
+        isFinal: true,
+        createdAt: Date(),
+        updatedAt: Date()
+    )
+    try await databaseClient.createTranscriptSegment(oldSegment)
+
+    // Mock FluidAudio that succeeds on retry
+    let retryScript = MockFluidAudioScript(
+        segments: [
+            ScriptedSegment(
+                id: TranscriptSegmentID(rawValue: "retry-seg-001"),
+                text: "Successfully transcribed text",
+                startMs: 0,
+                endMs: 5000,
+                speakerId: "spk_0",
+                isFinal: true
+            ),
+            ScriptedSegment(
+                id: TranscriptSegmentID(rawValue: "retry-seg-002"),
+                text: "More transcribed content",
+                startMs: 5500,
+                endMs: 10000,
+                speakerId: "spk_1",
+                isFinal: true
+            )
+        ]
+    )
+    let mockFluidAudio = MockFluidAudioClient.client(script: retryScript, offlineBehavior: .success)
+
+    let processor = withDependencies {
+        $0.databaseClient = databaseClient
+        $0.fluidAudioClient = mockFluidAudio
+        $0.uuid = .incrementing
+        $0.date = .constant(Date(timeIntervalSince1970: 2000))
+    } operation: {
+        RecordingProcessor()
+    }
+
+    // Retry offline transcription
+    let sessionId = SessionID(rawValue: "retry-test-session")
+    let success = try await processor.retryOfflineTranscription(sessionId: sessionId)
+
+    #expect(success, "Retry should succeed")
+
+    // Verify session is now processed
+    let updatedSession = try await databaseClient.fetchSession(sessionId)
+    #expect(updatedSession?.processingState == .processed)
+    #expect(updatedSession?.processingError == nil, "Error should be cleared on success")
+
+    // Verify old segments were replaced with new ones
+    let segments = try await databaseClient.fetchTranscriptSegments(sessionId)
+    #expect(segments.count == 2, "Should have 2 segments from retry")
+    #expect(segments.allSatisfy { $0.text.contains("transcribed") }, "Segments should be from retry")
+
+    // Verify speaker tracks were recreated
+    let speakerTracks = try await databaseClient.fetchSpeakerTracks(sessionId)
+    #expect(speakerTracks.count == 2, "Should have 2 speaker tracks from retry")
+
+    // Clean up
+    try? FileManager.default.removeItem(atPath: audioPath)
+}
+
+@Test func testRetryOfflineTranscriptionFailsWithoutAudioFile() async throws {
+    // This test verifies that retry fails appropriately when there's no audio file
+
+    let dbQueue = try makeDatabase(configuration: .inMemory)
+    let databaseClient = DatabaseClient.live(dbQueue: dbQueue)
+
+    // Create a session in failed state WITHOUT an audio file
+    let failedSession = SessionRecord(
+        id: "no-audio-session",
+        startedAt: Date(timeIntervalSince1970: 1000),
+        endedAt: Date(timeIntervalSince1970: 1100),
+        audioPath: nil, // No audio file
+        processingState: .failed,
+        speakerCount: 0,
+        updatedAt: Date(timeIntervalSince1970: 1100),
+        processingError: "Previous transcription failed"
+    )
+    try await databaseClient.createSession(failedSession)
+
+    let processor = withDependencies {
+        $0.databaseClient = databaseClient
+        $0.fluidAudioClient = MockFluidAudioClient.empty
+        $0.uuid = .incrementing
+        $0.date = .constant(Date(timeIntervalSince1970: 2000))
+    } operation: {
+        RecordingProcessor()
+    }
+
+    // Retry should fail with noAudioFile error
+    let sessionId = SessionID(rawValue: "no-audio-session")
+    await #expect(throws: RecordingProcessorError.noAudioFile) {
+        _ = try await processor.retryOfflineTranscription(sessionId: sessionId)
+    }
+}
+
+@Test func testRetryOfflineTranscriptionFailsForProcessedSession() async throws {
+    // This test verifies that retry is rejected for sessions already in processed state
+
+    let dbQueue = try makeDatabase(configuration: .inMemory)
+    let databaseClient = DatabaseClient.live(dbQueue: dbQueue)
+
+    let tempDir = FileManager.default.temporaryDirectory
+    let audioPath = tempDir.appendingPathComponent("processed-test.caf").path
+    FileManager.default.createFile(atPath: audioPath, contents: Data(repeating: 0, count: 1024), attributes: nil)
+
+    // Create a session that's already processed
+    let processedSession = SessionRecord(
+        id: "processed-session",
+        startedAt: Date(timeIntervalSince1970: 1000),
+        endedAt: Date(timeIntervalSince1970: 1100),
+        audioPath: audioPath,
+        processingState: .processed,
+        speakerCount: 2,
+        updatedAt: Date(timeIntervalSince1970: 1100)
+    )
+    try await databaseClient.createSession(processedSession)
+
+    let processor = withDependencies {
+        $0.databaseClient = databaseClient
+        $0.fluidAudioClient = MockFluidAudioClient.empty
+        $0.uuid = .incrementing
+        $0.date = .constant(Date(timeIntervalSince1970: 2000))
+    } operation: {
+        RecordingProcessor()
+    }
+
+    // Retry should fail with invalidStateForRetry error
+    let sessionId = SessionID(rawValue: "processed-session")
+    await #expect(throws: RecordingProcessorError.invalidStateForRetry(.processed)) {
+        _ = try await processor.retryOfflineTranscription(sessionId: sessionId)
+    }
+
+    // Clean up
+    try? FileManager.default.removeItem(atPath: audioPath)
+}
+
+@Test func testRetryOfflineTranscriptionFailsWhileRecording() async throws {
+    // This test verifies that retry is rejected while a recording is in progress
+
+    let dbQueue = try makeDatabase(configuration: .inMemory)
+    let databaseClient = DatabaseClient.live(dbQueue: dbQueue)
+
+    // Create a session in failed state
+    let failedSession = SessionRecord(
+        id: "failed-session",
+        startedAt: Date(timeIntervalSince1970: 1000),
+        endedAt: Date(timeIntervalSince1970: 1100),
+        audioPath: "/tmp/test.caf",
+        processingState: .failed,
+        speakerCount: 0,
+        updatedAt: Date(timeIntervalSince1970: 1100)
+    )
+    try await databaseClient.createSession(failedSession)
+
+    let mockAudioCapture = AudioCaptureClient(
+        startCapture: { AsyncStream { _ in } },
+        stopCapture: { },
+        isCapturing: { false },
+        getInputFormat: { .recording }
+    )
+
+    let mockFileWriter = AudioFileWriterClient(
+        startWriting: { _, _ in },
+        appendFrame: { _ in },
+        finishWriting: { 0 },
+        cancelWriting: { },
+        isWriting: { false }
+    )
+
+    let mockAudioSession = AudioSessionClient(
+        startObserving: { AsyncStream { $0.finish() } },
+        stopObserving: { },
+        configureForRecording: { }
+    )
+
+    let mockPreferences = PreferencesClient(
+        getAudioRetentionMode: { .both },
+        setAudioRetentionMode: { _ in }
+    )
+
+    let processor = withDependencies {
+        $0.audioCaptureClient = mockAudioCapture
+        $0.audioFileWriterClient = mockFileWriter
+        $0.audioSessionClient = mockAudioSession
+        $0.fluidAudioClient = MockFluidAudioClient.empty
+        $0.databaseClient = databaseClient
+        $0.preferencesClient = mockPreferences
+        $0.uuid = .incrementing
+        $0.date = .constant(Date(timeIntervalSince1970: 2000))
+    } operation: {
+        RecordingProcessor()
+    }
+
+    // Start a new recording
+    let tempDir = FileManager.default.temporaryDirectory
+    _ = try await processor.startRecording(audioDirectory: tempDir)
+
+    // Retry should fail with alreadyRecording error
+    let sessionId = SessionID(rawValue: "failed-session")
+    await #expect(throws: RecordingProcessorError.alreadyRecording) {
+        _ = try await processor.retryOfflineTranscription(sessionId: sessionId)
+    }
+
+    // Clean up
+    await processor.stopRecording()
+}

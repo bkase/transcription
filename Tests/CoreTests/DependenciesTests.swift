@@ -76,7 +76,8 @@ import Dependencies
             resumeRecording: { },
             isRecording: { false },
             isPaused: { false },
-            currentSessionID: { nil }
+            currentSessionID: { nil },
+            retryOfflineTranscription: { _ in false }
         )
         deps.exportClient = ExportClient(
             exportSession: { _, format in ExportResult(url: URL(fileURLWithPath: "/tmp"), format: format) },

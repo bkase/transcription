@@ -40,7 +40,8 @@ import GRDB
             "audioPath",
             "processingState",
             "speakerCount",
-            "updatedAt"
+            "updatedAt",
+            "processingError"
         ]
 
         #expect(columnNames == expectedColumns, "Sessions table should have all expected columns")

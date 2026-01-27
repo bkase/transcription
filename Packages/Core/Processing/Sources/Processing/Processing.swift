@@ -150,6 +150,10 @@ public struct RecordingProcessorClient: Sendable {
     public var isPaused: @Sendable () async -> Bool = { false }
     /// Get the current session ID if recording
     public var currentSessionID: @Sendable () async -> SessionID? = { nil }
+    /// Retry offline transcription for a failed/partial session
+    /// - Parameter sessionId: The session ID to retry transcription for
+    /// - Returns: true if retry succeeded, false otherwise
+    public var retryOfflineTranscription: @Sendable (_ sessionId: SessionID) async throws -> Bool = { _ in false }
 }
 
 extension RecordingProcessorClient: DependencyKey {
@@ -181,6 +185,9 @@ extension RecordingProcessorClient: DependencyKey {
             },
             currentSessionID: {
                 await processor.getCurrentSessionID()
+            },
+            retryOfflineTranscription: { sessionId in
+                try await processor.retryOfflineTranscription(sessionId: sessionId)
             }
         )
     }
@@ -769,14 +776,19 @@ public actor RecordingProcessor {
         } catch {
             NSLog("[OfflineTranscription] ERROR: \(String(describing: error))")
             NSLog("[OfflineTranscription] ERROR localizedDescription: \(error.localizedDescription)")
-            // Mark session as processed anyway so it doesn't stay stuck
-            // The live transcription results should still be there (we only delete after success)
+            // Mark session as failed with error message, but keep live transcription segments
+            // Live segments are still available since we only delete after successful offline transcription
             do {
                 if var session = try await databaseClient.fetchSession(sessionId) {
-                    session.processingState = .processed
+                    // Check if there are live segments - if so, mark as partial; otherwise failed
+                    let existingSegments = (try? await databaseClient.fetchTranscriptSegments(sessionId)) ?? []
+                    let hasLiveSegments = !existingSegments.isEmpty
+
+                    session.processingState = hasLiveSegments ? .partial : .failed
+                    session.processingError = "Offline transcription failed: \(error.localizedDescription)"
                     session.updatedAt = date.now
                     try await databaseClient.updateSession(session)
-                    NSLog("[OfflineTranscription] Session marked as processed after error")
+                    NSLog("[OfflineTranscription] Session marked as \(session.processingState.rawValue) with error: \(session.processingError ?? "unknown")")
                 }
             } catch {
                 // Silent failure - recovery routine will clean up
@@ -800,6 +812,148 @@ public actor RecordingProcessor {
 
         return (stream1, stream2)
     }
+
+    // MARK: - Retry Offline Transcription
+
+    /// Retry offline transcription for a failed/partial session
+    /// - Parameter sessionId: The session ID to retry transcription for
+    /// - Returns: true if retry succeeded, false otherwise
+    public func retryOfflineTranscription(sessionId: SessionID) async throws -> Bool {
+        // Verify we're not currently recording
+        guard !isRecording else {
+            throw RecordingProcessorError.alreadyRecording
+        }
+
+        // Fetch session
+        guard let session = try await databaseClient.fetchSession(sessionId) else {
+            throw RecordingProcessorError.sessionNotFound
+        }
+
+        // Verify session is in a state that can be retried (failed or partial)
+        guard session.processingState == .failed || session.processingState == .partial else {
+            throw RecordingProcessorError.invalidStateForRetry(session.processingState)
+        }
+
+        // Verify audio file exists
+        guard let audioPath = session.audioPath else {
+            throw RecordingProcessorError.noAudioFile
+        }
+
+        let audioFileURL = URL(fileURLWithPath: audioPath)
+        guard FileManager.default.fileExists(atPath: audioFileURL.path) else {
+            throw RecordingProcessorError.audioFileNotFound
+        }
+
+        // Mark session as transcribing
+        var updatedSession = session
+        updatedSession.processingState = .transcribing
+        updatedSession.processingError = nil
+        updatedSession.updatedAt = date.now
+        try await databaseClient.updateSession(updatedSession)
+
+        NSLog("[RetryOfflineTranscription] Starting retry for session \(sessionId.rawValue)")
+
+        do {
+            // Run offline transcription on the saved audio file
+            let segments = try await fluidAudioClient.transcribeFile(audioFileURL)
+            NSLog("[RetryOfflineTranscription] Got \(segments.count) segments from file")
+
+            // If offline transcription returned no segments, mark as failed
+            guard !segments.isEmpty else {
+                NSLog("[RetryOfflineTranscription] No segments from offline transcription")
+                var failedSession = session
+                failedSession.processingState = .failed
+                failedSession.processingError = "Offline transcription produced no segments"
+                failedSession.updatedAt = date.now
+                try await databaseClient.updateSession(failedSession)
+                return false
+            }
+
+            // Delete existing segments (old live or previous retry)
+            try await databaseClient.deleteTranscriptSegmentsForSession(sessionId)
+            NSLog("[RetryOfflineTranscription] Deleted existing transcript segments")
+
+            // Track speakers for this session
+            var retrySpeakers: Set<String> = []
+
+            // Delete existing speaker tracks and recreate them based on new results
+            try await databaseClient.deleteSpeakerTracksForSession(sessionId)
+
+            let now = date.now
+
+            // Insert new segments from offline transcription
+            for segment in segments {
+                // Create speaker track if this is a new speaker
+                if let speakerId = segment.speakerId, !retrySpeakers.contains(speakerId) {
+                    retrySpeakers.insert(speakerId)
+                    let displayOrder = retrySpeakers.count
+                    let trackId = uuid().uuidString
+
+                    let speakerTrack = SpeakerTrackRecord(
+                        id: trackId,
+                        sessionId: sessionId.rawValue,
+                        machineSpeakerId: speakerId,
+                        displayOrder: displayOrder
+                    )
+                    try await databaseClient.createSpeakerTrack(speakerTrack)
+                }
+
+                // Create transcript segment
+                let segmentRecord = TranscriptSegmentRecord(
+                    id: segment.id.rawValue,
+                    sessionId: sessionId.rawValue,
+                    startMs: Int(segment.startMs),
+                    endMs: Int(segment.endMs),
+                    machineSpeakerId: segment.speakerId,
+                    text: segment.text,
+                    isFinal: segment.isFinal,
+                    createdAt: now,
+                    updatedAt: now
+                )
+                try await databaseClient.createTranscriptSegment(segmentRecord)
+            }
+            NSLog("[RetryOfflineTranscription] Inserted \(segments.count) new segments")
+
+            // Update session to processed state
+            if var finalSession = try await databaseClient.fetchSession(sessionId) {
+                // Recompute preview text from offline segments
+                let previewText = segments
+                    .filter { $0.isFinal }
+                    .prefix(3)
+                    .map { $0.text }
+                    .joined(separator: " ")
+
+                finalSession.previewText = previewText.isEmpty ? nil : String(previewText.prefix(200))
+                finalSession.speakerCount = retrySpeakers.count
+                finalSession.processingState = .processed
+                finalSession.processingError = nil
+                finalSession.updatedAt = date.now
+                try await databaseClient.updateSession(finalSession)
+                NSLog("[RetryOfflineTranscription] Session marked as processed")
+            }
+
+            return true
+
+        } catch {
+            NSLog("[RetryOfflineTranscription] ERROR: \(String(describing: error))")
+            // Mark session as failed again
+            do {
+                if var failedSession = try await databaseClient.fetchSession(sessionId) {
+                    // Check if there are existing segments
+                    let existingSegments = (try? await databaseClient.fetchTranscriptSegments(sessionId)) ?? []
+                    let hasSegments = !existingSegments.isEmpty
+
+                    failedSession.processingState = hasSegments ? .partial : .failed
+                    failedSession.processingError = "Retry failed: \(error.localizedDescription)"
+                    failedSession.updatedAt = date.now
+                    try await databaseClient.updateSession(failedSession)
+                }
+            } catch {
+                // Silent failure
+            }
+            return false
+        }
+    }
 }
 
 // MARK: - RecordingProcessorError
@@ -807,6 +961,10 @@ public actor RecordingProcessor {
 public enum RecordingProcessorError: Error, Equatable, Sendable {
     case alreadyRecording
     case notRecording
+    case sessionNotFound
+    case noAudioFile
+    case audioFileNotFound
+    case invalidStateForRetry(ProcessingState)
 }
 
 // MARK: - RecoveryRoutine

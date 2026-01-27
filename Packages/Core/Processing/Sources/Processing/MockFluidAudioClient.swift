@@ -126,19 +126,32 @@ public struct MockFluidAudioScript: Sendable {
 
 // MARK: - MockFluidAudioClient Actor
 
+/// Configuration for offline (file) transcription behavior
+public enum OfflineTranscriptionBehavior: Sendable {
+    /// Return segments from the script
+    case success
+    /// Return empty array (no segments)
+    case empty
+    /// Throw an error
+    case failure(String)
+}
+
 /// Actor that manages mock transcription state
 public actor MockFluidAudioClientActor {
     private var script: MockFluidAudioScript
     private var isTranscribing: Bool = false
     private var continuation: AsyncStream<TranscriptSegment>.Continuation?
     private var modelState: ModelPreparationState
+    private var offlineBehavior: OfflineTranscriptionBehavior
 
     public init(
         script: MockFluidAudioScript = .twoSpeakerConversation,
-        modelState: ModelPreparationState = .ready
+        modelState: ModelPreparationState = .ready,
+        offlineBehavior: OfflineTranscriptionBehavior = .success
     ) {
         self.script = script
         self.modelState = modelState
+        self.offlineBehavior = offlineBehavior
     }
 
     /// Update the script to use for the next transcription
@@ -149,6 +162,21 @@ public actor MockFluidAudioClientActor {
     /// Update the model state
     public func setModelState(_ state: ModelPreparationState) {
         self.modelState = state
+    }
+
+    /// Update the offline behavior
+    public func setOfflineBehavior(_ behavior: OfflineTranscriptionBehavior) {
+        self.offlineBehavior = behavior
+    }
+
+    /// Get the offline behavior
+    public func getOfflineBehavior() -> OfflineTranscriptionBehavior {
+        offlineBehavior
+    }
+
+    /// Get the script segments
+    public func getScriptSegments() -> [ScriptedSegment] {
+        script.segments
     }
 
     /// Get current model status
@@ -216,15 +244,29 @@ public actor MockFluidAudioClientActor {
 
 // MARK: - MockFluidAudioClient Factory
 
+/// Error type for mock offline transcription failures
+public struct MockOfflineTranscriptionError: Error, LocalizedError {
+    public let message: String
+
+    public init(message: String) {
+        self.message = message
+    }
+
+    public var errorDescription: String? {
+        message
+    }
+}
+
 /// Creates a FluidAudioClient that emits scripted segments for testing
 public struct MockFluidAudioClient {
 
     /// Create a FluidAudioClient with scripted segment output and configurable model state
     public static func client(
         script: MockFluidAudioScript = .twoSpeakerConversation,
-        modelState: ModelPreparationState = .ready
+        modelState: ModelPreparationState = .ready,
+        offlineBehavior: OfflineTranscriptionBehavior = .success
     ) -> FluidAudioClient {
-        let actor = MockFluidAudioClientActor(script: script, modelState: modelState)
+        let actor = MockFluidAudioClientActor(script: script, modelState: modelState, offlineBehavior: offlineBehavior)
 
         return FluidAudioClient(
             prepareModels: {
@@ -243,8 +285,17 @@ public struct MockFluidAudioClient {
                 await actor.getIsTranscribing()
             },
             transcribeFile: { _ in
-                // Mock returns empty array for offline transcription
-                []
+                let behavior = await actor.getOfflineBehavior()
+                switch behavior {
+                case .success:
+                    // Return script segments for offline transcription
+                    let segments = await actor.getScriptSegments()
+                    return segments.map { $0.toTranscriptSegment() }
+                case .empty:
+                    return []
+                case .failure(let message):
+                    throw MockOfflineTranscriptionError(message: message)
+                }
             }
         )
     }
@@ -272,5 +323,20 @@ public struct MockFluidAudioClient {
     /// Create a FluidAudioClient configured with failed model state
     public static func failed(message: String) -> FluidAudioClient {
         client(script: .empty, modelState: .failed(message))
+    }
+
+    /// Create a FluidAudioClient where offline transcription fails with an error
+    public static func offlineFailure(
+        script: MockFluidAudioScript = .twoSpeakerConversation,
+        errorMessage: String = "Mock offline transcription error"
+    ) -> FluidAudioClient {
+        client(script: script, modelState: .ready, offlineBehavior: .failure(errorMessage))
+    }
+
+    /// Create a FluidAudioClient where offline transcription returns empty (no segments)
+    public static func offlineEmpty(
+        script: MockFluidAudioScript = .twoSpeakerConversation
+    ) -> FluidAudioClient {
+        client(script: script, modelState: .ready, offlineBehavior: .empty)
     }
 }
