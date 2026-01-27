@@ -12,6 +12,7 @@ let package = Package(
         .package(path: "../../Core/Models"),
         .package(path: "../../Core/Persistence"),
         .package(path: "../../Core/DesignSystem"),
+        .package(path: "../../Core/Processing"),
         .package(path: "../../Core/Export"),
         .package(path: "../../Core/Observability"),
         .package(path: "../AudioPlayerFeature"),
@@ -26,6 +27,7 @@ let package = Package(
                 "Models",
                 "Persistence",
                 "DesignSystem",
+                "Processing",
                 "Export",
                 "Observability",
                 "AudioPlayerFeature",
@@ -39,6 +41,7 @@ let package = Package(
             dependencies: [
                 "SessionDetailFeature",
                 "AudioPlayerFeature",
+                "Processing",
                 "Export",
                 "Observability",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),

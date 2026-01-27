@@ -1,8 +1,10 @@
+import CasePaths
 import ComposableArchitecture
 import Dependencies
 import Foundation
 import Models
 import Persistence
+import Processing
 import DesignSystem
 import AudioPlayerFeature
 import SpeakerPickerFeature
@@ -63,6 +65,7 @@ public struct SessionDetailFeature {
     @Dependency(\.databaseClient) var databaseClient
     @Dependency(\.exportClient) var exportClient
     @Dependency(\.fileClient) var fileClient
+    @Dependency(\.recordingProcessorClient) var recordingProcessorClient
     @Dependency(\.uuid) var uuid
 
     private enum CancelID {
@@ -96,6 +99,9 @@ public struct SessionDetailFeature {
         public var isEditingTitle: Bool = false
         public var editedTitle: String = ""
 
+        // Retry transcription state
+        public var isRetrying: Bool = false
+
         public init(
             sessionID: SessionID,
             session: SessionRecord? = nil,
@@ -112,7 +118,8 @@ public struct SessionDetailFeature {
             isDeleting: Bool = false,
             alertInfo: AlertInfo? = nil,
             isEditingTitle: Bool = false,
-            editedTitle: String = ""
+            editedTitle: String = "",
+            isRetrying: Bool = false
         ) {
             self.sessionID = sessionID
             self.session = session
@@ -130,6 +137,7 @@ public struct SessionDetailFeature {
             self.alertInfo = alertInfo
             self.isEditingTitle = isEditingTitle
             self.editedTitle = editedTitle
+            self.isRetrying = isRetrying
         }
     }
 
@@ -173,6 +181,11 @@ public struct SessionDetailFeature {
         case deleteFailed(String)
         case alertActionTapped(RecoveryAction)
         case alertDismissed
+
+        // Retry transcription actions
+        case retryTranscriptionTapped
+        case retryTranscriptionCompleted
+        case retryTranscriptionFailed(String)
     }
 
     public var body: some ReducerOf<Self> {
@@ -489,6 +502,35 @@ public struct SessionDetailFeature {
 
             case .alertDismissed:
                 state.alertInfo = nil
+                return .none
+
+            // MARK: - Retry Transcription
+
+            case .retryTranscriptionTapped:
+                guard !state.isRetrying else { return .none }
+                guard let session = state.session,
+                      session.processingState == .failed || session.processingState == .partial else {
+                    return .none
+                }
+
+                state.isRetrying = true
+                state.error = nil
+
+                return .run { [sessionID = state.sessionID, recordingProcessorClient] send in
+                    _ = try await recordingProcessorClient.retryOfflineTranscription(sessionID)
+                    await send(.retryTranscriptionCompleted)
+                } catch: { error, send in
+                    await send(.retryTranscriptionFailed(error.localizedDescription))
+                }
+
+            case .retryTranscriptionCompleted:
+                state.isRetrying = false
+                // Reload session to get updated state and segments
+                return .send(.loadSession)
+
+            case let .retryTranscriptionFailed(errorMessage):
+                state.isRetrying = false
+                state.error = errorMessage
                 return .none
             }
         }

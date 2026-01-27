@@ -3,6 +3,7 @@ import Foundation
 import ComposableArchitecture
 import Models
 import Persistence
+import Processing
 import AudioPlayerFeature
 @testable import SessionDetailFeature
 
@@ -320,5 +321,235 @@ struct SessionDetailFeatureTests {
 
         // onAppear should not trigger another load when already loading
         await store.send(.onAppear)
+    }
+
+    // MARK: - testRetryTranscriptionSuccess
+
+    @Test
+    func testRetryTranscriptionSuccess() async {
+        let mockDate = Date(timeIntervalSince1970: 1000000)
+        let sessionID = SessionID("session-123")
+
+        let failedSession = SessionRecord(
+            id: sessionID.rawValue,
+            startedAt: mockDate,
+            endedAt: mockDate.addingTimeInterval(300),
+            title: "Failed Recording",
+            previewText: nil,
+            durationMs: 300000,
+            audioPath: "/audio/session-123.caf",
+            processingState: .failed,
+            speakerCount: 0,
+            updatedAt: mockDate
+        )
+
+        let processedSession = SessionRecord(
+            id: sessionID.rawValue,
+            startedAt: mockDate,
+            endedAt: mockDate.addingTimeInterval(300),
+            title: "Failed Recording",
+            previewText: "Now transcribed",
+            durationMs: 300000,
+            audioPath: "/audio/session-123.caf",
+            processingState: .processed,
+            speakerCount: 1,
+            updatedAt: mockDate
+        )
+
+        let mockSegments = [
+            TranscriptSegmentRecord(
+                id: "seg-1",
+                sessionId: sessionID.rawValue,
+                startMs: 0,
+                endMs: 5000,
+                machineSpeakerId: "spk_0",
+                text: "Hello world",
+                confidence: 0.95,
+                isFinal: true,
+                createdAt: mockDate,
+                updatedAt: mockDate
+            )
+        ]
+
+        var retryWasCalled = false
+
+        let store = TestStore(
+            initialState: SessionDetailFeature.State(
+                sessionID: sessionID,
+                session: failedSession
+            )
+        ) {
+            SessionDetailFeature()
+        } withDependencies: {
+            $0.recordingProcessorClient.retryOfflineTranscription = { id in
+                #expect(id == sessionID)
+                retryWasCalled = true
+                return true
+            }
+            $0.databaseClient.fetchSession = { _ in processedSession }
+            $0.databaseClient.fetchTranscriptSegments = { _ in mockSegments }
+            $0.databaseClient.fetchSpeakerTracks = { _ in [] }
+            $0.databaseClient.fetchPeople = { [] }
+        }
+
+        await store.send(.retryTranscriptionTapped) {
+            $0.isRetrying = true
+            $0.error = nil
+        }
+
+        await store.receive(\.retryTranscriptionCompleted) {
+            $0.isRetrying = false
+        }
+
+        // loadSession is triggered after retry completes
+        await store.receive(\.loadSession) {
+            $0.isLoading = true
+        }
+
+        await store.receive(\.sessionLoaded) {
+            $0.isLoading = false
+            $0.session = processedSession
+            $0.segments = [
+                DetailSegment(
+                    id: TranscriptSegmentID("seg-1"),
+                    machineSpeakerId: "spk_0",
+                    startMs: 0,
+                    endMs: 5000,
+                    text: "Hello world"
+                )
+            ]
+            $0.speakerTracks = []
+            $0.audioPlayer = AudioPlayerFeature.State(
+                audioURL: URL(fileURLWithPath: "/audio/session-123.caf"),
+                duration: 300.0
+            )
+        }
+
+        #expect(retryWasCalled)
+    }
+
+    // MARK: - testRetryTranscriptionFailure
+
+    @Test
+    func testRetryTranscriptionFailure() async {
+        let mockDate = Date(timeIntervalSince1970: 1000000)
+        let sessionID = SessionID("session-123")
+
+        let failedSession = SessionRecord(
+            id: sessionID.rawValue,
+            startedAt: mockDate,
+            endedAt: mockDate.addingTimeInterval(300),
+            title: "Failed Recording",
+            previewText: nil,
+            durationMs: 300000,
+            audioPath: "/audio/session-123.caf",
+            processingState: .failed,
+            speakerCount: 0,
+            updatedAt: mockDate
+        )
+
+        struct RetryError: Error, LocalizedError {
+            var errorDescription: String? { "Transcription engine unavailable" }
+        }
+
+        let store = TestStore(
+            initialState: SessionDetailFeature.State(
+                sessionID: sessionID,
+                session: failedSession
+            )
+        ) {
+            SessionDetailFeature()
+        } withDependencies: {
+            $0.recordingProcessorClient.retryOfflineTranscription = { _ in
+                throw RetryError()
+            }
+        }
+
+        await store.send(.retryTranscriptionTapped) {
+            $0.isRetrying = true
+            $0.error = nil
+        }
+
+        await store.receive(\.retryTranscriptionFailed) {
+            $0.isRetrying = false
+            $0.error = "Transcription engine unavailable"
+        }
+    }
+
+    // MARK: - testRetryTranscriptionNotAllowedWhenProcessed
+
+    @Test
+    func testRetryTranscriptionNotAllowedWhenProcessed() async {
+        let mockDate = Date(timeIntervalSince1970: 1000000)
+        let sessionID = SessionID("session-123")
+
+        let processedSession = SessionRecord(
+            id: sessionID.rawValue,
+            startedAt: mockDate,
+            endedAt: mockDate.addingTimeInterval(300),
+            title: "Processed Recording",
+            previewText: "Already transcribed",
+            durationMs: 300000,
+            audioPath: "/audio/session-123.caf",
+            processingState: .processed,
+            speakerCount: 1,
+            updatedAt: mockDate
+        )
+
+        let store = TestStore(
+            initialState: SessionDetailFeature.State(
+                sessionID: sessionID,
+                session: processedSession
+            )
+        ) {
+            SessionDetailFeature()
+        } withDependencies: {
+            $0.recordingProcessorClient.retryOfflineTranscription = { _ in
+                Issue.record("Should not call retry for processed session")
+                return false
+            }
+        }
+
+        // Retry should be ignored for processed sessions
+        await store.send(.retryTranscriptionTapped)
+    }
+
+    // MARK: - testRetryTranscriptionNotAllowedWhenAlreadyRetrying
+
+    @Test
+    func testRetryTranscriptionNotAllowedWhenAlreadyRetrying() async {
+        let mockDate = Date(timeIntervalSince1970: 1000000)
+        let sessionID = SessionID("session-123")
+
+        let failedSession = SessionRecord(
+            id: sessionID.rawValue,
+            startedAt: mockDate,
+            endedAt: mockDate.addingTimeInterval(300),
+            title: "Failed Recording",
+            previewText: nil,
+            durationMs: 300000,
+            audioPath: "/audio/session-123.caf",
+            processingState: .failed,
+            speakerCount: 0,
+            updatedAt: mockDate
+        )
+
+        let store = TestStore(
+            initialState: SessionDetailFeature.State(
+                sessionID: sessionID,
+                session: failedSession,
+                isRetrying: true
+            )
+        ) {
+            SessionDetailFeature()
+        } withDependencies: {
+            $0.recordingProcessorClient.retryOfflineTranscription = { _ in
+                Issue.record("Should not call retry when already retrying")
+                return false
+            }
+        }
+
+        // Retry should be ignored when already retrying
+        await store.send(.retryTranscriptionTapped)
     }
 }

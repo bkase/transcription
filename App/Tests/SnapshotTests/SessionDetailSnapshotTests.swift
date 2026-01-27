@@ -196,4 +196,87 @@ struct SessionDetailSnapshotTests {
 
         SnapshotHarness.assertSnapshot(of: view, named: "session_detail_long_transcript")
     }
+
+    // MARK: - Processing State Snapshots
+
+    @Test func testSessionDetailTranscribing() {
+        // Session while transcription is in progress
+        let view = SessionDetailViewPreview(
+            title: "Recording Session",
+            time: "11:30 AM",
+            duration: "5:42",
+            segments: [],
+            displayMode: .transcribing,
+            showAudioPlayer: true,
+            audioProgress: 0.0,
+            audioTime: "0:00",
+            isPlaying: false
+        )
+
+        SnapshotHarness.assertSnapshot(of: view, named: "session_detail_transcribing")
+    }
+
+    @Test func testSessionDetailRetrying() {
+        // Session while retrying transcription
+        let view = SessionDetailViewPreview(
+            title: "Failed Recording",
+            time: "2:15 PM",
+            duration: "12:30",
+            segments: [],
+            displayMode: .retrying,
+            showAudioPlayer: true,
+            audioProgress: 0.0,
+            audioTime: "0:00",
+            isPlaying: false
+        )
+
+        SnapshotHarness.assertSnapshot(of: view, named: "session_detail_retrying")
+    }
+
+    @Test func testSessionDetailFailed() {
+        // Session with failed transcription (no segments)
+        let view = SessionDetailViewPreview(
+            title: "Architecture Review",
+            time: "9:41 AM",
+            duration: "42:10",
+            segments: [],
+            displayMode: .failed,
+            showAudioPlayer: true,
+            audioProgress: 0.0,
+            audioTime: "0:00",
+            isPlaying: false
+        )
+
+        SnapshotHarness.assertSnapshot(of: view, named: "session_detail_failed")
+    }
+
+    @Test func testSessionDetailPartial() {
+        // Session with partial transcript (some segments available)
+        let partialSegments: [SessionDetailViewPreview.SegmentData] = [
+            .init(
+                speaker: .user,
+                timestamp: "00:12",
+                text: "So we're looking at the Vapor direction."
+            ),
+            .init(
+                speaker: .guest,
+                timestamp: "00:18",
+                text: "Exactly. It needs to feel like breath on glass."
+            )
+        ]
+
+        let view = SessionDetailViewPreview(
+            title: "Partial Recording",
+            time: "3:00 PM",
+            duration: "25:15",
+            segments: [],
+            displayMode: .partial(segments: partialSegments),
+            showAudioPlayer: true,
+            audioProgress: 0.0,
+            audioTime: "0:00",
+            isPlaying: false
+        )
+
+        SnapshotHarness.assertSnapshot(of: view, named: "session_detail_partial")
+    }
 }

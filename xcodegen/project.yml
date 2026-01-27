@@ -324,6 +324,7 @@ targets:
     dependencies:
       - target: Models
       - target: Persistence
+      - target: Processing
       - target: DesignSystem
       - target: Export
       - target: AudioPlayerFeature

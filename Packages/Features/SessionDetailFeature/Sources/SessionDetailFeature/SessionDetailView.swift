@@ -290,6 +290,20 @@ public struct SessionDetailView: View {
                     }
                 }
             }
+        } else if store.isRetrying {
+            // Retrying transcription
+            VStack(spacing: VaporSpacing.md) {
+                ProgressView()
+                    .scaleEffect(1.2)
+                    .tint(VaporColor.sky)
+
+                Text("Retrying transcription...")
+                    .font(.system(size: 14, weight: .light))
+                    .foregroundColor(VaporColor.textSecondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, VaporSpacing.xxl)
+            .accessibilityIdentifier("retryingIndicator")
         } else if let session = store.session, session.processingState == .transcribing {
             // Processing state - transcription in progress
             VStack(spacing: VaporSpacing.md) {
@@ -303,49 +317,70 @@ public struct SessionDetailView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.top, VaporSpacing.xxl)
+            .accessibilityIdentifier("transcribingIndicator")
 
             // Still show any segments that have been transcribed so far
             if !store.segments.isEmpty {
-                LazyVStack(alignment: .leading, spacing: VaporSpacing.xl) {
-                    ForEach(store.segments) { segment in
-                        TranscriptSegment(
-                            speaker: speakerType(for: segment),
-                            timestamp: formatTimestamp(segment.startMs),
-                            text: segment.text,
-                            onSpeakerTap: {
-                                store.send(.speakerLabelTapped(
-                                    segmentId: segment.id,
-                                    machineSpeakerId: segment.machineSpeakerId
-                                ))
-                            }
-                        )
+                transcriptSegmentsList
+                    .padding(.top, VaporSpacing.xl)
+            }
+        } else if let session = store.session, session.processingState == .failed {
+            // Failed state - show error UI with retry CTA
+            VStack(spacing: VaporSpacing.lg) {
+                ErrorStateView(
+                    type: store.segments.isEmpty ? .transcriptionUnavailable : .transcriptionFailed,
+                    primaryLabel: "Retry Transcription",
+                    primaryAction: {
+                        store.send(.retryTranscriptionTapped)
                     }
-                }
-                .padding(.top, VaporSpacing.xl)
+                )
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if let session = store.session, session.processingState == .partial {
+            // Partial state - show segments with a partial banner
+            VStack(alignment: .leading, spacing: VaporSpacing.md) {
+                StatusBanner(
+                    type: .custom(
+                        icon: "exclamationmark.triangle",
+                        title: "Partial transcript",
+                        description: "Some parts couldn't be processed"
+                    ),
+                    onRetry: {
+                        store.send(.retryTranscriptionTapped)
+                    }
+                )
+                .accessibilityIdentifier("partialBanner")
+
+                transcriptSegmentsList
             }
         } else if store.segments.isEmpty && store.session != nil {
-            // Empty state
+            // Empty state - processed but no segments
             Text("No transcript available")
                 .font(.system(size: 14, weight: .light))
                 .foregroundColor(VaporColor.textTertiary)
                 .frame(maxWidth: .infinity)
                 .padding(.top, VaporSpacing.xl)
         } else {
-            // Transcript segments
-            LazyVStack(alignment: .leading, spacing: VaporSpacing.xl) {
-                ForEach(store.segments) { segment in
-                    TranscriptSegment(
-                        speaker: speakerType(for: segment),
-                        timestamp: formatTimestamp(segment.startMs),
-                        text: segment.text,
-                        onSpeakerTap: {
-                            store.send(.speakerLabelTapped(
-                                segmentId: segment.id,
-                                machineSpeakerId: segment.machineSpeakerId
-                            ))
-                        }
-                    )
-                }
+            // Normal state - show transcript segments
+            transcriptSegmentsList
+        }
+    }
+
+    @ViewBuilder
+    private var transcriptSegmentsList: some View {
+        LazyVStack(alignment: .leading, spacing: VaporSpacing.xl) {
+            ForEach(store.segments) { segment in
+                TranscriptSegment(
+                    speaker: speakerType(for: segment),
+                    timestamp: formatTimestamp(segment.startMs),
+                    text: segment.text,
+                    onSpeakerTap: {
+                        store.send(.speakerLabelTapped(
+                            segmentId: segment.id,
+                            machineSpeakerId: segment.machineSpeakerId
+                        ))
+                    }
+                )
             }
         }
     }
@@ -419,7 +454,7 @@ public struct SessionDetailView: View {
 /// Non-interactive preview variant for snapshot testing.
 /// Uses static data instead of Store for deterministic snapshots.
 public struct SessionDetailViewPreview: View {
-    public struct SegmentData: Identifiable {
+    public struct SegmentData: Identifiable, Sendable {
         public let id: String
         public let speaker: SpeakerType
         public let timestamp: String
@@ -438,10 +473,25 @@ public struct SessionDetailViewPreview: View {
         }
     }
 
+    /// Display mode for different processing states
+    public enum DisplayMode: Sendable {
+        /// Normal state with transcript segments
+        case normal
+        /// Transcription in progress
+        case transcribing
+        /// Retrying transcription
+        case retrying
+        /// Failed transcription with no segments
+        case failed
+        /// Partial transcription with some segments
+        case partial(segments: [SegmentData])
+    }
+
     private let title: String
     private let time: String
     private let duration: String?
     private let segments: [SegmentData]
+    private let displayMode: DisplayMode
     private let showAudioPlayer: Bool
     private let audioProgress: Double
     private let audioTime: String
@@ -452,6 +502,7 @@ public struct SessionDetailViewPreview: View {
         time: String,
         duration: String? = nil,
         segments: [SegmentData] = [],
+        displayMode: DisplayMode = .normal,
         showAudioPlayer: Bool = true,
         audioProgress: Double = 0.0,
         audioTime: String = "0:00",
@@ -461,6 +512,7 @@ public struct SessionDetailViewPreview: View {
         self.time = time
         self.duration = duration
         self.segments = segments
+        self.displayMode = displayMode
         self.showAudioPlayer = showAudioPlayer
         self.audioProgress = audioProgress
         self.audioTime = audioTime
@@ -531,28 +583,8 @@ public struct SessionDetailViewPreview: View {
                         .padding(.top, VaporSpacing.md)
                         .padding(.horizontal, VaporSpacing.lg)
 
-                        // Transcript segments
-                        LazyVStack(alignment: .leading, spacing: VaporSpacing.xl) {
-                            ForEach(segments) { segment in
-                                TranscriptSegmentPreview(
-                                    speaker: segment.speaker,
-                                    timestamp: segment.timestamp,
-                                    text: segment.text
-                                )
-                            }
-                        }
-                        .padding(.top, VaporSpacing.xl)
-                        .padding(.horizontal, VaporSpacing.lg)
-
-                        // End indicator
-                        if !segments.isEmpty {
-                            TranscriptEndIndicator()
-                                .padding(.horizontal, VaporSpacing.lg)
-                        }
-
-                        // Bottom padding
-                        Spacer()
-                            .frame(height: 100)
+                        // Transcript content based on display mode
+                        transcriptArea
                     }
                 }
             }
@@ -570,6 +602,115 @@ public struct SessionDetailViewPreview: View {
             }
         }
         .background(VaporColor.mist)
+    }
+
+    @ViewBuilder
+    private var transcriptArea: some View {
+        switch displayMode {
+        case .transcribing:
+            VStack(spacing: VaporSpacing.md) {
+                ProgressView()
+                    .scaleEffect(1.2)
+                    .tint(VaporColor.sky)
+
+                Text("Processing transcription...")
+                    .font(.system(size: 14, weight: .light))
+                    .foregroundColor(VaporColor.textSecondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, VaporSpacing.xxl)
+            .padding(.horizontal, VaporSpacing.lg)
+
+            // Still show any segments if present
+            if !segments.isEmpty {
+                segmentsList
+                    .padding(.top, VaporSpacing.xl)
+            }
+
+            Spacer().frame(height: 100)
+
+        case .retrying:
+            VStack(spacing: VaporSpacing.md) {
+                ProgressView()
+                    .scaleEffect(1.2)
+                    .tint(VaporColor.sky)
+
+                Text("Retrying transcription...")
+                    .font(.system(size: 14, weight: .light))
+                    .foregroundColor(VaporColor.textSecondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, VaporSpacing.xxl)
+            .padding(.horizontal, VaporSpacing.lg)
+
+            Spacer().frame(height: 100)
+
+        case .failed:
+            VStack(spacing: VaporSpacing.lg) {
+                ErrorStateView(
+                    type: .transcriptionUnavailable,
+                    primaryLabel: "Retry Transcription",
+                    primaryAction: {}
+                )
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.horizontal, VaporSpacing.lg)
+
+        case .partial(let partialSegments):
+            VStack(alignment: .leading, spacing: VaporSpacing.md) {
+                StatusBanner(
+                    type: .custom(
+                        icon: "exclamationmark.triangle",
+                        title: "Partial transcript",
+                        description: "Some parts couldn't be processed"
+                    ),
+                    onRetry: {}
+                )
+
+                LazyVStack(alignment: .leading, spacing: VaporSpacing.xl) {
+                    ForEach(partialSegments) { segment in
+                        TranscriptSegmentPreview(
+                            speaker: segment.speaker,
+                            timestamp: segment.timestamp,
+                            text: segment.text
+                        )
+                    }
+                }
+
+                if !partialSegments.isEmpty {
+                    TranscriptEndIndicator()
+                }
+            }
+            .padding(.top, VaporSpacing.xl)
+            .padding(.horizontal, VaporSpacing.lg)
+
+            Spacer().frame(height: 100)
+
+        case .normal:
+            segmentsList
+                .padding(.top, VaporSpacing.xl)
+
+            // End indicator
+            if !segments.isEmpty {
+                TranscriptEndIndicator()
+                    .padding(.horizontal, VaporSpacing.lg)
+            }
+
+            Spacer().frame(height: 100)
+        }
+    }
+
+    private var segmentsList: some View {
+        LazyVStack(alignment: .leading, spacing: VaporSpacing.xl) {
+            ForEach(segments) { segment in
+                TranscriptSegmentPreview(
+                    speaker: segment.speaker,
+                    timestamp: segment.timestamp,
+                    text: segment.text
+                )
+            }
+        }
+        .padding(.horizontal, VaporSpacing.lg)
     }
 }
 
