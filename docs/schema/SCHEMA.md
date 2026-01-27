@@ -92,7 +92,9 @@ Full-text search tables:
 | `idx_transcript_segments_startMs` | `transcript_segments` | `sessionId`, `startMs` |
 | `idx_speaker_segments_sessionId` | `speaker_segments` | `sessionId` |
 
-## Migration: `v2_fts5_search`
+## Migration: `v2_processing_error`
+
+## Migration: `v3_fts5_search`
 
 ### transcript_fts (FTS5 Virtual Table)
 
