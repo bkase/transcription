@@ -248,37 +248,59 @@ public struct RecordingView: View {
 
     private var liveTranscriptView: some View {
         ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: VaporSpacing.lg) {
-                    ForEach(Array(store.liveSegments.enumerated()), id: \.element.id) { index, segment in
-                        let isLastSegment = index == store.liveSegments.count - 1
-                        TranscriptSegment(
-                            speaker: speakerType(for: segment),
-                            timestamp: formatTimestamp(segment.startMs),
-                            text: segment.text,
-                            isActive: isLastSegment && store.isListening
-                        )
-                        .vaporAppear(index: index)
-                        .id(segment.id)
-                    }
+            liveTranscriptScrollView(proxy: proxy)
+        }
+    }
 
-                    // Show listening indicator at the end when recording
-                    if store.isListening {
-                        TranscriptLiveIndicator()
-                            .vaporAppear()
-                            .id("live-indicator")
-                    }
-                }
-                .padding(.horizontal, VaporSpacing.lg)
-                .padding(.top, VaporSpacing.md)
-            }
-            .onChange(of: store.liveSegments.count) { _, _ in
-                // Auto-scroll to bottom when new segments arrive
-                if let lastSegment = store.liveSegments.last {
-                    withAnimation(VaporAnimation.driftCurve.animation(duration: VaporAnimation.normalDuration)) {
-                        proxy.scrollTo(lastSegment.id, anchor: .bottom)
-                    }
-                }
+    private func liveTranscriptScrollView(proxy: ScrollViewProxy) -> some View {
+        ScrollView {
+            liveTranscriptContent
+        }
+        .onChange(of: store.liveSegments.count) { _, _ in
+            scrollToLastSegment(proxy: proxy)
+        }
+    }
+
+    private var liveTranscriptContent: some View {
+        VStack(alignment: .leading, spacing: VaporSpacing.lg) {
+            liveSegmentsList
+            liveIndicatorIfListening
+        }
+        .padding(.horizontal, VaporSpacing.lg)
+        .padding(.top, VaporSpacing.md)
+    }
+
+    private var liveSegmentsList: some View {
+        ForEach(Array(store.liveSegments.enumerated()), id: \.element.id) { index, segment in
+            liveSegmentRow(index: index, segment: segment)
+        }
+    }
+
+    private func liveSegmentRow(index: Int, segment: LiveSegment) -> some View {
+        let isLastSegment = index == store.liveSegments.count - 1
+        return TranscriptSegment(
+            speaker: speakerType(for: segment),
+            timestamp: formatTimestamp(segment.startMs),
+            text: segment.text,
+            isActive: isLastSegment && store.isListening
+        )
+        .vaporAppear(index: index)
+        .id(segment.id)
+    }
+
+    @ViewBuilder
+    private var liveIndicatorIfListening: some View {
+        if store.isListening {
+            TranscriptLiveIndicator()
+                .vaporAppear()
+                .id("live-indicator")
+        }
+    }
+
+    private func scrollToLastSegment(proxy: ScrollViewProxy) {
+        if let lastSegment = store.liveSegments.last {
+            withAnimation(VaporAnimation.driftCurve.animation(duration: VaporAnimation.normalDuration)) {
+                proxy.scrollTo(lastSegment.id, anchor: .bottom)
             }
         }
     }
