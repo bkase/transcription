@@ -180,8 +180,8 @@ public struct AudioPlayerPreview: View {
 public struct RecordingHeader: View {
     private let elapsedTime: String
 
-    /// Breathing animation for the recording dot
-    @State private var dotOpacity: Double = 1.0
+    /// Breathing animation for the recording dot - uses scale per brand guidelines
+    @State private var dotScale: CGFloat = 0.98
 
     public init(elapsedTime: String) {
         self.elapsedTime = elapsedTime
@@ -194,7 +194,7 @@ public struct RecordingHeader: View {
                 Circle()
                     .fill(VaporColor.recording)
                     .frame(width: 8, height: 8)
-                    .opacity(dotOpacity)
+                    .scaleEffect(dotScale)
                     .onAppear {
                         startBreathingAnimation()
                     }
@@ -232,11 +232,13 @@ public struct RecordingHeader: View {
     }
 
     private func startBreathingAnimation() {
+        // Start from 0.98 and animate to 1.02 following brand guidelines
+        dotScale = 0.98
         withAnimation(
             VaporAnimation.breatheCurve.animation(duration: VaporAnimation.breatheDuration)
                 .repeatForever(autoreverses: true)
         ) {
-            dotOpacity = 0.4
+            dotScale = 1.02
         }
     }
 }
@@ -287,12 +289,12 @@ public enum RecordingHeaderStatus: Equatable, Sendable {
 /// Non-interactive preview variant for snapshot testing (no animations)
 public struct RecordingHeaderPreview: View {
     private let elapsedTime: String
-    private let dotOpacity: Double
+    private let dotScale: CGFloat
     private let status: RecordingHeaderStatus
 
-    public init(elapsedTime: String, dotOpacity: Double = 1.0, status: RecordingHeaderStatus = .recording) {
+    public init(elapsedTime: String, dotScale: CGFloat = 1.0, status: RecordingHeaderStatus = .recording) {
         self.elapsedTime = elapsedTime
-        self.dotOpacity = dotOpacity
+        self.dotScale = dotScale
         self.status = status
     }
 
@@ -303,7 +305,7 @@ public struct RecordingHeaderPreview: View {
                 Circle()
                     .fill(status.color)
                     .frame(width: 8, height: 8)
-                    .opacity(dotOpacity)
+                    .scaleEffect(dotScale)
 
                 Text(status.label)
                     .font(.system(size: 14, weight: .light))
