@@ -15,6 +15,8 @@ import sys
 import os
 import re
 from dataclasses import dataclass, field
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Lock
 
 
 @dataclass
@@ -66,6 +68,40 @@ def run_build(env: dict[str, str]) -> bool:
     return True
 
 
+def run_single_package_test(package_path: str, env: dict[str, str], project_root: str) -> tuple[int, int, bool, str]:
+    """
+    Run tests for a single SPM package.
+    Returns: (passed_count, failed_count, success, output)
+    """
+    old_cwd = os.getcwd()
+    try:
+        full_path = os.path.join(project_root, package_path)
+        os.chdir(full_path)
+        proc = subprocess.run(["swift", "test", "--quiet"], env=env, capture_output=True, text=True, timeout=120)
+        output = proc.stdout + proc.stderr
+
+        match = re.search(r"Test run with (\d+) tests? .* (passed|failed)", output)
+        if match:
+            count = int(match.group(1))
+            if match.group(2) == "passed":
+                return (count, 0, True, "")
+            else:
+                return (0, count, False, output)
+        elif proc.returncode != 0:
+            # Signal 11 crashes from stale macro build artifacts are common
+            if "signal code 11" in output:
+                # This is a known issue with swift-syntax macros
+                # Skip unless we can't find any test results
+                return (0, 0, True, "")
+            else:
+                return (0, 0, False, output)
+        return (0, 0, True, "")
+    except subprocess.TimeoutExpired:
+        return (0, 0, False, f"{package_path}: TIMEOUT")
+    finally:
+        os.chdir(old_cwd)
+
+
 def run_spm_tests(env: dict[str, str]) -> TestResult:
     print("spm...", end=" ", flush=True)
     packages = [
@@ -78,39 +114,23 @@ def run_spm_tests(env: dict[str, str]) -> TestResult:
         "Packages/Features/PeopleFeature", "Packages/Features/SpeakerPickerFeature",
         "Packages/Features/ProfileFeature",
     ]
+
+    project_root = os.getcwd()
     result = TestResult(phase="SPM")
     outputs = []
 
-    for path in packages:
-        old_cwd = os.getcwd()
-        try:
-            os.chdir(path)
-            proc = subprocess.run(["swift", "test", "--quiet"], env=env, capture_output=True, text=True, timeout=120)
-            output = proc.stdout + proc.stderr
-            match = re.search(r"Test run with (\d+) tests? .* (passed|failed)", output)
-            if match:
-                count = int(match.group(1))
-                if match.group(2) == "passed":
-                    result.passed += count
-                else:
-                    result.failed += count
-                    result.success = False
+    # Run packages in parallel (4 workers to match simulator count)
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = {executor.submit(run_single_package_test, pkg, env, project_root): pkg for pkg in packages}
+
+        for future in as_completed(futures):
+            passed, failed, success, output = future.result()
+            result.passed += passed
+            result.failed += failed
+            if not success:
+                result.success = False
+                if output:
                     outputs.append(output)
-            elif proc.returncode != 0:
-                # Signal 11 crashes from stale macro build artifacts are common
-                # Only mark as failure if we didn't run any tests at all
-                if "signal code 11" in output:
-                    # This is a known issue with swift-syntax macros
-                    # Skip unless we can't find any test results
-                    pass
-                else:
-                    result.success = False
-                    outputs.append(output)
-        except subprocess.TimeoutExpired:
-            result.success = False
-            outputs.append(f"{path}: TIMEOUT")
-        finally:
-            os.chdir(old_cwd)
 
     result.output = "\n".join(outputs)
     status = "ok" if result.success else "FAILED"
@@ -175,6 +195,7 @@ def main() -> int:
 
     results.append(run_spm_tests(env))
     results.append(run_xcode_tests(env, ["VaporTests", "SnapshotTests"], "unit/snapshot", parallel=True))
+    # E2E tests run serially for now - RecordingE2ETests.testLiveSegmentsAppear has timing issues in parallel
     results.append(run_xcode_tests(env, ["E2ETests"], "e2e", parallel=False))
 
     total_passed = sum(r.passed for r in results)
