@@ -251,10 +251,12 @@ public struct RecordingView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: VaporSpacing.lg) {
                     ForEach(Array(store.liveSegments.enumerated()), id: \.element.id) { index, segment in
+                        let isLastSegment = index == store.liveSegments.count - 1
                         TranscriptSegment(
                             speaker: speakerType(for: segment),
                             timestamp: formatTimestamp(segment.startMs),
-                            text: segment.text
+                            text: segment.text,
+                            isActive: isLastSegment && store.isListening
                         )
                         .vaporAppear(index: index)
                         .id(segment.id)
@@ -490,11 +492,13 @@ public struct RecordingViewPreview: View {
             case .liveSegments(let segments):
                 ScrollView {
                     VStack(alignment: .leading, spacing: VaporSpacing.lg) {
-                        ForEach(Array(segments.enumerated()), id: \.offset) { _, segment in
+                        ForEach(Array(segments.enumerated()), id: \.offset) { index, segment in
+                            let isLastSegment = index == segments.count - 1
                             TranscriptSegmentPreview(
                                 speaker: segment.speaker,
                                 timestamp: segment.timestamp,
-                                text: segment.text
+                                text: segment.text,
+                                isActive: isLastSegment
                             )
                         }
 

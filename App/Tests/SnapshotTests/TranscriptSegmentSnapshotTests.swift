@@ -160,4 +160,41 @@ struct TranscriptSegmentSnapshotTests {
 
         SnapshotHarness.assertSnapshot(of: view, named: "transcript_in_session_detail")
     }
+
+    @Test func testActiveSegmentBreathing() {
+        // Test active segment with breathing animation (live recording state)
+        // The active segment should have scale effect applied
+        let view = VStack(alignment: .leading, spacing: 16) {
+            // Previous segments (not active)
+            TranscriptSegment(
+                speaker: .user,
+                timestamp: "00:12",
+                text: "So we're looking at the Vapor direction.",
+                isActive: false
+            )
+
+            TranscriptSegment(
+                speaker: .guest,
+                timestamp: "00:18",
+                text: "Exactly. It needs to feel like breath on glass.",
+                isActive: false
+            )
+
+            // Current active segment (most recent, has breathing animation)
+            TranscriptSegment(
+                speaker: .user,
+                timestamp: "00:35",
+                text: "I love that metaphor. The UI should barely be there.",
+                isActive: true
+            )
+
+            // Live indicator
+            TranscriptLiveIndicator()
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(VaporColor.cloud)
+
+        SnapshotHarness.assertSnapshot(of: view, named: "transcript_active_segment")
+    }
 }

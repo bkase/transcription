@@ -854,3 +854,10 @@
 - View extension: `.vaporAppear()` or `.vaporAppear(delay:)` for single elements
 - Staggered list animation: `.vaporAppear(index: i)` with default 50ms stagger delay between items
 - ForEach with index: `ForEach(Array(items.enumerated()), id: \.element.id) { index, item in ... }`
+
+## TranscriptSegment breathing animation
+- `isActive: Bool` parameter enables breathing animation on active speaker segment
+- Breathing animation: scale 0.98 ↔ 1.02, 2000ms duration, vapor-breathe curve (ease-in-out-sine)
+- Use VaporAnimation.breatheCurve.animation(duration: VaporAnimation.breatheDuration).repeatForever(autoreverses: true)
+- Active segment determined by: `index == segments.count - 1 && isListening`
+- Only most recent segment during live recording should be active

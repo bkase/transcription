@@ -41,23 +41,29 @@ public struct TranscriptSegment: View {
     private let speaker: SpeakerType
     private let timestamp: String
     private let text: String
+    private let isActive: Bool
     private let onSpeakerTap: (() -> Void)?
+
+    @State private var breatheScale: CGFloat = 0.98
 
     /// Create a transcript segment.
     /// - Parameters:
     ///   - speaker: The speaker type (user, guest, or custom)
     ///   - timestamp: Timestamp string (e.g., "00:12")
     ///   - text: The transcript text content
+    ///   - isActive: Whether this segment is the currently active/speaking segment (applies breathing animation)
     ///   - onSpeakerTap: Optional callback when speaker label is tapped
     public init(
         speaker: SpeakerType,
         timestamp: String,
         text: String,
+        isActive: Bool = false,
         onSpeakerTap: (() -> Void)? = nil
     ) {
         self.speaker = speaker
         self.timestamp = timestamp
         self.text = text
+        self.isActive = isActive
         self.onSpeakerTap = onSpeakerTap
     }
 
@@ -79,7 +85,30 @@ public struct TranscriptSegment: View {
                 .lineSpacing(6)
                 .foregroundColor(VaporColor.textPrimary)
         }
+        .scaleEffect(isActive ? breatheScale : 1.0)
         .accessibilityIdentifier("transcriptSegment")
+        .onAppear {
+            if isActive {
+                startBreathingAnimation()
+            }
+        }
+        .onChange(of: isActive) { _, newValue in
+            if newValue {
+                startBreathingAnimation()
+            } else {
+                breatheScale = 1.0
+            }
+        }
+    }
+
+    private func startBreathingAnimation() {
+        breatheScale = 0.98
+        withAnimation(
+            VaporAnimation.breatheCurve.animation(duration: VaporAnimation.breatheDuration)
+                .repeatForever(autoreverses: true)
+        ) {
+            breatheScale = 1.02
+        }
     }
 
     @ViewBuilder
@@ -123,22 +152,26 @@ public struct TranscriptSegmentPreview: View {
     private let speaker: SpeakerType
     private let timestamp: String
     private let text: String
+    private let isActive: Bool
 
     public init(
         speaker: SpeakerType,
         timestamp: String,
-        text: String
+        text: String,
+        isActive: Bool = false
     ) {
         self.speaker = speaker
         self.timestamp = timestamp
         self.text = text
+        self.isActive = isActive
     }
 
     public var body: some View {
         TranscriptSegment(
             speaker: speaker,
             timestamp: timestamp,
-            text: text
+            text: text,
+            isActive: isActive
         )
     }
 }
