@@ -21,19 +21,34 @@ struct VaporApp: App {
                 AppFeature()
             }
 
-        case .uiTesting:
+        case .uiTesting(let scenario):
             // Create in-memory database for testing
             let dbQueue = try! makeDatabase(configuration: .inMemory)
             let databaseClient = DatabaseClient.live(dbQueue: dbQueue)
             // Create in-memory profile storage for testing
             let profileStorage = InMemoryProfileStorage()
 
+            // Determine FluidAudioClient based on scenario
+            let fluidAudioClient: FluidAudioClient = {
+                switch scenario {
+                case .normal:
+                    return MockFluidAudioClient.twoSpeakerConversation
+                case .modelDownloadFailure:
+                    return MockFluidAudioClient.failed(message: "Unable to download models. Please check your connection.")
+                case .transcriptionFailure:
+                    return MockFluidAudioClient.offlineFailure(
+                        script: .twoSpeakerConversation,
+                        errorMessage: "Transcription failed: audio processing error"
+                    )
+                }
+            }()
+
             // Inject mock dependencies for deterministic E2E tests
             return withDependencies {
                 // Use generated audio capture for deterministic audio (short duration for faster tests)
                 $0.audioCaptureClient = .generated(config: .silent(durationSeconds: 2))
-                // Use mock transcription client with scripted segments
-                $0.fluidAudioClient = MockFluidAudioClient.twoSpeakerConversation
+                // Use mock transcription client based on scenario
+                $0.fluidAudioClient = fluidAudioClient
                 // Use in-memory database
                 $0.databaseClient = databaseClient
                 // Use in-memory profile client for profile tests

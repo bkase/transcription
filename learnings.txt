@@ -839,3 +839,12 @@
 - RecordingViewPreview ContentState enum extended with .transcriptionUnavailable(message:) and .processingError(segments:)
 - effectiveHeaderStatus computed property maps contentState to appropriate header status
 - Processing error state shows captured segments + ErrorStateView with retry/save buttons
+
+## E2E error state fixture patterns
+- AppEnvironment.UITestScenario enum defines different test scenarios: .normal, .modelDownloadFailure, .transcriptionFailure
+- Launch arguments parsed: `-uiTesting` + optional scenario flag (`-modelDownloadFailure`, `-transcriptionFailure`)
+- MockFluidAudioClient factories: .failed(message:) for model download failure, .offlineFailure(script:errorMessage:) for transcription failure
+- With live transcription script + offline failure, session ends in `.partial` state (has live segments), not `.failed`
+- Partial state shows StatusBanner with retry button (not ErrorStateView), and displays transcript segments below
+- Empty timeline + model failure shows "Unable to connect" variant of empty state with disabled record button
+- E2E tests use predicates: `NSPredicate(format: "identifier == 'partialBanner'")` with `waitForExistence(timeout:)`
