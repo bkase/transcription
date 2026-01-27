@@ -273,7 +273,7 @@ public struct RecordingView: View {
             .onChange(of: store.liveSegments.count) { _, _ in
                 // Auto-scroll to bottom when new segments arrive
                 if let lastSegment = store.liveSegments.last {
-                    withAnimation(.easeOut(duration: 0.2)) {
+                    withAnimation(VaporAnimation.driftCurve.animation(duration: VaporAnimation.normalDuration)) {
                         proxy.scrollTo(lastSegment.id, anchor: .bottom)
                     }
                 }
