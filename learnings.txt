@@ -823,3 +823,13 @@
 - Per-session status: SessionCardViewModel.statusPillType maps ProcessingState to StatusPillType (.transcribing/.partial/.failed/nil)
 - SessionCard displays StatusPill between title and time when statusPillType is non-nil
 - PreviewVariant structs (like SessionData) need parallel statusPillType parameter for snapshot testing
+
+## SessionDetail retry transcription patterns
+- Add Processing dependency to SessionDetailFeature when needing RecordingProcessorClient.retryOfflineTranscription
+- Feature state: `isRetrying: Bool` tracks in-progress retry (distinct from isLoading for initial load)
+- retryTranscriptionTapped action guards: !isRetrying, session exists, processingState in (.failed, .partial)
+- Successful retry calls `.loadSession` to refresh segments; failure sets error message
+- SessionDetailView uses ErrorStateView for .failed state with "Retry Transcription" CTA
+- SessionDetailView uses StatusBanner for .partial state (segments exist but incomplete)
+- SessionDetailViewPreview.DisplayMode enum: .normal, .transcribing, .retrying, .failed, .partial(segments:)
+- XcodeGen project.yml needs Processing target added to SessionDetailFeature dependencies
