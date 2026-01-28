@@ -219,6 +219,10 @@ public struct SessionDetailFeature {
         case retryTranscriptionTapped
         case retryTranscriptionCompleted
         case retryTranscriptionFailed(String)
+
+        // Create speaker track for untracked segment
+        case speakerTrackCreated(trackId: String, displayOrder: Int)
+        case speakerTrackCreationFailed(String)
     }
 
     public var body: some ReducerOf<Self> {
@@ -395,21 +399,63 @@ public struct SessionDetailFeature {
                 // Handled by child reducer
                 return .none
 
-            case let .speakerLabelTapped(_, machineSpeakerId):
-                // Find the speaker track for this segment
-                guard let speakerId = machineSpeakerId,
-                      let track = state.speakerTracks.first(where: { $0.machineSpeakerId == speakerId }) else {
+            case let .speakerLabelTapped(segmentId, machineSpeakerId):
+                // If we have a machineSpeakerId, find the corresponding track
+                if let speakerId = machineSpeakerId,
+                   let track = state.speakerTracks.first(where: { $0.machineSpeakerId == speakerId }) {
+                    // Open the speaker picker modal with existing track
+                    state.speakerPicker = SpeakerPickerFeature.State(
+                        speakerTrackId: track.id,
+                        sessionId: state.sessionID,
+                        displayOrder: track.displayOrder,
+                        currentPersonId: track.personId.map { PersonID($0) },
+                        userProfile: state.userProfile
+                    )
                     return .none
                 }
 
-                // Open the speaker picker modal
+                // No machineSpeakerId (or no matching track) - create a new speaker track
+                let newMachineSpeakerId = uuid().uuidString
+                let newTrackId = uuid().uuidString
+                let newDisplayOrder = state.speakerTracks.count + 1
+                let sessionIdString = state.sessionID.rawValue
+
+                return .run { [databaseClient, segmentId, newMachineSpeakerId, newTrackId, newDisplayOrder, sessionIdString] send in
+                    // Create a new speaker track for this segment
+                    let newTrack = SpeakerTrackRecord(
+                        id: newTrackId,
+                        sessionId: sessionIdString,
+                        machineSpeakerId: newMachineSpeakerId,
+                        displayOrder: newDisplayOrder
+                    )
+                    try await databaseClient.createSpeakerTrack(newTrack)
+
+                    // Update the segment with the new machineSpeakerId
+                    let segments = try await databaseClient.fetchTranscriptSegments(SessionID(sessionIdString))
+                    if let segmentRecord = segments.first(where: { $0.id == segmentId.rawValue }) {
+                        var updatedSegment = segmentRecord
+                        updatedSegment.machineSpeakerId = newMachineSpeakerId
+                        try await databaseClient.updateTranscriptSegment(updatedSegment)
+                    }
+
+                    await send(.speakerTrackCreated(trackId: newTrackId, displayOrder: newDisplayOrder))
+                } catch: { error, send in
+                    await send(.speakerTrackCreationFailed(error.localizedDescription))
+                }
+
+            case let .speakerTrackCreated(trackId, displayOrder):
+                // Open the speaker picker modal with the newly created track
                 state.speakerPicker = SpeakerPickerFeature.State(
-                    speakerTrackId: track.id,
+                    speakerTrackId: trackId,
                     sessionId: state.sessionID,
-                    displayOrder: track.displayOrder,
-                    currentPersonId: track.personId.map { PersonID($0) },
+                    displayOrder: displayOrder,
+                    currentPersonId: nil,
                     userProfile: state.userProfile
                 )
+                return .none
+
+            case let .speakerTrackCreationFailed(errorMessage):
+                state.error = errorMessage
                 return .none
 
             case .speakerPicker(.presented(.selectionConfirmed)):

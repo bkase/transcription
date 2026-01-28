@@ -6,7 +6,22 @@ import Models
 import Persistence
 import Processing
 import AudioPlayerFeature
+import SpeakerPickerFeature
 @testable import SessionDetailFeature
+
+// Actor for thread-safe capture of DB operations in tests
+private actor CapturedTrackState {
+    var createdTrack: SpeakerTrackRecord?
+    var updatedSegment: TranscriptSegmentRecord?
+
+    func setCreatedTrack(_ track: SpeakerTrackRecord) {
+        createdTrack = track
+    }
+
+    func setUpdatedSegment(_ segment: TranscriptSegmentRecord) {
+        updatedSegment = segment
+    }
+}
 
 @MainActor
 struct SessionDetailFeatureTests {
@@ -763,6 +778,238 @@ struct SessionDetailFeatureTests {
         #expect(spk0Segments.count == 3)
         for segment in spk0Segments {
             #expect(segment.speakerType == aliceSpeakerType, "All spk_0 segments should have Alice as speaker, but segment \(segment.id) did not")
+        }
+    }
+
+    // MARK: - testSpeakerLabelTappedWithExistingTrack
+
+    @Test
+    func testSpeakerLabelTappedWithExistingTrack() async {
+        let sessionID = SessionID("session-123")
+        let mockDate = Date(timeIntervalSince1970: 1000000)
+
+        let mockSession = SessionRecord(
+            id: sessionID.rawValue,
+            startedAt: mockDate,
+            endedAt: mockDate.addingTimeInterval(300),
+            title: "Test Session",
+            previewText: nil,
+            durationMs: 300000,
+            audioPath: nil,
+            processingState: .processed,
+            speakerCount: 1,
+            updatedAt: mockDate
+        )
+
+        let existingTrack = DetailSpeakerTrack(
+            id: "track-1",
+            machineSpeakerId: "spk_0",
+            displayOrder: 1,
+            personId: nil,
+            personName: nil
+        )
+
+        let existingSegment = DetailSegment(
+            id: TranscriptSegmentID("seg-1"),
+            machineSpeakerId: "spk_0",
+            startMs: 0,
+            endMs: 5000,
+            text: "Hello",
+            speakerType: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color)
+        )
+
+        let store = TestStore(
+            initialState: SessionDetailFeature.State(
+                sessionID: sessionID,
+                session: mockSession,
+                segments: [existingSegment],
+                speakerTracks: [existingTrack]
+            )
+        ) {
+            SessionDetailFeature()
+        }
+
+        // Tap speaker label on segment with existing track
+        await store.send(.speakerLabelTapped(
+            segmentId: TranscriptSegmentID("seg-1"),
+            machineSpeakerId: "spk_0"
+        )) {
+            // Should open speaker picker modal with existing track info
+            $0.speakerPicker = SpeakerPickerFeature.State(
+                speakerTrackId: "track-1",
+                sessionId: sessionID,
+                displayOrder: 1,
+                currentPersonId: nil,
+                userProfile: .empty
+            )
+        }
+    }
+
+    // MARK: - testSpeakerLabelTappedWithNilMachineSpeakerId
+
+    /// Regression test for bd-3t9s: Verifies that tapping a speaker label on a segment
+    /// with nil machineSpeakerId creates a new speaker track and opens the picker.
+    @Test
+    func testSpeakerLabelTappedWithNilMachineSpeakerId() async {
+        let sessionID = SessionID("session-123")
+        let mockDate = Date(timeIntervalSince1970: 1000000)
+
+        let mockSession = SessionRecord(
+            id: sessionID.rawValue,
+            startedAt: mockDate,
+            endedAt: mockDate.addingTimeInterval(300),
+            title: "Test Session",
+            previewText: nil,
+            durationMs: 300000,
+            audioPath: nil,
+            processingState: .processed,
+            speakerCount: 1,
+            updatedAt: mockDate
+        )
+
+        // Segment with nil machineSpeakerId (the bug case)
+        let segmentWithNilSpeaker = DetailSegment(
+            id: TranscriptSegmentID("seg-1"),
+            machineSpeakerId: nil,  // This is the key - nil speaker
+            startMs: 0,
+            endMs: 5000,
+            text: "Hello",
+            speakerType: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color)
+        )
+
+        // The segment record in DB (with nil machineSpeakerId)
+        let segmentRecord = TranscriptSegmentRecord(
+            id: "seg-1",
+            sessionId: sessionID.rawValue,
+            startMs: 0,
+            endMs: 5000,
+            machineSpeakerId: nil,
+            text: "Hello",
+            confidence: nil,
+            isFinal: true,
+            createdAt: mockDate,
+            updatedAt: mockDate
+        )
+
+        let testUUID1 = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let testUUID2 = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+
+        // Use actor for thread-safe capture of mutable state
+        let capturedState = CapturedTrackState()
+
+        let store = TestStore(
+            initialState: SessionDetailFeature.State(
+                sessionID: sessionID,
+                session: mockSession,
+                segments: [segmentWithNilSpeaker],
+                speakerTracks: []  // No existing tracks
+            )
+        ) {
+            SessionDetailFeature()
+        } withDependencies: {
+            // Use deterministic UUIDs: first for machineSpeakerId, second for trackId
+            var uuids = [testUUID1, testUUID2].makeIterator()
+            $0.uuid = .init { uuids.next()! }
+            $0.databaseClient.createSpeakerTrack = { record in
+                await capturedState.setCreatedTrack(record)
+            }
+            $0.databaseClient.fetchTranscriptSegments = { _ in
+                [segmentRecord]
+            }
+            $0.databaseClient.updateTranscriptSegment = { record in
+                await capturedState.setUpdatedSegment(record)
+            }
+        }
+
+        // Tap speaker label on segment with nil machineSpeakerId
+        await store.send(.speakerLabelTapped(
+            segmentId: TranscriptSegmentID("seg-1"),
+            machineSpeakerId: nil
+        ))
+
+        // Should receive speakerTrackCreated with new track info
+        await store.receive(\.speakerTrackCreated) {
+            // Speaker picker modal should open with the new track
+            $0.speakerPicker = SpeakerPickerFeature.State(
+                speakerTrackId: testUUID2.uuidString,  // Second UUID is the track ID
+                sessionId: sessionID,
+                displayOrder: 1  // First speaker track
+            )
+        }
+
+        // Verify the speaker track was created with correct data
+        let createdTrack = await capturedState.createdTrack
+        #expect(createdTrack != nil)
+        #expect(createdTrack?.id == testUUID2.uuidString)
+        #expect(createdTrack?.sessionId == sessionID.rawValue)
+        #expect(createdTrack?.machineSpeakerId == testUUID1.uuidString)  // First UUID is the new machineSpeakerId
+        #expect(createdTrack?.displayOrder == 1)
+
+        // Verify the segment was updated with the new machineSpeakerId
+        let updatedSeg = await capturedState.updatedSegment
+        #expect(updatedSeg != nil)
+        #expect(updatedSeg?.id == "seg-1")
+        #expect(updatedSeg?.machineSpeakerId == testUUID1.uuidString)
+    }
+
+    // MARK: - testSpeakerLabelTappedWithNilMachineSpeakerIdError
+
+    @Test
+    func testSpeakerLabelTappedWithNilMachineSpeakerIdError() async {
+        let sessionID = SessionID("session-123")
+        let mockDate = Date(timeIntervalSince1970: 1000000)
+
+        let mockSession = SessionRecord(
+            id: sessionID.rawValue,
+            startedAt: mockDate,
+            endedAt: mockDate.addingTimeInterval(300),
+            title: "Test Session",
+            previewText: nil,
+            durationMs: 300000,
+            audioPath: nil,
+            processingState: .processed,
+            speakerCount: 1,
+            updatedAt: mockDate
+        )
+
+        let segmentWithNilSpeaker = DetailSegment(
+            id: TranscriptSegmentID("seg-1"),
+            machineSpeakerId: nil,
+            startMs: 0,
+            endMs: 5000,
+            text: "Hello",
+            speakerType: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color)
+        )
+
+        struct TestError: Error, LocalizedError {
+            var errorDescription: String? { "Database error" }
+        }
+
+        let store = TestStore(
+            initialState: SessionDetailFeature.State(
+                sessionID: sessionID,
+                session: mockSession,
+                segments: [segmentWithNilSpeaker],
+                speakerTracks: []
+            )
+        ) {
+            SessionDetailFeature()
+        } withDependencies: {
+            $0.uuid = .incrementing
+            $0.databaseClient.createSpeakerTrack = { _ in
+                throw TestError()
+            }
+        }
+
+        // Tap speaker label on segment with nil machineSpeakerId
+        await store.send(.speakerLabelTapped(
+            segmentId: TranscriptSegmentID("seg-1"),
+            machineSpeakerId: nil
+        ))
+
+        // Should receive error
+        await store.receive(\.speakerTrackCreationFailed) {
+            $0.error = "Database error"
         }
     }
 }

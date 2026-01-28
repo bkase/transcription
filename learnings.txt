@@ -1118,3 +1118,16 @@
 - Without NavigationStack wrapper, appending to path won't trigger visible navigation in that tab
 - Pattern: Both Timeline and People tabs wrap their content in `NavigationStack(path: $store.scope(state: \.path, action: \.path)) { ... }`
 - Share navigation destinations across tabs by duplicating the `destination:` closure
+
+## IconButton for header settings navigation
+- Use IconButton with "gearshape" SF Symbol for settings navigation in headers
+- Style: .transparent with VaporColor.textTertiary for subtle appearance
+- When replacing avatar with icon, the action can remain named (e.g., avatarTapped) if other tabs still use avatars
+- Update accessibility identifiers and E2E tests when changing interactive elements
+
+## TCA action with async side effects for speaker track creation
+- When speakerLabelTapped has nil machineSpeakerId, need to create speaker track before opening picker
+- Pattern: speakerLabelTapped -> async effect creates track -> speakerTrackCreated opens modal
+- Use separate action (speakerTrackCreated) to update state after async DB operations complete
+- Generate both new machineSpeakerId and trackId using @Dependency(\.uuid)
+- Update segment's machineSpeakerId in DB to link segment with new speaker track
