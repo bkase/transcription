@@ -225,6 +225,7 @@ struct AppFeatureTests {
             $0.date = .constant(fixedDate)
             // Mock database client for timeline reload
             $0.databaseClient.fetchSessionsGroupedByDate = { _ in [] }
+            $0.databaseClient.fetchSpeakerInfoForSessions = { _ in [:] }
             // Mock session detail load methods (triggered by retryTranscriptionCompleted sending loadSession)
             $0.databaseClient.fetchSession = { _ in nil }
             $0.databaseClient.fetchTranscriptSegments = { _ in [] }
@@ -262,6 +263,7 @@ struct AppFeatureTests {
         } withDependencies: {
             $0.date = .constant(fixedDate)
             $0.databaseClient.fetchSessionsGroupedByDate = { _ in [] }
+            $0.databaseClient.fetchSpeakerInfoForSessions = { _ in [:] }
             $0.databaseClient.fetchSession = { _ in nil }
             $0.databaseClient.fetchTranscriptSegments = { _ in [] }
             $0.databaseClient.fetchSpeakerTracks = { _ in [] }

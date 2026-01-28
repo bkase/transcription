@@ -115,6 +115,7 @@ struct TimelineErrorTests {
         } withDependencies: {
             $0.date = .constant(mockDate)
             $0.databaseClient.fetchSessionsGroupedByDate = { _ in mockGroups }
+            $0.databaseClient.fetchSpeakerInfoForSessions = { _ in [:] }
         }
 
         // Tap retry
@@ -130,6 +131,7 @@ struct TimelineErrorTests {
         await store.receive(\.sessionsLoaded) {
             $0.isLoading = false
             $0.sessionGroups = mockGroups
+            $0.speakerInfoBySession = [:]
         }
     }
 

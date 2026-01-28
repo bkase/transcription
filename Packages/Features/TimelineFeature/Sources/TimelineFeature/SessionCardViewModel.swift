@@ -15,6 +15,8 @@ public struct SessionCardViewModel: Equatable, Sendable {
     public let isTranscribed: Bool
     /// Optional status pill type for displaying session processing state
     public let statusPillType: StatusPillType?
+    /// Speaker avatars for displaying in the card header
+    public let speakerAvatars: [SpeakerAvatarInfo]
 
     public init(
         title: String,
@@ -23,7 +25,8 @@ public struct SessionCardViewModel: Equatable, Sendable {
         speakerCount: Int?,
         duration: String?,
         isTranscribed: Bool,
-        statusPillType: StatusPillType? = nil
+        statusPillType: StatusPillType? = nil,
+        speakerAvatars: [SpeakerAvatarInfo] = []
     ) {
         self.title = title
         self.time = time
@@ -32,6 +35,7 @@ public struct SessionCardViewModel: Equatable, Sendable {
         self.duration = duration
         self.isTranscribed = isTranscribed
         self.statusPillType = statusPillType
+        self.speakerAvatars = speakerAvatars
     }
 }
 
@@ -41,20 +45,44 @@ extension SessionCardViewModel {
     /// Create a view model from a database session record.
     /// - Parameters:
     ///   - session: The session record from the database.
+    ///   - speakerInfo: Optional array of speaker info for avatars.
     ///   - timeFormatter: Date formatter for formatting the session start time.
     /// - Returns: A view model ready for rendering.
     public static func from(
         session: SessionRecord,
+        speakerInfo: [SessionSpeakerInfo] = [],
         timeFormatter: DateFormatter = Self.defaultTimeFormatter
     ) -> SessionCardViewModel {
-        SessionCardViewModel(
+        // Convert speaker info to avatar info
+        let avatars = speakerInfo.map { info -> SpeakerAvatarInfo in
+            if let personId = info.personId, let personName = info.personName {
+                // Assigned speaker - use person data
+                return SpeakerAvatarInfo.from(
+                    id: personId,
+                    name: personName,
+                    imageData: info.personImageData,
+                    colorIndex: info.displayOrder - 1
+                )
+            } else {
+                // Unassigned speaker - use display order for initials
+                return SpeakerAvatarInfo(
+                    id: info.machineSpeakerId,
+                    imageData: nil,
+                    initials: "S\(info.displayOrder)",
+                    color: SpeakerColor.forIndex(info.displayOrder - 1)
+                )
+            }
+        }
+
+        return SessionCardViewModel(
             title: session.title ?? "Untitled",
             time: timeFormatter.string(from: session.startedAt),
             previewText: session.previewText ?? "",
             speakerCount: session.speakerCount > 0 ? session.speakerCount : nil,
             duration: session.durationMs.map { formatDuration($0) },
             isTranscribed: session.processingState == .processed,
-            statusPillType: statusPillType(for: session.processingState)
+            statusPillType: statusPillType(for: session.processingState),
+            speakerAvatars: avatars
         )
     }
 

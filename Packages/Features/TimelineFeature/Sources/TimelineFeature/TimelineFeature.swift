@@ -43,6 +43,9 @@ public struct TimelineFeature {
         // User profile for avatar display
         public var userProfile: UserProfile = .empty
 
+        // Speaker info for session cards
+        public var speakerInfoBySession: [String: [SessionSpeakerInfo]] = [:]
+
         /// Whether the user is actively searching (non-empty query)
         public var isSearching: Bool {
             !searchQuery.isEmpty
@@ -84,7 +87,8 @@ public struct TimelineFeature {
             isShowingDeleteConfirmation: Bool = false,
             isDeleting: Bool = false,
             modelPreparationState: ModelPreparationState = .idle,
-            userProfile: UserProfile = .empty
+            userProfile: UserProfile = .empty,
+            speakerInfoBySession: [String: [SessionSpeakerInfo]] = [:]
         ) {
             self.searchQuery = searchQuery
             self.sessionGroups = sessionGroups
@@ -97,6 +101,7 @@ public struct TimelineFeature {
             self.isDeleting = isDeleting
             self.modelPreparationState = modelPreparationState
             self.userProfile = userProfile
+            self.speakerInfoBySession = speakerInfoBySession
         }
     }
 
@@ -105,9 +110,9 @@ public struct TimelineFeature {
         case onDisappear
         case searchQueryChanged(String)
         case loadSessions
-        case sessionsLoaded([SessionGroup])
+        case sessionsLoaded([SessionGroup], [String: [SessionSpeakerInfo]])
         case sessionsFailed(String)
-        case searchPerformed([SessionRecord])
+        case searchPerformed([SessionRecord], [String: [SessionSpeakerInfo]])
         case sessionTapped(SessionID)
         case newRecordingTapped
         /// User tapped the header avatar to navigate to profile
@@ -182,7 +187,12 @@ public struct TimelineFeature {
                 // Perform FTS search with full session details
                 return .run { send in
                     let results = try await databaseClient.searchSessionsWithDetails(query)
-                    await send(.searchPerformed(results))
+
+                    // Fetch speaker info for search results
+                    let sessionIds = results.map { SessionID(rawValue: $0.id) }
+                    let speakerInfo = try await databaseClient.fetchSpeakerInfoForSessions(sessionIds)
+
+                    await send(.searchPerformed(results, speakerInfo))
                 } catch: { error, send in
                     await send(.sessionsFailed(error.localizedDescription))
                 }
@@ -193,14 +203,27 @@ public struct TimelineFeature {
 
                 return .run { [date] send in
                     let groups = try await databaseClient.fetchSessionsGroupedByDate(date.now)
-                    await send(.sessionsLoaded(groups))
+
+                    // Collect all session IDs to fetch speaker info
+                    var sessionIds: [SessionID] = []
+                    for group in groups {
+                        for session in group.sessions {
+                            sessionIds.append(SessionID(rawValue: session.id))
+                        }
+                    }
+
+                    // Fetch speaker info for all sessions
+                    let speakerInfo = try await databaseClient.fetchSpeakerInfoForSessions(sessionIds)
+
+                    await send(.sessionsLoaded(groups, speakerInfo))
                 } catch: { error, send in
                     await send(.sessionsFailed(error.localizedDescription))
                 }
 
-            case let .sessionsLoaded(groups):
+            case let .sessionsLoaded(groups, speakerInfo):
                 state.isLoading = false
                 state.sessionGroups = groups
+                state.speakerInfoBySession = speakerInfo
 
                 // Start polling if any sessions are transcribing
                 let hasTranscribing = groups.contains { group in
@@ -230,8 +253,12 @@ public struct TimelineFeature {
                 )
                 return .none
 
-            case let .searchPerformed(results):
+            case let .searchPerformed(results, speakerInfo):
                 state.searchResults = results
+                // Merge speaker info into existing map (search results may overlap with current sessions)
+                for (sessionId, info) in speakerInfo {
+                    state.speakerInfoBySession[sessionId] = info
+                }
                 return .none
 
             case .sessionTapped:
@@ -365,7 +392,19 @@ public struct TimelineFeature {
                 // Reload sessions to get updated processing states
                 return .run { [date] send in
                     let groups = try await databaseClient.fetchSessionsGroupedByDate(date.now)
-                    await send(.sessionsLoaded(groups))
+
+                    // Collect all session IDs to fetch speaker info
+                    var sessionIds: [SessionID] = []
+                    for group in groups {
+                        for session in group.sessions {
+                            sessionIds.append(SessionID(rawValue: session.id))
+                        }
+                    }
+
+                    // Fetch speaker info for all sessions
+                    let speakerInfo = try await databaseClient.fetchSpeakerInfoForSessions(sessionIds)
+
+                    await send(.sessionsLoaded(groups, speakerInfo))
                 } catch: { _, _ in
                     // Silently continue polling on error
                 }

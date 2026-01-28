@@ -616,7 +616,190 @@ public struct SpeakerPickerModalPreview: View {
 
 // MARK: - Previews
 
+// MARK: - Speaker Avatar Info
+
+/// Data model for displaying a speaker avatar in a stack.
+/// Contains the visual properties needed to render the avatar.
+public struct SpeakerAvatarInfo: Equatable, Sendable, Identifiable {
+    public let id: String
+    public let imageData: Data?
+    public let initials: String
+    public let color: SpeakerColor
+
+    public init(
+        id: String,
+        imageData: Data? = nil,
+        initials: String,
+        color: SpeakerColor
+    ) {
+        self.id = id
+        self.imageData = imageData
+        self.initials = initials
+        self.color = color
+    }
+
+    /// Create from a person's name with auto-generated initials
+    public static func from(
+        id: String,
+        name: String,
+        imageData: Data? = nil,
+        colorIndex: Int
+    ) -> SpeakerAvatarInfo {
+        let components = name.split(separator: " ")
+        let first = components.first?.prefix(1) ?? ""
+        let last = components.count > 1 ? components.last?.prefix(1) ?? "" : ""
+        let initials = String(first + last).uppercased()
+        return SpeakerAvatarInfo(
+            id: id,
+            imageData: imageData,
+            initials: initials.isEmpty ? "?" : initials,
+            color: SpeakerColor.forIndex(colorIndex)
+        )
+    }
+}
+
+// MARK: - Speaker Avatar Stack
+
+/// Overlapping avatar circles representing session speakers.
+/// Shows up to 2 avatars with overlap, designed for session cards.
+public struct SpeakerAvatarStack: View {
+    private let speakers: [SpeakerAvatarInfo]
+    private let circleSize: CGFloat
+    private let overlap: CGFloat
+
+    /// Create a speaker avatar stack.
+    /// - Parameters:
+    ///   - speakers: Array of speaker info (displays first 2 only)
+    ///   - circleSize: Diameter of each avatar circle (default 24pt)
+    ///   - overlap: Horizontal overlap between circles (default 8pt)
+    public init(
+        speakers: [SpeakerAvatarInfo],
+        circleSize: CGFloat = 24,
+        overlap: CGFloat = 8
+    ) {
+        self.speakers = speakers
+        self.circleSize = circleSize
+        self.overlap = overlap
+    }
+
+    /// Fixed width container based on number of speakers
+    private var containerWidth: CGFloat {
+        if speakers.count <= 1 {
+            return circleSize
+        }
+        // Two or more: first circle full width + second circle minus overlap
+        return circleSize + (circleSize - overlap)
+    }
+
+    public var body: some View {
+        HStack(spacing: -overlap) {
+            ForEach(Array(speakers.prefix(2).enumerated()), id: \.element.id) { index, speaker in
+                avatarCircle(for: speaker)
+                    .zIndex(Double(speakers.count - index)) // First speaker on top
+            }
+        }
+        .frame(width: containerWidth, alignment: .leading)
+        .accessibilityIdentifier("speakerAvatarStack")
+    }
+
+    @ViewBuilder
+    private func avatarCircle(for speaker: SpeakerAvatarInfo) -> some View {
+        ZStack {
+            Circle()
+                .fill(speaker.color.color)
+                .frame(width: circleSize, height: circleSize)
+
+            #if os(iOS)
+            if let data = speaker.imageData,
+               let uiImage = UIImage(data: data) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: circleSize, height: circleSize)
+                    .clipShape(Circle())
+            } else {
+                Text(speaker.initials)
+                    .font(.system(size: circleSize * 0.42, weight: .medium))
+                    .foregroundColor(VaporColor.cloud)
+            }
+            #else
+            Text(speaker.initials)
+                .font(.system(size: circleSize * 0.42, weight: .medium))
+                .foregroundColor(VaporColor.cloud)
+            #endif
+        }
+        .overlay(
+            Circle()
+                .strokeBorder(VaporColor.cloud, lineWidth: 2)
+        )
+    }
+}
+
+/// Preview variant for snapshot testing.
+public struct SpeakerAvatarStackPreview: View {
+    private let speakers: [SpeakerAvatarInfo]
+    private let circleSize: CGFloat
+    private let overlap: CGFloat
+
+    public init(
+        speakers: [SpeakerAvatarInfo],
+        circleSize: CGFloat = 24,
+        overlap: CGFloat = 8
+    ) {
+        self.speakers = speakers
+        self.circleSize = circleSize
+        self.overlap = overlap
+    }
+
+    public var body: some View {
+        SpeakerAvatarStack(speakers: speakers, circleSize: circleSize, overlap: overlap)
+    }
+}
+
+// MARK: - Previews
+
 #if DEBUG
+struct SpeakerAvatarStack_Previews: PreviewProvider {
+    static var previews: some View {
+        VStack(spacing: 24) {
+            // Single speaker
+            HStack {
+                SpeakerAvatarStack(speakers: [
+                    SpeakerAvatarInfo(id: "1", initials: "SC", color: .sky)
+                ])
+                Text("Single")
+            }
+
+            // Two speakers
+            HStack {
+                SpeakerAvatarStack(speakers: [
+                    SpeakerAvatarInfo(id: "1", initials: "SC", color: .sky),
+                    SpeakerAvatarInfo(id: "2", initials: "MK", color: .lavender)
+                ])
+                Text("Two speakers")
+            }
+
+            // Three speakers (shows first 2)
+            HStack {
+                SpeakerAvatarStack(speakers: [
+                    SpeakerAvatarInfo(id: "1", initials: "SC", color: .sky),
+                    SpeakerAvatarInfo(id: "2", initials: "MK", color: .lavender),
+                    SpeakerAvatarInfo(id: "3", initials: "AL", color: .deep)
+                ])
+                Text("Three speakers (shows 2)")
+            }
+
+            // Empty
+            HStack {
+                SpeakerAvatarStack(speakers: [])
+                Text("Empty")
+            }
+        }
+        .padding(24)
+        .background(VaporColor.mist)
+    }
+}
+
 struct SpeakerUnset_Previews: PreviewProvider {
     static var previews: some View {
         VStack(spacing: 16) {

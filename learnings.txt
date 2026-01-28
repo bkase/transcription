@@ -1016,3 +1016,11 @@
 - Reuse ProfileImageClient.normalize for image processing (consistent 256px max, 0.8 compression)
 - PersonCard/PersonCardPreview need imageData parameter to display person photos
 - Tests must account for new formImageData field in state assertions after create/edit/dismiss actions
+
+## Session speaker avatars pattern
+- Batch-fetch speaker info for multiple sessions: use LEFT JOIN speaker_tracks with people table
+- Create SpeakerAvatarInfo model with id, initials, color, imageData for display
+- SpeakerAvatarStack component: overlapping circles using HStack(spacing: -overlap)
+- Use zIndex to control circle stacking order (first speaker on top)
+- Add speakerInfoBySession: [String: [SessionSpeakerInfo]] to parent state for lookup
+- When action parameters change (e.g., sessionsLoaded takes new arg), update ALL tests using that action

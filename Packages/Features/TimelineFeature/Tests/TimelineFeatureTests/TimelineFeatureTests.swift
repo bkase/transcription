@@ -43,6 +43,7 @@ struct TimelineFeatureTests {
         } withDependencies: {
             $0.date = .constant(mockDate)
             $0.databaseClient.fetchSessionsGroupedByDate = { _ in mockGroups }
+            $0.databaseClient.fetchSpeakerInfoForSessions = { _ in [:] }
         }
 
         // onAppear should trigger loadSessions (no immediate state change)
@@ -57,6 +58,7 @@ struct TimelineFeatureTests {
         await store.receive(\.sessionsLoaded) {
             $0.isLoading = false
             $0.sessionGroups = mockGroups
+            $0.speakerInfoBySession = [:]
         }
     }
 
@@ -101,6 +103,7 @@ struct TimelineFeatureTests {
                 return mockSearchResults
             }
             $0.databaseClient.fetchSessionsGroupedByDate = { _ in [] }
+            $0.databaseClient.fetchSpeakerInfoForSessions = { _ in [:] }
         }
 
         // Change search query to non-empty value
@@ -175,6 +178,7 @@ struct TimelineFeatureTests {
                 return swiftSearchResults
             }
             $0.databaseClient.fetchSessionsGroupedByDate = { _ in allGroups }
+            $0.databaseClient.fetchSpeakerInfoForSessions = { _ in [:] }
         }
 
         // Verify initial state has all sessions
@@ -231,6 +235,7 @@ struct TimelineFeatureTests {
         } withDependencies: {
             $0.date = .constant(mockDate)
             $0.databaseClient.fetchSessionsGroupedByDate = { _ in mockGroups }
+            $0.databaseClient.fetchSpeakerInfoForSessions = { _ in [:] }
         }
 
         // Clear search query
@@ -247,6 +252,7 @@ struct TimelineFeatureTests {
         await store.receive(\.sessionsLoaded) {
             $0.isLoading = false
             $0.sessionGroups = mockGroups
+            $0.speakerInfoBySession = [:]
         }
     }
 
@@ -268,6 +274,7 @@ struct TimelineFeatureTests {
             $0.databaseClient.fetchSessionsGroupedByDate = { _ in
                 throw TestError()
             }
+            $0.databaseClient.fetchSpeakerInfoForSessions = { _ in [:] }
         }
 
         await store.send(.loadSessions) {
@@ -674,6 +681,7 @@ struct TimelineFeatureTests {
         } withDependencies: {
             $0.date = .constant(mockDate)
             $0.databaseClient.fetchSessionsGroupedByDate = { _ in updatedGroups }
+            $0.databaseClient.fetchSpeakerInfoForSessions = { _ in [:] }
         }
 
         // Verify initial state has transcribing session
@@ -685,6 +693,7 @@ struct TimelineFeatureTests {
         // Should receive updated sessions (no more transcribing)
         await store.receive(\.sessionsLoaded) {
             $0.sessionGroups = updatedGroups
+            $0.speakerInfoBySession = [:]
         }
 
         // Now hasTranscribingSessions should be false

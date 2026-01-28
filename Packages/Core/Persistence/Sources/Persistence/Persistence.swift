@@ -179,6 +179,38 @@ public struct SpeakerSegmentRecord: Codable, FetchableRecord, PersistableRecord,
     }
 }
 
+// MARK: - Session Speaker Info
+
+/// Speaker info for displaying in session cards.
+/// Joins speaker_tracks with people table to get display data.
+public struct SessionSpeakerInfo: Sendable, Equatable {
+    public let sessionId: String
+    public let machineSpeakerId: String
+    public let displayOrder: Int
+    public let personId: String?
+    public let personName: String?
+    public let personColorToken: String?
+    public let personImageData: Data?
+
+    public init(
+        sessionId: String,
+        machineSpeakerId: String,
+        displayOrder: Int,
+        personId: String? = nil,
+        personName: String? = nil,
+        personColorToken: String? = nil,
+        personImageData: Data? = nil
+    ) {
+        self.sessionId = sessionId
+        self.machineSpeakerId = machineSpeakerId
+        self.displayOrder = displayOrder
+        self.personId = personId
+        self.personName = personName
+        self.personColorToken = personColorToken
+        self.personImageData = personImageData
+    }
+}
+
 // MARK: - Search Result Types
 
 /// A search result containing a session ID and its relevance score
@@ -454,6 +486,10 @@ public struct DatabaseClient: Sendable {
     public var reconcileStaleRecordings: @Sendable (_ sessionIds: [SessionID], _ now: Date) async throws -> Int = { _, _ in 0 }
     // Recovery: mark sessions stuck in transcribing state as processed
     public var recoverStuckTranscriptions: @Sendable (_ olderThan: Date) async throws -> Int = { _ in 0 }
+
+    /// Fetch speaker info for multiple sessions in a single query.
+    /// Returns a dictionary mapping session ID to array of speaker info (track + person data).
+    public var fetchSpeakerInfoForSessions: @Sendable (_ sessionIds: [SessionID]) async throws -> [String: [SessionSpeakerInfo]] = { _ in [:] }
 }
 
 extension DatabaseClient: DependencyKey {
@@ -723,6 +759,44 @@ extension DatabaseClient: DependencyKey {
                         ]
                     )
                     return db.changesCount
+                }
+            },
+            fetchSpeakerInfoForSessions: { sessionIds in
+                guard !sessionIds.isEmpty else { return [:] }
+                return try await dbQueue.read { db in
+                    // Build placeholders for IN clause
+                    let placeholders = sessionIds.map { _ in "?" }.joined(separator: ", ")
+                    let sql = """
+                        SELECT
+                            st.sessionId,
+                            st.machineSpeakerId,
+                            st.displayOrder,
+                            st.personId,
+                            p.name as personName,
+                            p.colorToken as personColorToken,
+                            p.imageData as personImageData
+                        FROM speaker_tracks st
+                        LEFT JOIN people p ON st.personId = p.id
+                        WHERE st.sessionId IN (\(placeholders))
+                        ORDER BY st.sessionId, st.displayOrder
+                        """
+                    let arguments = StatementArguments(sessionIds.map { $0.rawValue })
+                    let rows = try Row.fetchAll(db, sql: sql, arguments: arguments)
+
+                    var result: [String: [SessionSpeakerInfo]] = [:]
+                    for row in rows {
+                        let info = SessionSpeakerInfo(
+                            sessionId: row["sessionId"],
+                            machineSpeakerId: row["machineSpeakerId"],
+                            displayOrder: Int(row["displayOrder"] as Int64),
+                            personId: row["personId"],
+                            personName: row["personName"],
+                            personColorToken: row["personColorToken"],
+                            personImageData: row["personImageData"]
+                        )
+                        result[info.sessionId, default: []].append(info)
+                    }
+                    return result
                 }
             }
         )

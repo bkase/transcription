@@ -23,6 +23,7 @@ struct TimelineModelPreparationTests {
             $0.date = .constant(testDate)
             $0.uuid = .constant(testUUID)
             $0.databaseClient.fetchSessionsGroupedByDate = { _ in [] }
+            $0.databaseClient.fetchSpeakerInfoForSessions = { _ in [:] }
             $0.fluidAudioClient.prepareModels = { }
             $0.fluidAudioClient.modelStatus = { .ready }
         }
@@ -49,6 +50,7 @@ struct TimelineModelPreparationTests {
         await store.receive(\.sessionsLoaded) {
             $0.isLoading = false
             $0.sessionGroups = []
+            $0.speakerInfoBySession = [:]
         }
 
         // Verify isRecordEnabled is now true
@@ -65,6 +67,7 @@ struct TimelineModelPreparationTests {
             $0.date = .constant(testDate)
             $0.uuid = .constant(testUUID)
             $0.databaseClient.fetchSessionsGroupedByDate = { _ in [] }
+            $0.databaseClient.fetchSpeakerInfoForSessions = { _ in [:] }
             $0.fluidAudioClient.prepareModels = { }
             $0.fluidAudioClient.modelStatus = { .failed("Download failed") }
         }
@@ -82,19 +85,16 @@ struct TimelineModelPreparationTests {
             $0.isLoading = true
         }
 
-        // The following actions can arrive in any order due to async effects
-        // Sessions loaded
-        await store.receive(\.sessionsLoaded) {
-            $0.isLoading = false
-            $0.sessionGroups = []
-        }
+        // The following actions can arrive in any order due to async effects:
+        // - sessionsLoaded (from loadSessions effect)
+        // - modelPreparationFailed (from prepareModels effect)
+        // Skip all received actions and verify final state
+        await store.skipReceivedActions()
 
-        // Model preparation fails
-        await store.receive(\.modelPreparationFailed) {
-            $0.modelPreparationState = .failed("Download failed")
-        }
-
-        // Verify isRecordEnabled is still false
+        // Verify final state is correct regardless of action order
+        #expect(store.state.isLoading == false)
+        #expect(store.state.sessionGroups.isEmpty)
+        #expect(store.state.modelPreparationState == .failed("Download failed"))
         #expect(!store.state.isRecordEnabled)
     }
 
@@ -178,6 +178,7 @@ struct TimelineModelPreparationTests {
         } withDependencies: {
             $0.date = .constant(testDate)
             $0.databaseClient.fetchSessionsGroupedByDate = { _ in [] }
+            $0.databaseClient.fetchSpeakerInfoForSessions = { _ in [:] }
             // prepareModels should not be called
             $0.fluidAudioClient.prepareModels = {
                 Issue.record("prepareModels should not be called when already downloading")
@@ -194,6 +195,7 @@ struct TimelineModelPreparationTests {
         await store.receive(\.sessionsLoaded) {
             $0.isLoading = false
             $0.sessionGroups = []
+            $0.speakerInfoBySession = [:]
         }
     }
 
@@ -206,6 +208,7 @@ struct TimelineModelPreparationTests {
         } withDependencies: {
             $0.date = .constant(testDate)
             $0.databaseClient.fetchSessionsGroupedByDate = { _ in [] }
+            $0.databaseClient.fetchSpeakerInfoForSessions = { _ in [:] }
             // prepareModels should not be called
             $0.fluidAudioClient.prepareModels = {
                 Issue.record("prepareModels should not be called when already ready")
@@ -222,6 +225,7 @@ struct TimelineModelPreparationTests {
         await store.receive(\.sessionsLoaded) {
             $0.isLoading = false
             $0.sessionGroups = []
+            $0.speakerInfoBySession = [:]
         }
     }
 

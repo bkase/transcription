@@ -12,6 +12,7 @@ public struct SessionCard: View {
     private let duration: String?
     private let showMetadata: Bool
     private let statusPillType: StatusPillType?
+    private let speakerAvatars: [SpeakerAvatarInfo]
 
     /// Create a session card.
     /// - Parameters:
@@ -22,6 +23,7 @@ public struct SessionCard: View {
     ///   - duration: Duration string for metadata badge (nil to hide)
     ///   - showMetadata: Whether to show metadata badges (hover state)
     ///   - statusPillType: Optional status pill to display processing state
+    ///   - speakerAvatars: Array of speaker avatar info for displaying overlapping circles
     public init(
         title: String,
         time: String,
@@ -29,7 +31,8 @@ public struct SessionCard: View {
         speakerCount: Int? = nil,
         duration: String? = nil,
         showMetadata: Bool = false,
-        statusPillType: StatusPillType? = nil
+        statusPillType: StatusPillType? = nil,
+        speakerAvatars: [SpeakerAvatarInfo] = []
     ) {
         self.title = title
         self.time = time
@@ -38,12 +41,18 @@ public struct SessionCard: View {
         self.duration = duration
         self.showMetadata = showMetadata
         self.statusPillType = statusPillType
+        self.speakerAvatars = speakerAvatars
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: showMetadata ? 12 : 8) {
-            // Header: title + time + optional status
-            HStack {
+            // Header: speaker avatars + title + time + optional status
+            HStack(spacing: VaporSpacing.sm) {
+                // Speaker avatars (left side)
+                if !speakerAvatars.isEmpty {
+                    SpeakerAvatarStack(speakers: speakerAvatars)
+                }
+
                 Text(title)
                     .font(.system(size: 18, weight: .light))
                     .tracking(-0.2)
@@ -119,6 +128,7 @@ public struct SessionCardPreview: View {
     private let duration: String?
     private let showMetadata: Bool
     private let statusPillType: StatusPillType?
+    private let speakerAvatars: [SpeakerAvatarInfo]
 
     public init(
         title: String,
@@ -127,7 +137,8 @@ public struct SessionCardPreview: View {
         speakerCount: Int? = nil,
         duration: String? = nil,
         showMetadata: Bool = false,
-        statusPillType: StatusPillType? = nil
+        statusPillType: StatusPillType? = nil,
+        speakerAvatars: [SpeakerAvatarInfo] = []
     ) {
         self.title = title
         self.time = time
@@ -136,6 +147,7 @@ public struct SessionCardPreview: View {
         self.duration = duration
         self.showMetadata = showMetadata
         self.statusPillType = statusPillType
+        self.speakerAvatars = speakerAvatars
     }
 
     public var body: some View {
@@ -146,7 +158,8 @@ public struct SessionCardPreview: View {
             speakerCount: speakerCount,
             duration: duration,
             showMetadata: showMetadata,
-            statusPillType: statusPillType
+            statusPillType: statusPillType,
+            speakerAvatars: speakerAvatars
         )
     }
 }

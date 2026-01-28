@@ -251,14 +251,16 @@ public struct TimelineView: View {
     }
 
     private func sessionCard(for session: SessionRecord) -> some View {
-        let viewModel = SessionCardViewModel.from(session: session)
+        let speakerInfo = store.speakerInfoBySession[session.id] ?? []
+        let viewModel = SessionCardViewModel.from(session: session, speakerInfo: speakerInfo)
         return SessionCard(
             title: viewModel.title,
             time: viewModel.time,
             previewText: viewModel.previewText,
             speakerCount: viewModel.speakerCount,
             duration: viewModel.duration,
-            statusPillType: viewModel.statusPillType
+            statusPillType: viewModel.statusPillType,
+            speakerAvatars: viewModel.speakerAvatars
         )
     }
 
@@ -417,6 +419,7 @@ public struct TimelineViewPreview: View {
         public let duration: String?
         public let showMetadata: Bool
         public let statusPillType: StatusPillType?
+        public let speakerAvatars: [SpeakerAvatarInfo]
 
         public init(
             id: String = UUID().uuidString,
@@ -426,7 +429,8 @@ public struct TimelineViewPreview: View {
             speakerCount: Int? = nil,
             duration: String? = nil,
             showMetadata: Bool = false,
-            statusPillType: StatusPillType? = nil
+            statusPillType: StatusPillType? = nil,
+            speakerAvatars: [SpeakerAvatarInfo] = []
         ) {
             self.id = id
             self.title = title
@@ -436,6 +440,7 @@ public struct TimelineViewPreview: View {
             self.duration = duration
             self.showMetadata = showMetadata
             self.statusPillType = statusPillType
+            self.speakerAvatars = speakerAvatars
         }
     }
 
@@ -613,7 +618,8 @@ public struct TimelineViewPreview: View {
                                 speakerCount: session.speakerCount,
                                 duration: session.duration,
                                 showMetadata: session.showMetadata,
-                                statusPillType: session.statusPillType
+                                statusPillType: session.statusPillType,
+                                speakerAvatars: session.speakerAvatars
                             )
                         }
                     }
@@ -638,7 +644,8 @@ public struct TimelineViewPreview: View {
                             speakerCount: session.speakerCount,
                             duration: session.duration,
                             showMetadata: session.showMetadata,
-                            statusPillType: session.statusPillType
+                            statusPillType: session.statusPillType,
+                            speakerAvatars: session.speakerAvatars
                         )
                     }
                 }
