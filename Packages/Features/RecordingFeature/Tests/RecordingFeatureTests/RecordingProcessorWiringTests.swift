@@ -172,8 +172,10 @@ struct RecordingProcessorWiringTests {
             ]
             $0.speakerTracks = [
                 LiveSpeakerTrack(
+                    id: "track-1",
                     machineSpeakerId: "speaker_0",
                     displayOrder: 1,
+                    personId: nil,
                     personName: nil
                 )
             ]
@@ -209,13 +211,17 @@ struct RecordingProcessorWiringTests {
             ]
             $0.speakerTracks = [
                 LiveSpeakerTrack(
+                    id: "track-1",
                     machineSpeakerId: "speaker_0",
                     displayOrder: 1,
+                    personId: nil,
                     personName: nil
                 ),
                 LiveSpeakerTrack(
+                    id: "track-2",
                     machineSpeakerId: "speaker_1",
                     displayOrder: 2,
+                    personId: nil,
                     personName: nil
                 )
             ]
@@ -363,8 +369,10 @@ struct RecordingProcessorWiringTests {
             ]
             $0.speakerTracks = [
                 LiveSpeakerTrack(
+                    id: "track-1",
                     machineSpeakerId: "speaker_0",
                     displayOrder: 1,
+                    personId: nil,
                     personName: nil
                 )
             ]
@@ -515,8 +523,10 @@ struct RecordingProcessorWiringTests {
             ]
             $0.speakerTracks = [
                 LiveSpeakerTrack(
+                    id: "track-1",
                     machineSpeakerId: "speaker_0",
                     displayOrder: 1,
+                    personId: nil,
                     personName: nil
                 )
             ]

@@ -304,6 +304,7 @@ targets:
       - target: Audio
       - target: Processing
       - target: DesignSystem
+      - target: SpeakerPickerFeature
       - package: swift-tagged
         product: Tagged
       - package: swift-composable-architecture

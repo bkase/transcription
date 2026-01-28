@@ -15,6 +15,7 @@ let package = Package(
         .package(path: "../../Core/Processing"),
         .package(path: "../../Core/DesignSystem"),
         .package(path: "../../Core/Observability"),
+        .package(path: "../SpeakerPickerFeature"),
         .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.0.0"),
     ],
     targets: [
@@ -27,6 +28,7 @@ let package = Package(
                 "Processing",
                 "DesignSystem",
                 "Observability",
+                "SpeakerPickerFeature",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ]
         ),

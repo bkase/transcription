@@ -949,3 +949,18 @@
 - TimelineFeature polling: check `hasTranscribingSessions`, poll every 5 seconds if true, cancel when no more transcribing
 - MockFluidAudioClient.offlineHang() for testing timeout behavior (sleeps 1 hour, will be cancelled by timeout)
 - OfflineTranscriptionBehavior.hang case added to mock actor for timeout testing
+
+## Wiring child features with @Presents
+- Use `@Presents` for optional child feature state that appears/disappears (modal presentations)
+- Child feature actions use `PresentationAction<ChildFeature.Action>` wrapper
+- Set `state.childFeature = ChildFeature.State(...)` to present, `nil` to dismiss
+- Use `.ifLet(\.$childFeature, action: \.childFeature) { ChildFeature() }` in reducer body
+- Parent can intercept child actions like `.childFeature(.presented(.someAction))` before delegation
+- fullScreenCover on iOS requires `$store.scope(state: \.child, action: \.child)` for binding
+- fullScreenCover not available on macOS - use `#if os(iOS)` guard with sheet fallback
+
+## SwiftUI type-checker complexity
+- Large view bodies with many modifiers can hit "unable to type-check" errors
+- Extract modifiers into separate ViewBuilder methods or View extensions
+- Breaking body into `mainContent` and modifier chains helps type checker
+- Pass `store` or bindings to extension methods to maintain access to state

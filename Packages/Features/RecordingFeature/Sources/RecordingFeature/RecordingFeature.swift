@@ -7,6 +7,7 @@ import Persistence
 import Audio
 import Processing
 import DesignSystem
+import SpeakerPickerFeature
 
 /// A live transcript segment for display during recording
 public struct LiveSegment: Equatable, Sendable {
@@ -36,17 +37,23 @@ public struct LiveSegment: Equatable, Sendable {
 
 /// A speaker track with optional person assignment for live recording
 public struct LiveSpeakerTrack: Equatable, Sendable {
+    public let id: String
     public let machineSpeakerId: String
     public let displayOrder: Int
+    public let personId: String?
     public let personName: String?
 
     public init(
+        id: String,
         machineSpeakerId: String,
         displayOrder: Int,
+        personId: String?,
         personName: String?
     ) {
+        self.id = id
         self.machineSpeakerId = machineSpeakerId
         self.displayOrder = displayOrder
+        self.personId = personId
         self.personName = personName
     }
 }
@@ -104,6 +111,8 @@ public struct RecordingFeature {
         public var transcriptionUnavailableMessage: String?
         /// User profile for avatar display
         public var userProfile: UserProfile = .empty
+        /// Speaker picker modal state
+        @Presents public var speakerPicker: SpeakerPickerFeature.State?
 
         /// Compute initials from the profile name for avatar display
         public var initials: String {
@@ -135,7 +144,8 @@ public struct RecordingFeature {
             audioRetentionMode: AudioRetentionMode = .both,
             isTranscriptionAvailable: Bool = true,
             transcriptionUnavailableMessage: String? = nil,
-            userProfile: UserProfile = .empty
+            userProfile: UserProfile = .empty,
+            speakerPicker: SpeakerPickerFeature.State? = nil
         ) {
             self.isRecording = isRecording
             self.isPaused = isPaused
@@ -154,6 +164,7 @@ public struct RecordingFeature {
             self.isTranscriptionAvailable = isTranscriptionAvailable
             self.transcriptionUnavailableMessage = transcriptionUnavailableMessage
             self.userProfile = userProfile
+            self.speakerPicker = speakerPicker
         }
     }
 
@@ -202,6 +213,10 @@ public struct RecordingFeature {
         case actionsMenuDismissed
         /// User selected a privacy mode from the menu
         case setAudioRetentionMode(AudioRetentionMode)
+        /// User tapped a speaker label to assign a person
+        case speakerLabelTapped(segmentId: TranscriptSegmentID, machineSpeakerId: String?)
+        /// Speaker picker modal actions
+        case speakerPicker(PresentationAction<SpeakerPickerFeature.Action>)
     }
 
     public var body: some ReducerOf<Self> {
@@ -375,8 +390,10 @@ public struct RecordingFeature {
                         // Map speaker tracks with person names
                         let tracks = trackRecords.map { record in
                             LiveSpeakerTrack(
+                                id: record.id,
                                 machineSpeakerId: record.machineSpeakerId,
                                 displayOrder: record.displayOrder,
+                                personId: record.personId,
                                 personName: record.personId.flatMap { personLookup[$0] }
                             )
                         }
@@ -555,7 +572,77 @@ public struct RecordingFeature {
                 return .run { [preferencesClient] _ in
                     preferencesClient.setAudioRetentionMode(mode)
                 }
+
+            case let .speakerLabelTapped(_, machineSpeakerId):
+                // Find the speaker track for this segment
+                guard let machineSpeakerId = machineSpeakerId,
+                      let sessionId = state.sessionID,
+                      let track = state.speakerTracks.first(where: { $0.machineSpeakerId == machineSpeakerId }) else {
+                    return .none
+                }
+
+                // Open the speaker picker modal
+                state.speakerPicker = SpeakerPickerFeature.State(
+                    speakerTrackId: track.id,
+                    sessionId: sessionId,
+                    displayOrder: track.displayOrder,
+                    currentPersonId: track.personId.map { PersonID($0) }
+                )
+                return .none
+
+            case .speakerPicker(.presented(.selectionConfirmed)):
+                // Dismiss the modal and reload speaker tracks
+                state.speakerPicker = nil
+                guard let sessionID = state.sessionID else { return .none }
+                return .run { [sessionID, databaseClient] send in
+                    // Reload speaker tracks and people to get updated assignments
+                    async let tracksTask = databaseClient.fetchSpeakerTracks(sessionID)
+                    async let peopleTask = databaseClient.fetchPeople()
+
+                    let trackRecords = try await tracksTask
+                    let people = try await peopleTask
+
+                    // Create a lookup for person names
+                    let personLookup = Dictionary(uniqueKeysWithValues: people.map { ($0.id, $0.name) })
+
+                    // Map speaker tracks with person names
+                    let tracks = trackRecords.map { record in
+                        LiveSpeakerTrack(
+                            id: record.id,
+                            machineSpeakerId: record.machineSpeakerId,
+                            displayOrder: record.displayOrder,
+                            personId: record.personId,
+                            personName: record.personId.flatMap { personLookup[$0] }
+                        )
+                    }
+
+                    // Reload current segments too to update speaker display
+                    let records = try await databaseClient.fetchTranscriptSegments(sessionID)
+                    let segments = records.map { record in
+                        LiveSegment(
+                            id: TranscriptSegmentID(record.id),
+                            machineSpeakerId: record.machineSpeakerId,
+                            startMs: record.startMs,
+                            endMs: record.endMs,
+                            text: record.text,
+                            isFinal: record.isFinal
+                        )
+                    }
+
+                    await send(.segmentsLoaded(segments, tracks))
+                }
+
+            case .speakerPicker(.presented(.closeModal)):
+                state.speakerPicker = nil
+                return .none
+
+            case .speakerPicker:
+                // Other speaker picker actions handled by child reducer
+                return .none
             }
+        }
+        .ifLet(\.$speakerPicker, action: \.speakerPicker) {
+            SpeakerPickerFeature()
         }
     }
 }

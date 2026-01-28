@@ -2,6 +2,7 @@ import Audio
 import ComposableArchitecture
 import DesignSystem
 import Observability
+import SpeakerPickerFeature
 import SwiftUI
 
 #if os(iOS)
@@ -22,17 +23,18 @@ public struct RecordingView: View {
     }
 
     public var body: some View {
+        mainContent
+            .discardAlert(store: store)
+            .errorAlert(store: store, alertButton: alertButton)
+            .actionsMenu(store: store, privacyModeLabel: privacyModeLabel)
+            .speakerPickerModal(store: $store, sheetContent: speakerPickerSheet)
+    }
+
+    private var mainContent: some View {
         VStack(spacing: 0) {
-            // Nav header
             navHeader
-
-            // Recording header
             RecordingHeader(elapsedTime: formatElapsedTime(store.elapsedSeconds))
-
-            // Main content area
             contentArea
-
-            // Bottom controls
             controlsBar
         }
         .background(VaporColor.mist)
@@ -42,62 +44,19 @@ public struct RecordingView: View {
         .onDisappear {
             store.send(.onDisappear)
         }
-        .alert(
-            "Discard Recording?",
-            isPresented: Binding(
-                get: { store.isShowingDiscardConfirmation },
-                set: { if !$0 { store.send(.discardCancelled) } }
-            )
-        ) {
-            Button("Cancel", role: .cancel) {
-                store.send(.discardCancelled)
-            }
-            Button("Discard", role: .destructive) {
-                store.send(.discardConfirmed)
-            }
-        } message: {
-            Text("This will permanently delete the recording and all transcript data.")
-        }
-        .alert(
-            item: Binding(
-                get: { store.alertInfo },
-                set: { if $0 == nil { store.send(.alertDismissed) } }
-            )
-        ) { alertInfo in
-            Alert(
-                title: Text(alertInfo.title),
-                message: Text(alertInfo.message),
-                primaryButton: alertButton(for: alertInfo.primaryButton),
-                secondaryButton: alertInfo.secondaryButton.map { alertButton(for: $0) } ?? .cancel()
-            )
-        }
-        .confirmationDialog(
-            "Recording Options",
-            isPresented: Binding(
-                get: { store.isShowingActionsMenu },
-                set: { if !$0 { store.send(.actionsMenuDismissed) } }
-            ),
-            titleVisibility: .visible
-        ) {
-            // Privacy mode options
-            Button(privacyModeLabel(for: .both)) {
-                store.send(.setAudioRetentionMode(.both))
-            }
-            Button(privacyModeLabel(for: .transcriptOnly)) {
-                store.send(.setAudioRetentionMode(.transcriptOnly))
-            }
-            Button(privacyModeLabel(for: .audioOnly)) {
-                store.send(.setAudioRetentionMode(.audioOnly))
-            }
+    }
 
-            // Discard option
-            Button("Discard Recording", role: .destructive) {
-                store.send(.discardTapped)
-            }
-
-            Button("Cancel", role: .cancel) {
-                store.send(.actionsMenuDismissed)
-            }
+    @ViewBuilder
+    private func speakerPickerSheet(store speakerPickerStore: StoreOf<SpeakerPickerFeature>) -> some View {
+        NavigationStack {
+            SpeakerPickerView(store: speakerPickerStore)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            store.send(.speakerPicker(.presented(.closeModal)))
+                        }
+                    }
+                }
         }
     }
 
@@ -306,7 +265,10 @@ public struct RecordingView: View {
             speaker: speakerType(for: segment),
             timestamp: formatTimestamp(segment.startMs),
             text: segment.text,
-            isActive: isLastSegment && store.isListening
+            isActive: isLastSegment && store.isListening,
+            onSpeakerTap: {
+                store.send(.speakerLabelTapped(segmentId: segment.id, machineSpeakerId: segment.machineSpeakerId))
+            }
         )
         .vaporAppear(index: index)
         .id(segment.id)
@@ -684,6 +646,103 @@ public struct RecordingViewPreview: View {
 }
 
 // MARK: - Previews
+
+// MARK: - Recording View Modifiers
+
+private extension View {
+    func discardAlert(store: StoreOf<RecordingFeature>) -> some View {
+        self.alert(
+            "Discard Recording?",
+            isPresented: Binding(
+                get: { store.isShowingDiscardConfirmation },
+                set: { if !$0 { store.send(.discardCancelled) } }
+            )
+        ) {
+            Button("Cancel", role: .cancel) {
+                store.send(.discardCancelled)
+            }
+            Button("Discard", role: .destructive) {
+                store.send(.discardConfirmed)
+            }
+        } message: {
+            Text("This will permanently delete the recording and all transcript data.")
+        }
+    }
+
+    func errorAlert(
+        store: StoreOf<RecordingFeature>,
+        alertButton: @escaping (AlertInfo.AlertButton) -> Alert.Button
+    ) -> some View {
+        self.alert(
+            item: Binding(
+                get: { store.alertInfo },
+                set: { if $0 == nil { store.send(.alertDismissed) } }
+            )
+        ) { alertInfo in
+            Alert(
+                title: Text(alertInfo.title),
+                message: Text(alertInfo.message),
+                primaryButton: alertButton(alertInfo.primaryButton),
+                secondaryButton: alertInfo.secondaryButton.map { alertButton($0) } ?? .cancel()
+            )
+        }
+    }
+
+    func actionsMenu(
+        store: StoreOf<RecordingFeature>,
+        privacyModeLabel: @escaping (AudioRetentionMode) -> String
+    ) -> some View {
+        self.confirmationDialog(
+            "Recording Options",
+            isPresented: Binding(
+                get: { store.isShowingActionsMenu },
+                set: { if !$0 { store.send(.actionsMenuDismissed) } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(privacyModeLabel(.both)) {
+                store.send(.setAudioRetentionMode(.both))
+            }
+            Button(privacyModeLabel(.transcriptOnly)) {
+                store.send(.setAudioRetentionMode(.transcriptOnly))
+            }
+            Button(privacyModeLabel(.audioOnly)) {
+                store.send(.setAudioRetentionMode(.audioOnly))
+            }
+            Button("Discard Recording", role: .destructive) {
+                store.send(.discardTapped)
+            }
+            Button("Cancel", role: .cancel) {
+                store.send(.actionsMenuDismissed)
+            }
+        }
+    }
+
+    #if os(iOS)
+    func speakerPickerModal<Content: View>(
+        store: Bindable<StoreOf<RecordingFeature>>,
+        @ViewBuilder sheetContent: @escaping (StoreOf<SpeakerPickerFeature>) -> Content
+    ) -> some View {
+        self.fullScreenCover(
+            item: store.scope(state: \.speakerPicker, action: \.speakerPicker)
+        ) { speakerPickerStore in
+            sheetContent(speakerPickerStore)
+        }
+    }
+    #else
+    func speakerPickerModal<Content: View>(
+        store: Bindable<StoreOf<RecordingFeature>>,
+        @ViewBuilder sheetContent: @escaping (StoreOf<SpeakerPickerFeature>) -> Content
+    ) -> some View {
+        // macOS doesn't support fullScreenCover; use sheet instead
+        self.sheet(
+            item: store.scope(state: \.speakerPicker, action: \.speakerPicker)
+        ) { speakerPickerStore in
+            sheetContent(speakerPickerStore)
+        }
+    }
+    #endif
+}
 
 #if DEBUG
 struct RecordingView_Previews: PreviewProvider {

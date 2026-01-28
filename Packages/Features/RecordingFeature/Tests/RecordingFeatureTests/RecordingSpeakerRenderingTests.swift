@@ -459,8 +459,10 @@ struct RecordingSpeakerRenderingTests {
         )
         let tracks = [
             LiveSpeakerTrack(
+                id: "track-1",
                 machineSpeakerId: "spk_0",
                 displayOrder: 1,
+                personId: nil,
                 personName: nil
             )
         ]
@@ -487,8 +489,10 @@ struct RecordingSpeakerRenderingTests {
         )
         let tracks = [
             LiveSpeakerTrack(
+                id: "track-1",
                 machineSpeakerId: "spk_0",
                 displayOrder: 1,
+                personId: "person-alice",
                 personName: "Alice"
             )
         ]
@@ -515,13 +519,17 @@ struct RecordingSpeakerRenderingTests {
         )
         let tracks = [
             LiveSpeakerTrack(
+                id: "track-1",
                 machineSpeakerId: "spk_0",
                 displayOrder: 1,
+                personId: nil,
                 personName: nil
             ),
             LiveSpeakerTrack(
+                id: "track-2",
                 machineSpeakerId: "spk_1",
                 displayOrder: 2,
+                personId: nil,
                 personName: nil
             )
         ]

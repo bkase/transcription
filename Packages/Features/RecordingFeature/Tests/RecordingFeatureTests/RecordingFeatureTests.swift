@@ -344,8 +344,10 @@ struct RecordingFeatureTests {
             ]
             $0.speakerTracks = [
                 LiveSpeakerTrack(
+                    id: "track-1",
                     machineSpeakerId: "speaker_0",
                     displayOrder: 1,
+                    personId: nil,
                     personName: nil
                 )
             ]
