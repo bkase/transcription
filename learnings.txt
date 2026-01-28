@@ -1066,3 +1066,9 @@
 - Abrupt state changes cause visible bounce/snap when animation stops
 - Wrap exit in `withAnimation(VaporAnimation.exitCurve.animation(duration:))` for smooth deceleration
 - exitCurve (0.7, 0, 0.84, 0) provides smooth ease-out for stopping animations
+
+## TCA remove photo action pattern
+- Guard against nil imageData at start of removePhotoTapped to no-op when no photo exists
+- Set imageData = nil on avatar/profile to clear photo (triggers initials fallback)
+- UI conditionally shows "Remove photo" button (destructive red) vs "Tap to change photo" based on imageData presence
+- Same pattern works for both ProfileFeature (user profile) and PeopleFeature (person form)
