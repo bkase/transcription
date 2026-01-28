@@ -6,10 +6,6 @@ import Persistence
 import Processing
 import SwiftUI
 
-#if os(iOS)
-import UIKit
-#endif
-
 // MARK: - Timeline View
 
 /// Main timeline (archive) screen displaying sessions grouped by date.
@@ -107,37 +103,18 @@ public struct TimelineView: View {
         HStack {
             PageHeader(kicker: "Archive", title: "Timeline")
             Spacer()
-            Button {
+            IconButton(
+                systemName: "gearshape",
+                style: .transparent,
+                iconColor: VaporColor.textTertiary
+            ) {
                 store.send(.avatarTapped)
-            } label: {
-                avatarView
             }
-            .buttonStyle(PlainButtonStyle())
-            .accessibilityIdentifier("profileAvatarButton")
+            .accessibilityIdentifier("settingsButton")
         }
         .padding(.top, 56)
         .padding(.horizontal, VaporSpacing.lg)
         .padding(.bottom, VaporSpacing.md)
-    }
-
-    @ViewBuilder
-    private var avatarView: some View {
-        #if os(iOS)
-        if let imageData = store.userProfile.avatar.imageData,
-           let uiImage = UIImage(data: imageData) {
-            Avatar(image: Image(uiImage: uiImage), size: .medium)
-        } else if !store.initials.isEmpty {
-            Avatar(initials: store.initials, size: .medium)
-        } else {
-            Avatar(size: .medium)
-        }
-        #else
-        if !store.initials.isEmpty {
-            Avatar(initials: store.initials, size: .medium)
-        } else {
-            Avatar(size: .medium)
-        }
-        #endif
     }
 
     // MARK: - Search Section
@@ -525,7 +502,11 @@ public struct TimelineViewPreview: View {
                 HStack {
                     PageHeader(kicker: "Archive", title: "Timeline")
                     Spacer()
-                    Avatar(size: .medium)
+                    IconButton(
+                        systemName: "gearshape",
+                        style: .transparent,
+                        iconColor: VaporColor.textTertiary
+                    ) {}
                 }
                 .padding(.top, 56)
                 .padding(.horizontal, VaporSpacing.lg)

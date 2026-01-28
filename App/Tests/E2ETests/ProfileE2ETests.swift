@@ -29,9 +29,9 @@ final class ProfileE2ETests: XCTestCase {
 
     /// Navigate to profile screen from timeline.
     private func navigateToProfile() {
-        let profileAvatarButton = app.buttons["profileAvatarButton"]
-        XCTAssertTrue(profileAvatarButton.waitForExistence(timeout: 5), "Profile avatar button should exist")
-        profileAvatarButton.tap()
+        let settingsButton = app.buttons["settingsButton"]
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 5), "Settings button should exist")
+        settingsButton.tap()
 
         let profileScreen = app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'profileScreen'")).firstMatch
         XCTAssertTrue(profileScreen.waitForExistence(timeout: 5), "Profile screen should appear")

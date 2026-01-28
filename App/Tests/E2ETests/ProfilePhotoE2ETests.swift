@@ -29,10 +29,10 @@ final class ProfilePhotoE2ETests: XCTestCase {
         XCTAssertTrue(timelineTab.waitForExistence(timeout: 5), "Timeline tab should exist")
         XCTAssertTrue(timelineTab.isSelected, "Timeline tab should be selected by default")
 
-        // 3. Tap the profile avatar button to navigate to profile
-        let profileAvatarButton = app.buttons["profileAvatarButton"]
-        XCTAssertTrue(profileAvatarButton.waitForExistence(timeout: 5), "Profile avatar button should exist")
-        profileAvatarButton.tap()
+        // 3. Tap the settings button to navigate to profile
+        let settingsButton = app.buttons["settingsButton"]
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 5), "Settings button should exist")
+        settingsButton.tap()
 
         // 4. Verify profile screen appears
         let profileScreen = app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'profileScreen'")).firstMatch
@@ -80,9 +80,9 @@ final class ProfilePhotoE2ETests: XCTestCase {
         app.launch()
 
         // 2. Navigate to profile
-        let profileAvatarButton = app.buttons["profileAvatarButton"]
-        XCTAssertTrue(profileAvatarButton.waitForExistence(timeout: 5), "Profile avatar button should exist")
-        profileAvatarButton.tap()
+        let settingsButton = app.buttons["settingsButton"]
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 5), "Settings button should exist")
+        settingsButton.tap()
 
         // 3. Open mock photo picker
         let changePhotoButton = app.buttons["profileChangePhotoButton"]
