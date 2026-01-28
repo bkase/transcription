@@ -783,6 +783,39 @@ public actor RecordingProcessor {
         eventContinuation?.yield(.transcriptionUnavailable(message))
     }
 
+    /// Generate title at finalization for short recordings that didn't trigger live generation
+    private func generateTitleAtFinalization(text: String, sessionId: SessionID) async {
+        guard titleGeneratorClient.isAvailable() else {
+            NSLog("[TitleGeneration] Skipping finalization title generation - unavailable")
+            return
+        }
+
+        do {
+            guard let title = try await titleGeneratorClient.generateTitle(text) else {
+                NSLog("[TitleGeneration] Finalization title generation returned nil")
+                return
+            }
+            let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: "\"", with: "")
+            guard !trimmedTitle.isEmpty else {
+                NSLog("[TitleGeneration] Finalization title was empty after trimming")
+                return
+            }
+
+            // Update session title if not already set by user
+            if var sessionToUpdate = try await databaseClient.fetchSession(sessionId),
+               sessionToUpdate.title == nil {
+                sessionToUpdate.title = trimmedTitle
+                sessionToUpdate.updatedAt = date.now
+                try await databaseClient.updateSession(sessionToUpdate)
+                NSLog("[TitleGeneration] Finalization auto-generated title: '%@' for session %@", trimmedTitle, sessionId.rawValue)
+            }
+        } catch {
+            NSLog("[TitleGeneration] Finalization title generation failed: %@", error.localizedDescription)
+            // Silent failure - title generation is best-effort
+        }
+    }
+
     private func finalizeSession(_ sessionId: SessionID, audioFileURL: URL?) async {
         let now = date.now
 
@@ -873,38 +906,10 @@ public actor RecordingProcessor {
             // Generate title at finalization if not already generated (handles short recordings)
             // This is a fallback for recordings that didn't reach 15 seconds during live transcription
             if !titleGenerationTriggered && !accumulatedTranscriptText.isEmpty {
-                let textSnapshot = accumulatedTranscriptText
-                Task { [databaseClient, titleGeneratorClient, date] in
-                    guard titleGeneratorClient.isAvailable() else {
-                        NSLog("[TitleGeneration] Skipping finalization title generation - unavailable")
-                        return
-                    }
-
-                    do {
-                        guard let title = try await titleGeneratorClient.generateTitle(textSnapshot) else {
-                            NSLog("[TitleGeneration] Finalization title generation returned nil")
-                            return
-                        }
-                        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
-                            .replacingOccurrences(of: "\"", with: "")
-                        guard !trimmedTitle.isEmpty else {
-                            NSLog("[TitleGeneration] Finalization title was empty after trimming")
-                            return
-                        }
-
-                        // Update session title if not already set by user
-                        if var sessionToUpdate = try await databaseClient.fetchSession(sessionId),
-                           sessionToUpdate.title == nil {
-                            sessionToUpdate.title = trimmedTitle
-                            sessionToUpdate.updatedAt = date.now
-                            try await databaseClient.updateSession(sessionToUpdate)
-                            NSLog("[TitleGeneration] Finalization auto-generated title: '%@' for session %@", trimmedTitle, sessionId.rawValue)
-                        }
-                    } catch {
-                        NSLog("[TitleGeneration] Finalization title generation failed: %@", error.localizedDescription)
-                        // Silent failure - title generation is best-effort
-                    }
-                }
+                await generateTitleAtFinalization(
+                    text: accumulatedTranscriptText,
+                    sessionId: sessionId
+                )
             }
 
             // Start offline transcription if needed

@@ -1079,3 +1079,16 @@
 - Use standardizedFileURL when computing relative paths for zip entries to handle /private/var vs /var differences
 - ZIPFoundation archive.addEntry with type: .directory creates folder entries, with relativeTo: for files
 - Tests using timestamp-based export names need unique dates to avoid conflicts between parallel test runs
+
+## @Dependency properties in actors with detached Tasks
+- Detached Tasks (non-isolated Task{}) that capture @Dependency properties from actors may not inherit the dependency context correctly
+- The Task may use a different database client instance than the injected one, causing test data isolation issues
+- Fix: Make the operation an awaited actor method instead of a detached Task, so it runs within the actor's dependency context
+- Pattern: `await generateTitleAtFinalization(...)` instead of `Task { [databaseClient] in ... }`
+- This ensures the actor method accesses dependencies synchronously within the same context as the test's injected dependencies
+
+## FoundationModels framework (iOS 26+)
+- Import FoundationModels to use on-device LLM capabilities
+- LanguageModelSession() creates a session for text generation
+- session.respond(to: String) returns Response<String> with generated content in .content property
+- Use @available(iOS 26.0, *) guard and #if os(iOS) for cross-platform builds

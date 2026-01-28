@@ -799,18 +799,11 @@ import Persistence
     #expect(lastText?.contains("Hello this is a short recording") == true, "Text should include first segment")
     #expect(lastText?.contains("It ends before fifteen seconds") == true, "Text should include second segment")
 
-    // Verify session title was updated in database (with retry for async Task completion)
-    var session: SessionRecord?
-    for _ in 0..<5 {
-        let sessions = try await databaseClient.fetchSessions()
-        if sessions.count == 1 && sessions[0].title != nil {
-            session = sessions[0]
-            break
-        }
-        try await Task.sleep(for: .milliseconds(100))
-    }
-    #expect(session != nil, "Session should exist")
-    #expect(session?.title == "Short Recording Title", "Session title should be set to generated title from finalization")
+    // Verify session title was updated in database
+    // Title generation now runs as an awaited actor method, so no retry needed
+    let sessions = try await databaseClient.fetchSessions()
+    #expect(sessions.count == 1, "Session should exist")
+    #expect(sessions[0].title == "Short Recording Title", "Session title should be set to generated title from finalization")
 }
 
 @Test func testTitleGenerationNotDuplicatedAtFinalization() async throws {

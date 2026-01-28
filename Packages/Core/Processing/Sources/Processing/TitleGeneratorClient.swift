@@ -55,17 +55,10 @@ extension TitleGeneratorClient: DependencyKey {
 // MARK: - Foundation Models Implementation
 
 #if os(iOS)
+import FoundationModels
+
 @available(iOS 26.0, *)
 private func generateTitleWithFoundationModels(text: String) async throws -> String? {
-    // Import FoundationModels at runtime
-    // Note: This requires iOS 18.4+ which introduces the FoundationModels framework
-
-    // We use a guard-let pattern with NSClassFromString to safely check availability
-    // If Foundation Models isn't available, return nil gracefully
-
-    // For iOS 26+, we can use the FoundationModels framework directly
-    // The framework provides on-device LLM capabilities
-
     // Prepare prompt - limit input to first 3000 chars for performance
     let truncatedText = String(text.prefix(3000))
     let prompt = """
@@ -77,27 +70,17 @@ private func generateTitleWithFoundationModels(text: String) async throws -> Str
         """
 
     // Use Foundation Models API
-    // This is a placeholder that will be replaced with actual FoundationModels import
-    // when compiled for iOS 26+
+    NSLog("[TitleGenerator] Starting title generation with Foundation Models")
+
     do {
-        // Dynamic runtime check for FoundationModels availability
-        guard let sessionClass = NSClassFromString("FoundationModels.LanguageModelSession") else {
-            NSLog("[TitleGenerator] FoundationModels.LanguageModelSession class not found")
-            return nil
-        }
-
-        // For now, we'll use a simple approach that works with the framework
-        // This will be properly implemented when Foundation Models is available in the SDK
-        NSLog("[TitleGenerator] Foundation Models framework detected, attempting title generation")
-
-        // Placeholder: The actual implementation would use:
-        // let session = LanguageModelSession()
-        // let response = try await session.respond(to: prompt)
-        // return response.content.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        // Since FoundationModels isn't in the current SDK, return nil for now
-        // This will be updated when the iOS 26 SDK is available
-        return nil
+        let session = LanguageModelSession()
+        let response = try await session.respond(to: prompt)
+        let title = response.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        NSLog("[TitleGenerator] Generated title: '%@'", title)
+        return title
+    } catch {
+        NSLog("[TitleGenerator] Foundation Models error: %@", error.localizedDescription)
+        throw error
     }
 }
 #endif
