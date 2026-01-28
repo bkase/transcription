@@ -184,27 +184,31 @@ import Persistence
     #expect(session.title == "Auto-Generated Title", "Session title should be set to generated title")
 }
 
-@Test func testTitleGenerationNotTriggeredBefore15Seconds() async throws {
-    // This test verifies that title generation is NOT triggered before 15 seconds
+@Test func testTitleGenerationNotTriggeredDuringLiveBefore15Seconds() async throws {
+    // This test verifies that title generation is NOT triggered during live transcription
+    // before 15 seconds, but IS triggered at finalization (tested separately)
 
     let dbQueue = try makeDatabase(configuration: .inMemory)
     let databaseClient = DatabaseClient.live(dbQueue: dbQueue)
 
-    // Track title generation calls
+    // Track title generation calls and timestamps
     actor TitleGeneratorState {
         var generateTitleCallCount = 0
-        func incrementCallCount() { generateTitleCallCount += 1 }
+        var callDuringLive = false
+        var callAtFinalization = false
+
+        func recordLiveCall() { generateTitleCallCount += 1; callDuringLive = true }
+        func recordFinalizationCall() { generateTitleCallCount += 1; callAtFinalization = true }
         func getCallCount() -> Int { generateTitleCallCount }
+        func wasCalledDuringLive() -> Bool { callDuringLive }
     }
     let generatorState = TitleGeneratorState()
 
-    // Mock title generator that tracks calls
+    // This test uses an unavailable title generator to verify no live generation happens
+    // For short recordings with available title generator, finalization WILL trigger it (see testTitleGenerationAtFinalizationForShortRecordings)
     let mockTitleGenerator = TitleGeneratorClient(
-        generateTitle: { _ in
-            await generatorState.incrementCallCount()
-            return "Should Not Be Set"
-        },
-        isAvailable: { true }
+        generateTitle: { _ in nil },
+        isAvailable: { false }  // Unavailable - so no generation at all
     )
 
     let mockAudioCapture = AudioCaptureClient(
@@ -256,7 +260,7 @@ import Persistence
                 id: TranscriptSegmentID(rawValue: "seg-003"),
                 text: "Almost at threshold",
                 startMs: 10000,
-                endMs: 14999,  // Just under 15000ms - should NOT trigger
+                endMs: 14999,  // Just under 15000ms - should NOT trigger LIVE generation
                 speakerId: "spk_1",
                 isFinal: true
             ),
@@ -292,18 +296,14 @@ import Persistence
 
     try await Task.sleep(for: .milliseconds(200))
     await processor.stopRecording()
-    try await Task.sleep(for: .milliseconds(100))
+    try await Task.sleep(for: .milliseconds(200))
     collectTask.cancel()
 
-    // Verify title generation was NOT called
-    let callCount = await generatorState.getCallCount()
-    #expect(callCount == 0, "Title generation should NOT be triggered before 15s")
-
-    // Verify session title is still nil
+    // Verify session title is nil (because title generator is unavailable)
     let sessions = try await databaseClient.fetchSessions()
     #expect(sessions.count == 1)
     let session = sessions[0]
-    #expect(session.title == nil, "Session title should remain nil for short recordings")
+    #expect(session.title == nil, "Session title should remain nil when title generation unavailable")
 }
 
 @Test func testTitleGenerationNotOverwrittenIfUserAlreadySetTitle() async throws {
@@ -673,4 +673,451 @@ import Persistence
     #expect(sessions.count == 1)
     let session = sessions[0]
     #expect(session.title == nil, "Session title should remain nil when title generation fails")
+}
+
+// MARK: - Finalization Title Generation Tests
+
+@Test func testTitleGenerationAtFinalizationForShortRecordings() async throws {
+    // This test verifies that title generation is triggered at finalization
+    // for recordings shorter than 15 seconds
+
+    let dbQueue = try makeDatabase(configuration: .inMemory)
+    let databaseClient = DatabaseClient.live(dbQueue: dbQueue)
+
+    // Track title generation calls
+    actor TitleGeneratorState {
+        var generateTitleCallCount = 0
+        var lastTextReceived: String?
+
+        func recordCall(text: String) {
+            generateTitleCallCount += 1
+            lastTextReceived = text
+        }
+
+        func getCallCount() -> Int { generateTitleCallCount }
+        func getLastText() -> String? { lastTextReceived }
+    }
+    let generatorState = TitleGeneratorState()
+
+    // Mock title generator that tracks calls and returns a title
+    let mockTitleGenerator = TitleGeneratorClient(
+        generateTitle: { text in
+            await generatorState.recordCall(text: text)
+            return "Short Recording Title"
+        },
+        isAvailable: { true }
+    )
+
+    let mockAudioCapture = AudioCaptureClient(
+        startCapture: {
+            AsyncStream { continuation in
+                continuation.yield(AudioFrame(data: Data(repeating: 0, count: 1024), timestamp: 0))
+                continuation.finish()
+            }
+        },
+        stopCapture: { },
+        isCapturing: { false },
+        getInputFormat: { .recording }
+    )
+
+    let mockFileWriter = AudioFileWriterClient(
+        startWriting: { _, _ in },
+        appendFrame: { _ in },
+        finishWriting: { 1024 },
+        cancelWriting: { },
+        isWriting: { false }
+    )
+
+    let mockAudioSession = AudioSessionClient(
+        startObserving: { AsyncStream { $0.finish() } },
+        stopObserving: { },
+        configureForRecording: { }
+    )
+
+    // Create script with segments UNDER 15 seconds (won't trigger live title generation)
+    let script = MockFluidAudioScript(
+        segments: [
+            ScriptedSegment(
+                id: TranscriptSegmentID(rawValue: "seg-001"),
+                text: "Hello this is a short recording",
+                startMs: 0,
+                endMs: 5000,
+                speakerId: "spk_0",
+                isFinal: true
+            ),
+            ScriptedSegment(
+                id: TranscriptSegmentID(rawValue: "seg-002"),
+                text: "It ends before fifteen seconds",
+                startMs: 5000,
+                endMs: 10000,
+                speakerId: "spk_0",
+                isFinal: true
+            ),
+        ]
+    )
+    let mockFluidAudio = MockFluidAudioClient.client(script: script)
+
+    let mockPreferences = PreferencesClient(
+        getAudioRetentionMode: { .both },
+        setAudioRetentionMode: { _ in }
+    )
+
+    let processor = withDependencies {
+        $0.audioCaptureClient = mockAudioCapture
+        $0.audioFileWriterClient = mockFileWriter
+        $0.audioSessionClient = mockAudioSession
+        $0.fluidAudioClient = mockFluidAudio
+        $0.databaseClient = databaseClient
+        $0.preferencesClient = mockPreferences
+        $0.titleGeneratorClient = mockTitleGenerator
+        $0.uuid = .incrementing
+        $0.date = .constant(Date(timeIntervalSince1970: 1000))
+    } operation: {
+        RecordingProcessor()
+    }
+
+    let tempDir = FileManager.default.temporaryDirectory
+    let eventStream = try await processor.startRecording(audioDirectory: tempDir)
+
+    let collectTask = Task {
+        for await _ in eventStream { }
+    }
+
+    // Wait for segments to be processed
+    try await Task.sleep(for: .milliseconds(200))
+    await processor.stopRecording()
+    // Wait for finalization title generation to run (runs in detached Task, needs extra time for DB update)
+    try await Task.sleep(for: .milliseconds(500))
+    collectTask.cancel()
+
+    // Verify title generation was called at finalization
+    let callCount = await generatorState.getCallCount()
+    #expect(callCount == 1, "Title generation should be triggered at finalization for short recordings")
+
+    // Verify the accumulated text was passed
+    let lastText = await generatorState.getLastText()
+    #expect(lastText?.contains("Hello this is a short recording") == true, "Text should include first segment")
+    #expect(lastText?.contains("It ends before fifteen seconds") == true, "Text should include second segment")
+
+    // Verify session title was updated in database (with retry for async Task completion)
+    var session: SessionRecord?
+    for _ in 0..<5 {
+        let sessions = try await databaseClient.fetchSessions()
+        if sessions.count == 1 && sessions[0].title != nil {
+            session = sessions[0]
+            break
+        }
+        try await Task.sleep(for: .milliseconds(100))
+    }
+    #expect(session != nil, "Session should exist")
+    #expect(session?.title == "Short Recording Title", "Session title should be set to generated title from finalization")
+}
+
+@Test func testTitleGenerationNotDuplicatedAtFinalization() async throws {
+    // This test verifies that if title was already generated during live recording (>15s),
+    // it is NOT generated again at finalization
+
+    let dbQueue = try makeDatabase(configuration: .inMemory)
+    let databaseClient = DatabaseClient.live(dbQueue: dbQueue)
+
+    // Track title generation calls
+    actor TitleGeneratorState {
+        var generateTitleCallCount = 0
+
+        func incrementCallCount() { generateTitleCallCount += 1 }
+        func getCallCount() -> Int { generateTitleCallCount }
+    }
+    let generatorState = TitleGeneratorState()
+
+    let mockTitleGenerator = TitleGeneratorClient(
+        generateTitle: { _ in
+            await generatorState.incrementCallCount()
+            return "Generated Title"
+        },
+        isAvailable: { true }
+    )
+
+    let mockAudioCapture = AudioCaptureClient(
+        startCapture: {
+            AsyncStream { continuation in
+                continuation.yield(AudioFrame(data: Data(repeating: 0, count: 1024), timestamp: 0))
+                continuation.finish()
+            }
+        },
+        stopCapture: { },
+        isCapturing: { false },
+        getInputFormat: { .recording }
+    )
+
+    let mockFileWriter = AudioFileWriterClient(
+        startWriting: { _, _ in },
+        appendFrame: { _ in },
+        finishWriting: { 1024 },
+        cancelWriting: { },
+        isWriting: { false }
+    )
+
+    let mockAudioSession = AudioSessionClient(
+        startObserving: { AsyncStream { $0.finish() } },
+        stopObserving: { },
+        configureForRecording: { }
+    )
+
+    // Create script with segments exceeding 15 seconds (will trigger live title generation)
+    let script = MockFluidAudioScript(
+        segments: [
+            ScriptedSegment(
+                id: TranscriptSegmentID(rawValue: "seg-001"),
+                text: "First segment of long recording",
+                startMs: 0,
+                endMs: 10000,
+                speakerId: "spk_0",
+                isFinal: true
+            ),
+            ScriptedSegment(
+                id: TranscriptSegmentID(rawValue: "seg-002"),
+                text: "Second segment exceeds threshold",
+                startMs: 10000,
+                endMs: 20000,  // > 15000ms - triggers live title generation
+                speakerId: "spk_0",
+                isFinal: true
+            ),
+        ]
+    )
+    let mockFluidAudio = MockFluidAudioClient.client(script: script)
+
+    let mockPreferences = PreferencesClient(
+        getAudioRetentionMode: { .both },
+        setAudioRetentionMode: { _ in }
+    )
+
+    let processor = withDependencies {
+        $0.audioCaptureClient = mockAudioCapture
+        $0.audioFileWriterClient = mockFileWriter
+        $0.audioSessionClient = mockAudioSession
+        $0.fluidAudioClient = mockFluidAudio
+        $0.databaseClient = databaseClient
+        $0.preferencesClient = mockPreferences
+        $0.titleGeneratorClient = mockTitleGenerator
+        $0.uuid = .incrementing
+        $0.date = .constant(Date(timeIntervalSince1970: 1000))
+    } operation: {
+        RecordingProcessor()
+    }
+
+    let tempDir = FileManager.default.temporaryDirectory
+    let eventStream = try await processor.startRecording(audioDirectory: tempDir)
+
+    let collectTask = Task {
+        for await _ in eventStream { }
+    }
+
+    try await Task.sleep(for: .milliseconds(200))
+    await processor.stopRecording()
+    try await Task.sleep(for: .milliseconds(200))
+    collectTask.cancel()
+
+    // Verify title generation was called exactly ONCE (during live, NOT at finalization)
+    let callCount = await generatorState.getCallCount()
+    #expect(callCount == 1, "Title generation should only be triggered once (during live recording, not at finalization)")
+}
+
+@Test func testFinalizationTitleGenerationSkippedWhenUnavailable() async throws {
+    // This test verifies that finalization title generation is skipped when unavailable
+
+    let dbQueue = try makeDatabase(configuration: .inMemory)
+    let databaseClient = DatabaseClient.live(dbQueue: dbQueue)
+
+    // Track title generation calls
+    actor TitleGeneratorState {
+        var generateTitleCallCount = 0
+        func incrementCallCount() { generateTitleCallCount += 1 }
+        func getCallCount() -> Int { generateTitleCallCount }
+    }
+    let generatorState = TitleGeneratorState()
+
+    // Mock title generator that is unavailable
+    let mockTitleGenerator = TitleGeneratorClient(
+        generateTitle: { _ in
+            await generatorState.incrementCallCount()
+            return "Should Not Be Called"
+        },
+        isAvailable: { false }  // Not available!
+    )
+
+    let mockAudioCapture = AudioCaptureClient(
+        startCapture: {
+            AsyncStream { continuation in
+                continuation.yield(AudioFrame(data: Data(repeating: 0, count: 1024), timestamp: 0))
+                continuation.finish()
+            }
+        },
+        stopCapture: { },
+        isCapturing: { false },
+        getInputFormat: { .recording }
+    )
+
+    let mockFileWriter = AudioFileWriterClient(
+        startWriting: { _, _ in },
+        appendFrame: { _ in },
+        finishWriting: { 1024 },
+        cancelWriting: { },
+        isWriting: { false }
+    )
+
+    let mockAudioSession = AudioSessionClient(
+        startObserving: { AsyncStream { $0.finish() } },
+        stopObserving: { },
+        configureForRecording: { }
+    )
+
+    // Create script with short recording (would trigger finalization if available)
+    let script = MockFluidAudioScript(
+        segments: [
+            ScriptedSegment(
+                id: TranscriptSegmentID(rawValue: "seg-001"),
+                text: "Short recording content",
+                startMs: 0,
+                endMs: 5000,
+                speakerId: "spk_0",
+                isFinal: true
+            ),
+        ]
+    )
+    let mockFluidAudio = MockFluidAudioClient.client(script: script)
+
+    let mockPreferences = PreferencesClient(
+        getAudioRetentionMode: { .both },
+        setAudioRetentionMode: { _ in }
+    )
+
+    let processor = withDependencies {
+        $0.audioCaptureClient = mockAudioCapture
+        $0.audioFileWriterClient = mockFileWriter
+        $0.audioSessionClient = mockAudioSession
+        $0.fluidAudioClient = mockFluidAudio
+        $0.databaseClient = databaseClient
+        $0.preferencesClient = mockPreferences
+        $0.titleGeneratorClient = mockTitleGenerator
+        $0.uuid = .incrementing
+        $0.date = .constant(Date(timeIntervalSince1970: 1000))
+    } operation: {
+        RecordingProcessor()
+    }
+
+    let tempDir = FileManager.default.temporaryDirectory
+    let eventStream = try await processor.startRecording(audioDirectory: tempDir)
+
+    let collectTask = Task {
+        for await _ in eventStream { }
+    }
+
+    try await Task.sleep(for: .milliseconds(200))
+    await processor.stopRecording()
+    try await Task.sleep(for: .milliseconds(200))
+    collectTask.cancel()
+
+    // Verify title generation was NOT called
+    let callCount = await generatorState.getCallCount()
+    #expect(callCount == 0, "Title generation should NOT be called when unavailable (even at finalization)")
+
+    // Verify session title is nil
+    let sessions = try await databaseClient.fetchSessions()
+    #expect(sessions.count == 1)
+    let session = sessions[0]
+    #expect(session.title == nil, "Session title should remain nil when title generation unavailable")
+}
+
+@Test func testFinalizationTitleGenerationWithEmptyTranscript() async throws {
+    // This test verifies that finalization title generation is skipped when there's no transcript
+
+    let dbQueue = try makeDatabase(configuration: .inMemory)
+    let databaseClient = DatabaseClient.live(dbQueue: dbQueue)
+
+    // Track title generation calls
+    actor TitleGeneratorState {
+        var generateTitleCallCount = 0
+        func incrementCallCount() { generateTitleCallCount += 1 }
+        func getCallCount() -> Int { generateTitleCallCount }
+    }
+    let generatorState = TitleGeneratorState()
+
+    let mockTitleGenerator = TitleGeneratorClient(
+        generateTitle: { _ in
+            await generatorState.incrementCallCount()
+            return "Should Not Be Called"
+        },
+        isAvailable: { true }
+    )
+
+    let mockAudioCapture = AudioCaptureClient(
+        startCapture: {
+            AsyncStream { continuation in
+                continuation.yield(AudioFrame(data: Data(repeating: 0, count: 1024), timestamp: 0))
+                continuation.finish()
+            }
+        },
+        stopCapture: { },
+        isCapturing: { false },
+        getInputFormat: { .recording }
+    )
+
+    let mockFileWriter = AudioFileWriterClient(
+        startWriting: { _, _ in },
+        appendFrame: { _ in },
+        finishWriting: { 1024 },
+        cancelWriting: { },
+        isWriting: { false }
+    )
+
+    let mockAudioSession = AudioSessionClient(
+        startObserving: { AsyncStream { $0.finish() } },
+        stopObserving: { },
+        configureForRecording: { }
+    )
+
+    // Create empty script (no segments)
+    let script = MockFluidAudioScript(segments: [])
+    let mockFluidAudio = MockFluidAudioClient.client(script: script)
+
+    let mockPreferences = PreferencesClient(
+        getAudioRetentionMode: { .both },
+        setAudioRetentionMode: { _ in }
+    )
+
+    let processor = withDependencies {
+        $0.audioCaptureClient = mockAudioCapture
+        $0.audioFileWriterClient = mockFileWriter
+        $0.audioSessionClient = mockAudioSession
+        $0.fluidAudioClient = mockFluidAudio
+        $0.databaseClient = databaseClient
+        $0.preferencesClient = mockPreferences
+        $0.titleGeneratorClient = mockTitleGenerator
+        $0.uuid = .incrementing
+        $0.date = .constant(Date(timeIntervalSince1970: 1000))
+    } operation: {
+        RecordingProcessor()
+    }
+
+    let tempDir = FileManager.default.temporaryDirectory
+    let eventStream = try await processor.startRecording(audioDirectory: tempDir)
+
+    let collectTask = Task {
+        for await _ in eventStream { }
+    }
+
+    try await Task.sleep(for: .milliseconds(200))
+    await processor.stopRecording()
+    try await Task.sleep(for: .milliseconds(200))
+    collectTask.cancel()
+
+    // Verify title generation was NOT called (no transcript text)
+    let callCount = await generatorState.getCallCount()
+    #expect(callCount == 0, "Title generation should NOT be called when there's no transcript text")
+
+    // Verify session title is nil
+    let sessions = try await databaseClient.fetchSessions()
+    #expect(sessions.count == 1)
+    let session = sessions[0]
+    #expect(session.title == nil, "Session title should remain nil when there's no transcript")
 }

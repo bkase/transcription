@@ -917,3 +917,10 @@
 - Uses VaporAnimation.blurDuration (500ms) and VaporAnimation.appearCurve for timing
 - Default blur radius is 2px (subtle), can increase to 4px for stronger effect
 - Use on content behind search fields or modals that should recede when focus is active
+
+## Title generation fallback at finalization
+- Live title generation triggers at 15s during recording (handleSegment when segment.endMs >= 15_000)
+- Finalization fallback: if !titleGenerationTriggered && !accumulatedTranscriptText.isEmpty, trigger at session end
+- Runs in detached Task to avoid blocking finalization flow
+- Tests for async title generation need retry loops or longer waits for DB updates to complete
+- Track titleGenerationTriggered flag to prevent duplicate calls (live + finalization)
