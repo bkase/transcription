@@ -279,4 +279,28 @@ struct SessionDetailSnapshotTests {
 
         SnapshotHarness.assertSnapshot(of: view, named: "session_detail_partial")
     }
+
+    // MARK: - Session Actions Modal Snapshots
+
+    @Test func testSessionActionsModal() {
+        // Session actions modal (Share, Export, Delete)
+        let view = ZStack {
+            Color.black.opacity(0.3)
+                .ignoresSafeArea()
+
+            VStack {
+                HStack {
+                    Spacer()
+                    SessionActionsModalPreview()
+                        .frame(width: 260)
+                        .padding(.trailing, 24)
+                }
+                Spacer()
+            }
+            .padding(.top, 100)
+        }
+        .frame(width: 390, height: 844)
+
+        SnapshotHarness.assertSnapshot(of: view, named: "session_actions_modal")
+    }
 }

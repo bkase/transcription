@@ -93,26 +93,31 @@ public struct SessionDetailView: View {
                 ShareSheet(items: [shareURL])
             }
         }
-        .confirmationDialog(
-            "Session Actions",
+        .fullScreenCover(
             isPresented: Binding(
                 get: { store.isShowingActionsMenu },
                 set: { if !$0 { store.send(.actionsMenuDismissed) } }
-            ),
-            titleVisibility: .visible
+            )
         ) {
-            Button("Share") {
-                store.send(.shareTapped)
+            ZStack(alignment: .topTrailing) {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        store.send(.actionsMenuDismissed)
+                    }
+
+                SessionActionsModal(
+                    onShare: { store.send(.shareTapped) },
+                    onExport: { store.send(.exportTapped) },
+                    onDelete: { store.send(.deleteTapped) },
+                    onDismiss: { store.send(.actionsMenuDismissed) }
+                )
+                .frame(width: 260)
+                .padding(.top, 100)
+                .padding(.trailing, VaporSpacing.lg)
+                .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .topTrailing)))
             }
-            Button("Export") {
-                store.send(.exportTapped)
-            }
-            Button("Delete", role: .destructive) {
-                store.send(.deleteTapped)
-            }
-            Button("Cancel", role: .cancel) {
-                store.send(.actionsMenuDismissed)
-            }
+            .presentationBackground(.clear)
         }
         .confirmationDialog(
             "Delete Recording",
