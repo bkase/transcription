@@ -68,6 +68,7 @@ public struct ProfileFeature {
         case changePhotoTapped
         case photoPicked(Data)
         case photoProcessed(Data?)
+        case removePhotoTapped
 
         // Mock photo picker actions (for UI testing)
         case showMockPhotoPicker
@@ -161,6 +162,25 @@ public struct ProfileFeature {
 
                 var updatedProfile = state.profile
                 updatedProfile.avatar = UserProfile.Avatar(imageData: imageData)
+                state.profile = updatedProfile
+
+                return .run { [updatedProfile] send in
+                    try await userProfileClient.save(updatedProfile)
+                    await send(.profileSaved(updatedProfile))
+                } catch: { error, send in
+                    await send(.profileSaveFailed(error.localizedDescription))
+                }
+
+            case .removePhotoTapped:
+                guard state.profile.avatar.imageData != nil else {
+                    return .none
+                }
+
+                state.isSaving = true
+                state.error = nil
+
+                var updatedProfile = state.profile
+                updatedProfile.avatar = UserProfile.Avatar(imageData: nil)
                 state.profile = updatedProfile
 
                 return .run { [updatedProfile] send in

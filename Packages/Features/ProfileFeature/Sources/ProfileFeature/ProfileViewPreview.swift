@@ -10,6 +10,8 @@ public struct ProfileViewPreview: View {
     public enum DisplayMode {
         /// Default view with name and avatar
         case normal
+        /// View with photo set (shows remove option)
+        case withPhoto
         /// Editing name mode
         case editingName
         /// Empty state (new user)
@@ -132,9 +134,16 @@ public struct ProfileViewPreview: View {
                 .offset(x: 4, y: 4)
             }
 
-            Text("Tap to change photo")
-                .font(.system(size: 12, weight: .light))
-                .foregroundColor(VaporColor.textTertiary)
+            // Helper text and remove button
+            if displayMode == .withPhoto {
+                Text("Remove photo")
+                    .font(.system(size: 12, weight: .light))
+                    .foregroundColor(VaporColor.recording)
+            } else {
+                Text("Tap to change photo")
+                    .font(.system(size: 12, weight: .light))
+                    .foregroundColor(VaporColor.textTertiary)
+            }
         }
         .padding(.horizontal, VaporSpacing.lg)
         .padding(.bottom, VaporSpacing.lg)
@@ -324,6 +333,14 @@ struct ProfileViewPreview_Previews: PreviewProvider {
                 initials: "BK"
             )
             .previewDisplayName("Normal")
+
+            ProfileViewPreview(
+                name: "Brandon Kase",
+                initials: "BK",
+                imageData: Data([0x89, 0x50, 0x4E, 0x47]),
+                displayMode: .withPhoto
+            )
+            .previewDisplayName("With Photo")
 
             ProfileViewPreview(
                 name: "",

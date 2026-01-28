@@ -263,6 +263,77 @@ struct ProfileFeatureTests {
         }
     }
 
+    @Test
+    func removePhoto() async throws {
+        let profileWithPhoto = UserProfile(
+            name: "Brandon Kase",
+            email: "brandon@example.com",
+            avatar: UserProfile.Avatar(imageData: testPhotoData)
+        )
+        let profileStorage = InMemoryProfileStorage(profile: profileWithPhoto)
+
+        let store = TestStore(initialState: ProfileFeature.State(profile: profileWithPhoto)) {
+            ProfileFeature()
+        } withDependencies: {
+            $0.userProfileClient = .inMemory(storage: profileStorage)
+        }
+
+        await store.send(.removePhotoTapped) {
+            $0.isSaving = true
+            $0.profile.avatar = UserProfile.Avatar(imageData: nil)
+        }
+
+        await store.receive(\.profileSaved) {
+            $0.isSaving = false
+        }
+
+        await store.receive(\.delegate.didSaveProfile)
+
+        // Verify storage was updated
+        let savedProfile = await profileStorage.load()
+        #expect(savedProfile.avatar.imageData == nil)
+    }
+
+    @Test
+    func removePhotoWhenNoPhotoDoesNothing() async throws {
+        let store = TestStore(initialState: ProfileFeature.State(profile: testProfile)) {
+            ProfileFeature()
+        }
+
+        // Removing when no photo exists should do nothing
+        await store.send(.removePhotoTapped)
+        // No state changes or effects expected
+    }
+
+    @Test
+    func removePhotoFailure() async throws {
+        struct TestError: Error, LocalizedError {
+            var errorDescription: String? { "Storage error" }
+        }
+
+        let profileWithPhoto = UserProfile(
+            name: "Brandon Kase",
+            email: "brandon@example.com",
+            avatar: UserProfile.Avatar(imageData: testPhotoData)
+        )
+
+        let store = TestStore(initialState: ProfileFeature.State(profile: profileWithPhoto)) {
+            ProfileFeature()
+        } withDependencies: {
+            $0.userProfileClient.save = { _ in throw TestError() }
+        }
+
+        await store.send(.removePhotoTapped) {
+            $0.isSaving = true
+            $0.profile.avatar = UserProfile.Avatar(imageData: nil)
+        }
+
+        await store.receive(\.profileSaveFailed) {
+            $0.isSaving = false
+            $0.error = "Storage error"
+        }
+    }
+
     // MARK: - Initials Tests
 
     @Test

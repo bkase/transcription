@@ -135,4 +135,35 @@ struct PeopleFeatureTests {
         // avatarTapped is a navigation intent - no state change expected
         await store.send(.avatarTapped)
     }
+
+    // MARK: - testRemovePhotoTapped
+
+    @Test
+    func testRemovePhotoTappedClearsFormImageData() async {
+        let mockImageData = Data([0x89, 0x50, 0x4E, 0x47]) // PNG header bytes
+
+        let store = TestStore(initialState: PeopleFeature.State(
+            isShowingAddPersonSheet: true,
+            formImageData: mockImageData
+        )) {
+            PeopleFeature()
+        }
+
+        await store.send(.removePhotoTapped) {
+            $0.formImageData = nil
+        }
+    }
+
+    @Test
+    func testRemovePhotoTappedWhenNoPhotoDoesNothing() async {
+        let store = TestStore(initialState: PeopleFeature.State(
+            isShowingAddPersonSheet: true,
+            formImageData: nil
+        )) {
+            PeopleFeature()
+        }
+
+        // Removing when no photo exists should do nothing (formImageData already nil)
+        await store.send(.removePhotoTapped)
+    }
 }

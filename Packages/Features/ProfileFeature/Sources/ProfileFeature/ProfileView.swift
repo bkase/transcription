@@ -128,9 +128,21 @@ public struct ProfileView: View {
                 .accessibilityIdentifier("profileChangePhotoButton")
             }
 
-            Text("Tap to change photo")
-                .font(.system(size: 12, weight: .light))
-                .foregroundColor(VaporColor.textTertiary)
+            // Helper text and remove button
+            if store.profile.avatar.imageData != nil {
+                Button {
+                    store.send(.removePhotoTapped)
+                } label: {
+                    Text("Remove photo")
+                        .font(.system(size: 12, weight: .light))
+                        .foregroundColor(VaporColor.recording)
+                }
+                .accessibilityIdentifier("profileRemovePhotoButton")
+            } else {
+                Text("Tap to change photo")
+                    .font(.system(size: 12, weight: .light))
+                    .foregroundColor(VaporColor.textTertiary)
+            }
         }
         .padding(.horizontal, VaporSpacing.lg)
         .padding(.bottom, VaporSpacing.lg)
