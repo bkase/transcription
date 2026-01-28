@@ -59,6 +59,7 @@ import GRDB
             "id",
             "name",
             "colorToken",
+            "imageData",
             "createdAt",
             "updatedAt"
         ]

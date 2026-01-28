@@ -2,6 +2,7 @@ import ComposableArchitecture
 import DesignSystem
 import Models
 import Persistence
+import PhotosUI
 import SwiftUI
 
 #if os(iOS)
@@ -168,6 +169,7 @@ public struct PeopleView: View {
         let speakerColor = SpeakerColor(rawValue: person.colorToken) ?? .sky
         return PersonCard(
             name: person.name,
+            imageData: person.imageData,
             conversationCount: store.state.conversationCount(for: person.id),
             color: speakerColor
         )
@@ -178,10 +180,19 @@ public struct PeopleView: View {
 
 struct PersonFormSheet: View {
     @Bindable var store: StoreOf<PeopleFeature>
+    @State private var selectedPhoto: PhotosPickerItem?
+
+    /// Whether we're running in UI testing mode
+    private var isUITesting: Bool {
+        ProcessInfo.processInfo.arguments.contains("-uiTesting")
+    }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: VaporSpacing.lg) {
+                // Avatar/Photo section
+                avatarSection
+
                 // Name field
                 VStack(alignment: .leading, spacing: VaporSpacing.xs) {
                     Text("Name")
@@ -235,7 +246,142 @@ struct PersonFormSheet: View {
                     .accessibilityIdentifier("savePersonButton")
                 }
             }
+            .onChange(of: selectedPhoto) { _, newItem in
+                guard let item = newItem else { return }
+                Task {
+                    if let data = try? await item.loadTransferable(type: Data.self) {
+                        store.send(.photoPicked(data))
+                    }
+                }
+                selectedPhoto = nil
+            }
+            .sheet(
+                isPresented: Binding(
+                    get: { store.isShowingMockPhotoPicker },
+                    set: { if !$0 { store.send(.dismissMockPhotoPicker) } }
+                )
+            ) {
+                PersonMockPhotoPickerSheet(store: store)
+            }
         }
+    }
+
+    // MARK: - Avatar Section
+
+    private var avatarSection: some View {
+        VStack(spacing: VaporSpacing.sm) {
+            // Avatar with camera badge
+            if isUITesting {
+                // Mock picker button for UI tests
+                Button {
+                    store.send(.showMockPhotoPicker)
+                } label: {
+                    avatarWithBadge
+                }
+                .buttonStyle(PlainButtonStyle())
+                .accessibilityIdentifier("personChangePhotoButton")
+            } else {
+                // Real PhotosPicker for live mode
+                PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                    avatarWithBadge
+                }
+                .buttonStyle(PlainButtonStyle())
+                .accessibilityIdentifier("personChangePhotoButton")
+            }
+
+            // Helper text and remove button
+            if store.formImageData != nil {
+                Button {
+                    store.send(.removePhotoTapped)
+                } label: {
+                    Text("Remove photo")
+                        .font(.system(size: 12, weight: .light))
+                        .foregroundColor(VaporColor.recording)
+                }
+                .accessibilityIdentifier("removePhotoButton")
+            } else {
+                Text("Tap to add photo")
+                    .font(.system(size: 12, weight: .light))
+                    .foregroundColor(VaporColor.textTertiary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.bottom, VaporSpacing.sm)
+    }
+
+    private var avatarWithBadge: some View {
+        let speakerColor = SpeakerColor(rawValue: store.formColorToken) ?? .sky
+
+        return ZStack(alignment: .bottomTrailing) {
+            avatarImage(size: 80, fontSize: 28, color: speakerColor)
+
+            // Camera badge
+            ZStack {
+                Circle()
+                    .fill(VaporColor.cloud)
+                    .frame(width: 28, height: 28)
+                    .overlay(
+                        Circle()
+                            .strokeBorder(VaporColor.fog, lineWidth: 1)
+                    )
+
+                Image(systemName: "camera")
+                    .font(.system(size: 14))
+                    .foregroundColor(VaporColor.textSecondary)
+            }
+            .offset(x: 4, y: 4)
+        }
+    }
+
+    @ViewBuilder
+    private func avatarImage(size: CGFloat, fontSize: CGFloat, color: SpeakerColor) -> some View {
+        ZStack {
+            Circle()
+                .fill(color.color)
+                .frame(width: size, height: size)
+                .overlay(
+                    Circle()
+                        .strokeBorder(VaporColor.fog, lineWidth: size > 50 ? 2 : 1)
+                )
+
+            #if os(iOS)
+            if let imageData = store.formImageData,
+               let uiImage = UIImage(data: imageData) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
+            } else {
+                initialsView(fontSize: fontSize)
+            }
+            #else
+            initialsView(fontSize: fontSize)
+            #endif
+        }
+    }
+
+    @ViewBuilder
+    private func initialsView(fontSize: CGFloat) -> some View {
+        let initials = generateInitials(from: store.formName)
+        if !initials.isEmpty {
+            Text(initials)
+                .font(.system(size: fontSize, weight: .medium))
+                .foregroundColor(VaporColor.cloud)
+        } else {
+            Image(systemName: "person.fill")
+                .font(.system(size: fontSize))
+                .foregroundColor(VaporColor.cloud.opacity(0.8))
+        }
+    }
+
+    private func generateInitials(from name: String) -> String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+        let components = trimmed.split(separator: " ")
+        let first = components.first?.prefix(1) ?? ""
+        let last = components.count > 1 ? components.last?.prefix(1) ?? "" : ""
+        return String(first + last).uppercased()
     }
 
     private func colorButton(for color: SpeakerColor) -> some View {
@@ -254,6 +400,58 @@ struct PersonFormSheet: View {
                 }
         }
         .accessibilityIdentifier("color_\(color.rawValue)")
+    }
+}
+
+// MARK: - Mock Photo Picker Sheet (for UI Testing)
+
+/// A simple sheet with pre-defined photo options for deterministic UI testing.
+/// Avoids system Photos picker which is difficult to automate in XCUITest.
+struct PersonMockPhotoPickerSheet: View {
+    let store: StoreOf<PeopleFeature>
+
+    var body: some View {
+        NavigationView {
+            List {
+                ForEach(Array(MockPhotoData.options.enumerated()), id: \.offset) { index, option in
+                    Button {
+                        store.send(.mockPhotoSelected(index))
+                    } label: {
+                        HStack {
+                            Circle()
+                                .fill(colorForName(option.color))
+                                .frame(width: 44, height: 44)
+
+                            Text(option.name)
+                                .foregroundColor(VaporColor.textPrimary)
+                        }
+                    }
+                    .accessibilityIdentifier("personMockPhotoOption-\(index)")
+                }
+            }
+            .navigationTitle("Choose Photo")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        store.send(.dismissMockPhotoPicker)
+                    }
+                    .accessibilityIdentifier("personMockPhotoPickerCancel")
+                }
+            }
+        }
+        .accessibilityIdentifier("personMockPhotoPickerSheet")
+    }
+
+    private func colorForName(_ name: String) -> Color {
+        switch name {
+        case "blue": return .blue
+        case "green": return .green
+        case "red": return .red
+        default: return .gray
+        }
     }
 }
 

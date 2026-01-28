@@ -5,11 +5,38 @@ import Models
 import Persistence
 import DesignSystem
 
+// MARK: - Mock Photo Data
+
+/// Generates deterministic test image data for UI testing.
+/// Each index produces a unique colored square image.
+public enum MockPhotoData {
+    /// Available mock photo options for the UI test picker
+    public static let options: [(name: String, color: String)] = [
+        ("Blue Square", "blue"),
+        ("Green Square", "green"),
+        ("Red Square", "red"),
+    ]
+
+    /// Generate deterministic image data for a given index.
+    /// Returns a small PNG-like data blob that can be identified by index.
+    public static func imageData(forIndex index: Int) -> Data {
+        // Create a simple identifiable data pattern
+        // In a real scenario this would be actual image data,
+        // but for testing we just need deterministic bytes
+        let header: [UInt8] = [0x89, 0x50, 0x4E, 0x47] // PNG header
+        let indexBytes = withUnsafeBytes(of: UInt32(index).bigEndian) { Array($0) }
+        // Add some padding to make it look more like real image data
+        let padding: [UInt8] = Array(repeating: UInt8(index % 256), count: 100)
+        return Data(header + indexBytes + padding)
+    }
+}
+
 @Reducer
 public struct PeopleFeature {
     public init() {}
 
     @Dependency(\.databaseClient) var databaseClient
+    @Dependency(\.profileImageClient) var profileImageClient
     @Dependency(\.uuid) var uuid
     @Dependency(\.date) var date
 
@@ -26,7 +53,11 @@ public struct PeopleFeature {
         public var editingPerson: PersonRecord? = nil
         public var formName: String = ""
         public var formColorToken: String = SpeakerColor.sky.rawValue
+        public var formImageData: Data? = nil
         public var isSaving: Bool = false
+
+        // Mock photo picker state (for UI testing)
+        public var isShowingMockPhotoPicker: Bool = false
 
         // User profile for avatar display
         public var userProfile: UserProfile = .empty
@@ -74,7 +105,9 @@ public struct PeopleFeature {
             editingPerson: PersonRecord? = nil,
             formName: String = "",
             formColorToken: String = SpeakerColor.sky.rawValue,
+            formImageData: Data? = nil,
             isSaving: Bool = false,
+            isShowingMockPhotoPicker: Bool = false,
             userProfile: UserProfile = .empty
         ) {
             self.people = people
@@ -86,7 +119,9 @@ public struct PeopleFeature {
             self.editingPerson = editingPerson
             self.formName = formName
             self.formColorToken = formColorToken
+            self.formImageData = formImageData
             self.isSaving = isSaving
+            self.isShowingMockPhotoPicker = isShowingMockPhotoPicker
             self.userProfile = userProfile
         }
     }
@@ -113,6 +148,17 @@ public struct PeopleFeature {
         case personDeleted(PersonID)
         case saveFailed(String)
         case deleteFailed(String)
+
+        // Photo actions
+        case changePhotoTapped
+        case photoPicked(Data)
+        case photoProcessed(Data?)
+        case removePhotoTapped
+
+        // Mock photo picker actions (for UI testing)
+        case showMockPhotoPicker
+        case mockPhotoSelected(Int)
+        case dismissMockPhotoPicker
     }
 
     public var body: some ReducerOf<Self> {
@@ -166,6 +212,7 @@ public struct PeopleFeature {
                 state.editingPerson = nil
                 state.formName = ""
                 state.formColorToken = SpeakerColor.forIndex(state.people.count).rawValue
+                state.formImageData = nil
                 state.isShowingAddPersonSheet = true
                 state.error = nil
                 return .none
@@ -174,6 +221,7 @@ public struct PeopleFeature {
                 state.editingPerson = person
                 state.formName = person.name
                 state.formColorToken = person.colorToken
+                state.formImageData = person.imageData
                 state.isShowingAddPersonSheet = true
                 state.error = nil
                 return .none
@@ -191,6 +239,7 @@ public struct PeopleFeature {
                 state.editingPerson = nil
                 state.formName = ""
                 state.formColorToken = SpeakerColor.sky.rawValue
+                state.formImageData = nil
                 state.isSaving = false
                 return .none
 
@@ -218,6 +267,7 @@ public struct PeopleFeature {
                         id: existingPerson.id,
                         name: trimmedName,
                         colorToken: state.formColorToken,
+                        imageData: state.formImageData,
                         createdAt: existingPerson.createdAt,
                         updatedAt: date.now
                     )
@@ -233,6 +283,7 @@ public struct PeopleFeature {
                         id: uuid().uuidString,
                         name: trimmedName,
                         colorToken: state.formColorToken,
+                        imageData: state.formImageData,
                         createdAt: date.now,
                         updatedAt: date.now
                     )
@@ -260,6 +311,7 @@ public struct PeopleFeature {
                 state.editingPerson = nil
                 state.formName = ""
                 state.formColorToken = SpeakerColor.sky.rawValue
+                state.formImageData = nil
                 return .none
 
             case let .personDeleted(personId):
@@ -273,6 +325,45 @@ public struct PeopleFeature {
 
             case let .deleteFailed(errorMessage):
                 state.error = errorMessage
+                return .none
+
+            // MARK: - Photo Actions
+
+            case .changePhotoTapped:
+                // View layer handles PhotosPicker presentation (live mode)
+                // or triggers showMockPhotoPicker (UI testing mode)
+                return .none
+
+            case let .photoPicked(data):
+                return .run { send in
+                    let normalizedData = await profileImageClient.normalize(data, 256, 0.8)
+                    await send(.photoProcessed(normalizedData))
+                }
+
+            case let .photoProcessed(data):
+                guard let imageData = data else {
+                    state.error = "Failed to process image"
+                    return .none
+                }
+                state.formImageData = imageData
+                return .none
+
+            case .removePhotoTapped:
+                state.formImageData = nil
+                return .none
+
+            case .showMockPhotoPicker:
+                state.isShowingMockPhotoPicker = true
+                return .none
+
+            case let .mockPhotoSelected(index):
+                state.isShowingMockPhotoPicker = false
+                // Generate deterministic test image data based on index
+                let testImageData = MockPhotoData.imageData(forIndex: index)
+                return .send(.photoPicked(testImageData))
+
+            case .dismissMockPhotoPicker:
+                state.isShowingMockPhotoPicker = false
                 return .none
             }
         }

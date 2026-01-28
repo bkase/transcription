@@ -42,6 +42,7 @@ struct PeopleCrudTests {
             $0.editingPerson = nil
             $0.formName = ""
             $0.formColorToken = SpeakerColor.sky.rawValue
+            $0.formImageData = nil
         }
 
         await store.send(.formNameChanged("Alice Smith")) {
@@ -71,6 +72,7 @@ struct PeopleCrudTests {
             $0.editingPerson = nil
             $0.formName = ""
             $0.formColorToken = SpeakerColor.sky.rawValue
+            $0.formImageData = nil
         }
 
         #expect(createdPerson == expectedPerson)
@@ -80,6 +82,7 @@ struct PeopleCrudTests {
             $0.editingPerson = expectedPerson
             $0.formName = "Alice Smith"
             $0.formColorToken = "lavender"
+            $0.formImageData = nil
             $0.isShowingAddPersonSheet = true
         }
 
@@ -106,6 +109,7 @@ struct PeopleCrudTests {
             $0.editingPerson = nil
             $0.formName = ""
             $0.formColorToken = SpeakerColor.sky.rawValue
+            $0.formImageData = nil
         }
 
         #expect(updatedPerson == renamedPerson)
@@ -247,6 +251,7 @@ struct PeopleCrudTests {
             $0.editingPerson = nil
             $0.formName = ""
             $0.formColorToken = SpeakerColor.sky.rawValue
+            $0.formImageData = nil
             $0.isSaving = false
         }
     }
@@ -294,6 +299,7 @@ struct PeopleCrudTests {
             $0.editingPerson = nil
             $0.formName = ""
             $0.formColorToken = SpeakerColor.sky.rawValue
+            $0.formImageData = nil
             // Sorted alphabetically: Alice, Bob, Charlie, Zebra
             $0.people = [
                 PersonRecord(id: "2", name: "Alice", colorToken: "sky", createdAt: mockDate, updatedAt: mockDate),
@@ -349,6 +355,7 @@ struct PeopleCrudTests {
             $0.editingPerson = nil
             $0.formName = ""
             $0.formColorToken = SpeakerColor.sky.rawValue
+            $0.formImageData = nil
             $0.people = [updatedPerson]
         }
     }

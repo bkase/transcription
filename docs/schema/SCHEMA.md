@@ -114,6 +114,8 @@ Full-text search table for transcript search.
 | `transcript_fts_ad` | AFTER DELETE | `transcript_segments` | Removes record from FTS index |
 | `transcript_fts_au` | AFTER UPDATE | `transcript_segments` | Updates record in FTS index |
 
+## Migration: `v4_person_image`
+
 ---
 
 ## Entity Relationships

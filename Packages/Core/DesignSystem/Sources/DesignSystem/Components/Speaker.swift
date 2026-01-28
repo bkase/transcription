@@ -282,17 +282,20 @@ public struct NewSpeakerOption: View {
 public struct PersonCard: View {
     private let name: String
     private let initials: String
+    private let imageData: Data?
     private let conversationCount: Int
     private let color: SpeakerColor
 
     public init(
         name: String,
         initials: String? = nil,
+        imageData: Data? = nil,
         conversationCount: Int,
         color: SpeakerColor = .sky
     ) {
         self.name = name
         self.initials = initials ?? Self.generateInitials(from: name)
+        self.imageData = imageData
         self.conversationCount = conversationCount
         self.color = color
     }
@@ -307,15 +310,7 @@ public struct PersonCard: View {
     public var body: some View {
         HStack(spacing: 16) {
             // Avatar
-            ZStack {
-                Circle()
-                    .fill(color.color)
-                    .frame(width: 44, height: 44)
-
-                Text(initials)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(VaporColor.cloud)
-            }
+            avatarView
 
             // Info
             VStack(alignment: .leading, spacing: 4) {
@@ -346,23 +341,54 @@ public struct PersonCard: View {
                 )
         )
     }
+
+    @ViewBuilder
+    private var avatarView: some View {
+        ZStack {
+            Circle()
+                .fill(color.color)
+                .frame(width: 44, height: 44)
+
+            #if os(iOS)
+            if let data = imageData,
+               let uiImage = UIImage(data: data) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 44, height: 44)
+                    .clipShape(Circle())
+            } else {
+                Text(initials)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(VaporColor.cloud)
+            }
+            #else
+            Text(initials)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(VaporColor.cloud)
+            #endif
+        }
+    }
 }
 
 /// Preview variant for snapshot testing.
 public struct PersonCardPreview: View {
     private let name: String
     private let initials: String?
+    private let imageData: Data?
     private let conversationCount: Int
     private let color: SpeakerColor
 
     public init(
         name: String,
         initials: String? = nil,
+        imageData: Data? = nil,
         conversationCount: Int,
         color: SpeakerColor = .sky
     ) {
         self.name = name
         self.initials = initials
+        self.imageData = imageData
         self.conversationCount = conversationCount
         self.color = color
     }
@@ -371,6 +397,7 @@ public struct PersonCardPreview: View {
         PersonCard(
             name: name,
             initials: initials,
+            imageData: imageData,
             conversationCount: conversationCount,
             color: color
         )

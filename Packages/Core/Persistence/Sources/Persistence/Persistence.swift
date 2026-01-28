@@ -65,6 +65,7 @@ public struct PersonRecord: Codable, FetchableRecord, PersistableRecord, Sendabl
     public var id: String
     public var name: String
     public var colorToken: String
+    public var imageData: Data?
     public var createdAt: Date
     public var updatedAt: Date
 
@@ -72,12 +73,14 @@ public struct PersonRecord: Codable, FetchableRecord, PersistableRecord, Sendabl
         id: String,
         name: String,
         colorToken: String,
+        imageData: Data? = nil,
         createdAt: Date,
         updatedAt: Date
     ) {
         self.id = id
         self.name = name
         self.colorToken = colorToken
+        self.imageData = imageData
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -362,6 +365,13 @@ public enum AppMigrations {
                     VALUES (NEW.text, NEW.sessionId, NEW.id);
                 END
                 """)
+        }
+
+        migrator.registerMigration("v4_person_image") { db in
+            // Add imageData column to people table for profile photos
+            try db.alter(table: "people") { t in
+                t.add(column: "imageData", .blob)
+            }
         }
 
         return migrator

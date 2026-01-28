@@ -1009,3 +1009,10 @@
 - Test async navigation: use `skipReceivedActions()` and verify final state instead of matching StackState IDs
 - StackState ID matching can fail in receive blocks - IDs generated at runtime may differ from test expectations
 - Reuse existing views/components (SessionCard, SessionCardViewModel) via package dependencies
+
+## Adding photo/image fields to records
+- Add imageData: Data? field to record struct, add db migration with `.blob` type
+- Create MockPhotoData enum locally in the feature for UI testing (avoid cross-module dependency on ProfileFeature)
+- Reuse ProfileImageClient.normalize for image processing (consistent 256px max, 0.8 compression)
+- PersonCard/PersonCardPreview need imageData parameter to display person photos
+- Tests must account for new formImageData field in state assertions after create/edit/dismiss actions
