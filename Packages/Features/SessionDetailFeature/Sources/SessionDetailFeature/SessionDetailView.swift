@@ -289,18 +289,18 @@ public struct SessionDetailView: View {
                     Spacer()
 
                     // More actions button (ellipsis) - hidden during title edit
-                    if !store.isEditingTitle {
-                        IconButton(
-                            systemName: "ellipsis",
-                            style: .transparent,
-                            iconColor: VaporColor.textTertiary
-                        ) {
-                            store.send(.moreButtonTapped)
-                        }
-                        .accessibilityIdentifier("moreButton")
-                        .opacity(store.isExporting || store.isDeleting ? 0.5 : 1.0)
-                        .disabled(store.isExporting || store.isDeleting)
+                    // Use opacity instead of conditional to prevent slide-in animation
+                    IconButton(
+                        systemName: "ellipsis",
+                        style: .transparent,
+                        iconColor: VaporColor.textTertiary
+                    ) {
+                        store.send(.moreButtonTapped)
                     }
+                    .accessibilityIdentifier("moreButton")
+                    .opacity(store.isEditingTitle ? 0 : (store.isExporting || store.isDeleting ? 0.5 : 1.0))
+                    .disabled(store.isEditingTitle || store.isExporting || store.isDeleting)
+                    .animation(nil, value: store.isEditingTitle)
                 }
 
                 // Metadata row

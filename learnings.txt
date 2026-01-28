@@ -1054,3 +1054,9 @@
 - permissionGranted checks isContinuation to call appropriate processor method
 - AppFeature handles SessionDetailFeature.delegate.continueRecordingRequested to present recording in continuation mode
 - Clear continuation state (continuationSessionID, timestampOffsetMs) on didFinish and didDiscard
+
+## SwiftUI conditional view insertion animations
+- Views conditionally rendered (`if condition { View }`) in HStack can slide in from the left when inserted
+- Fix: Use opacity 0/1 instead of conditional to keep view in hierarchy, preventing insertion animation
+- Also add `.animation(nil, value: condition)` to explicitly disable animation on the controlling value
+- This approach prevents unwanted animations while keeping the view always present in the layout
