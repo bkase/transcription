@@ -85,6 +85,7 @@ import Dependencies
         deps.exportClient = ExportClient(
             exportSession: { _, format in ExportResult(url: URL(fileURLWithPath: "/tmp"), format: format) },
             exportBundle: { _ in URL(fileURLWithPath: "/tmp") },
+            exportAllSessions: { URL(fileURLWithPath: "/tmp") },
             availableFormats: { ExportFormat.allCases }
         )
         deps.fileClient = FileClient(

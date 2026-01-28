@@ -1,6 +1,7 @@
 import CasePaths
 import ComposableArchitecture
 import Dependencies
+import Export
 import Foundation
 import Models
 import Persistence
@@ -11,6 +12,7 @@ public struct ProfileFeature {
 
     @Dependency(\.userProfileClient) var userProfileClient
     @Dependency(\.profileImageClient) var profileImageClient
+    @Dependency(\.exportClient) var exportClient
 
     @ObservableState
     public struct State: Equatable {
@@ -26,6 +28,10 @@ public struct ProfileFeature {
         // Mock photo picker state (for UI testing)
         public var isShowingMockPhotoPicker: Bool
 
+        // Export all conversations state
+        public var isExporting: Bool
+        public var shareURL: URL?
+
         public init(
             profile: UserProfile = .empty,
             isLoading: Bool = false,
@@ -33,7 +39,9 @@ public struct ProfileFeature {
             error: String? = nil,
             isEditingName: Bool = false,
             editingNameText: String = "",
-            isShowingMockPhotoPicker: Bool = false
+            isShowingMockPhotoPicker: Bool = false,
+            isExporting: Bool = false,
+            shareURL: URL? = nil
         ) {
             self.profile = profile
             self.isLoading = isLoading
@@ -42,6 +50,8 @@ public struct ProfileFeature {
             self.isEditingName = isEditingName
             self.editingNameText = editingNameText
             self.isShowingMockPhotoPicker = isShowingMockPhotoPicker
+            self.isExporting = isExporting
+            self.shareURL = shareURL
         }
 
         /// Compute initials from the profile name for avatar display
@@ -84,6 +94,12 @@ public struct ProfileFeature {
         // Save responses
         case profileSaved(UserProfile)
         case profileSaveFailed(String)
+
+        // Export all conversations
+        case exportAllTapped
+        case exportAllCompleted(URL)
+        case exportAllFailed(String)
+        case shareSheetDismissed
 
         // Delegate to parent
         case delegate(Delegate)
@@ -238,6 +254,34 @@ public struct ProfileFeature {
 
             case .delegate:
                 // Handled by parent
+                return .none
+
+            // MARK: - Export All Conversations
+
+            case .exportAllTapped:
+                guard !state.isExporting else { return .none }
+                state.isExporting = true
+                state.error = nil
+
+                return .run { send in
+                    let bundleURL = try await exportClient.exportAllSessions()
+                    await send(.exportAllCompleted(bundleURL))
+                } catch: { error, send in
+                    await send(.exportAllFailed(error.localizedDescription))
+                }
+
+            case let .exportAllCompleted(url):
+                state.isExporting = false
+                state.shareURL = url
+                return .none
+
+            case let .exportAllFailed(errorMessage):
+                state.isExporting = false
+                state.error = errorMessage
+                return .none
+
+            case .shareSheetDismissed:
+                state.shareURL = nil
                 return .none
             }
         }

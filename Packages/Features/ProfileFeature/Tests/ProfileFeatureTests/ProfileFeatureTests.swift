@@ -1,4 +1,5 @@
 import ComposableArchitecture
+import Export
 import Foundation
 import Models
 import Persistence
@@ -454,5 +455,78 @@ struct ProfileFeatureTests {
         // Data starts with PNG header
         let header = Array(data1.prefix(4))
         #expect(header == [0x89, 0x50, 0x4E, 0x47])
+    }
+
+    // MARK: - Export All Conversations Tests
+
+    @Test
+    func exportAllTappedStartsExport() async throws {
+        let exportURL = URL(fileURLWithPath: "/tmp/test-export.zip")
+
+        let store = TestStore(initialState: ProfileFeature.State(profile: testProfile)) {
+            ProfileFeature()
+        } withDependencies: {
+            $0.exportClient.exportAllSessions = { exportURL }
+        }
+
+        await store.send(.exportAllTapped) {
+            $0.isExporting = true
+        }
+
+        await store.receive(\.exportAllCompleted) {
+            $0.isExporting = false
+            $0.shareURL = exportURL
+        }
+    }
+
+    @Test
+    func exportAllDoesNothingWhileExporting() async throws {
+        let store = TestStore(initialState: ProfileFeature.State(
+            profile: testProfile,
+            isExporting: true
+        )) {
+            ProfileFeature()
+        }
+
+        await store.send(.exportAllTapped)
+        // No state changes or effects expected
+    }
+
+    @Test
+    func exportAllFailure() async throws {
+        struct TestError: Error, LocalizedError {
+            var errorDescription: String? { "Export failed" }
+        }
+
+        let store = TestStore(initialState: ProfileFeature.State(profile: testProfile)) {
+            ProfileFeature()
+        } withDependencies: {
+            $0.exportClient.exportAllSessions = { throw TestError() }
+        }
+
+        await store.send(.exportAllTapped) {
+            $0.isExporting = true
+        }
+
+        await store.receive(\.exportAllFailed) {
+            $0.isExporting = false
+            $0.error = "Export failed"
+        }
+    }
+
+    @Test
+    func shareSheetDismissedClearsURL() async throws {
+        let exportURL = URL(fileURLWithPath: "/tmp/test-export.zip")
+
+        let store = TestStore(initialState: ProfileFeature.State(
+            profile: testProfile,
+            shareURL: exportURL
+        )) {
+            ProfileFeature()
+        }
+
+        await store.send(.shareSheetDismissed) {
+            $0.shareURL = nil
+        }
     }
 }

@@ -1072,3 +1072,10 @@
 - Set imageData = nil on avatar/profile to clear photo (triggers initials fallback)
 - UI conditionally shows "Remove photo" button (destructive red) vs "Tap to change photo" based on imageData presence
 - Same pattern works for both ProfileFeature (user profile) and PeopleFeature (person form)
+
+## Export all sessions bulk export
+- Add exportAllSessions() to ExportClient that fetches all sessions and creates combined zip bundle
+- Create session subdirectories inside staging directory, then use createZipArchiveRecursive for nested structure
+- Use standardizedFileURL when computing relative paths for zip entries to handle /private/var vs /var differences
+- ZIPFoundation archive.addEntry with type: .directory creates folder entries, with relativeTo: for files
+- Tests using timestamp-based export names need unique dates to avoid conflicts between parallel test runs

@@ -254,4 +254,149 @@ struct ExportClientTests {
         #expect(formats.contains(.markdown))
         #expect(formats.contains(.vtt))
     }
+
+    // MARK: - Export All Sessions Tests
+
+    private static let testSessionRecord2 = SessionRecord(
+        id: "session-456",
+        startedAt: testDate,
+        endedAt: testEndDate,
+        title: "Second Meeting",
+        previewText: "Good morning!",
+        durationMs: 300000,
+        audioPath: nil,
+        processingState: .processed,
+        speakerCount: 1,
+        updatedAt: testDate
+    )
+
+    private static let testSegments2: [TranscriptSegmentRecord] = [
+        TranscriptSegmentRecord(
+            id: "seg-3",
+            sessionId: "session-456",
+            startMs: 0,
+            endMs: 2000,
+            machineSpeakerId: "spk_0",
+            text: "Good morning!",
+            confidence: 0.98,
+            isFinal: true,
+            createdAt: testDate,
+            updatedAt: testDate
+        ),
+    ]
+
+    private static let testSpeakerTracks2: [SpeakerTrackRecord] = [
+        SpeakerTrackRecord(
+            id: "track-3",
+            sessionId: "session-456",
+            machineSpeakerId: "spk_0",
+            displayOrder: 1,
+            personId: nil
+        ),
+    ]
+
+    @Test("ExportClient exportAllSessions creates combined bundle")
+    func testExportAllSessionsCreatesCombinedBundle() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+
+        defer {
+            try? FileManager.default.removeItem(at: tempDir)
+        }
+
+        // Use a unique timestamp for this test to avoid conflicts
+        let uniqueDate = Date(timeIntervalSince1970: 1706143000) // Different from testExportDate
+
+        // Create client with mocked dependencies for multiple sessions
+        let client = withDependencies {
+            $0.databaseClient.fetchSessions = {
+                [Self.testSessionRecord, Self.testSessionRecord2]
+            }
+            $0.databaseClient.fetchTranscriptSegments = { id in
+                if id.rawValue == "session-123" {
+                    return Self.testSegments
+                } else {
+                    return Self.testSegments2
+                }
+            }
+            $0.databaseClient.fetchSpeakerTracks = { id in
+                if id.rawValue == "session-123" {
+                    return Self.testSpeakerTracks
+                } else {
+                    return Self.testSpeakerTracks2
+                }
+            }
+            $0.databaseClient.fetchPeople = {
+                return Self.testPeople
+            }
+            $0.fileClient = .liveValue
+            $0.preferencesClient.getAudioRetentionMode = { .both }
+            $0.date = .constant(uniqueDate)
+            $0.uuid = .constant(Self.testUUID)
+        } operation: {
+            ExportClient.live(appVersion: "1.0.0", buildNumber: "100")
+        }
+
+        // Call exportAllSessions
+        let bundleURL = try await client.exportAllSessions()
+
+        // Verify zip was created
+        #expect(FileManager.default.fileExists(atPath: bundleURL.path))
+        #expect(bundleURL.pathExtension == "zip")
+
+        // Open archive and verify contents without extracting
+        let archive = try Archive(url: bundleURL, accessMode: .read)
+        var entryPaths: [String] = []
+        for entry in archive {
+            entryPaths.append(entry.path)
+        }
+
+        // Verify session directories and files exist in archive
+        #expect(entryPaths.contains(where: { $0.hasPrefix("Test Meeting/") }))
+        #expect(entryPaths.contains(where: { $0.hasPrefix("Second Meeting/") }))
+        #expect(entryPaths.contains("Test Meeting/transcript.json"))
+        #expect(entryPaths.contains("Test Meeting/metadata.json"))
+        #expect(entryPaths.contains("Test Meeting/transcript.md"))
+        #expect(entryPaths.contains("Test Meeting/transcript.vtt"))
+        #expect(entryPaths.contains("Second Meeting/transcript.json"))
+        #expect(entryPaths.contains("Second Meeting/metadata.json"))
+
+        // Clean up generated bundle
+        try? FileManager.default.removeItem(at: bundleURL)
+    }
+
+    @Test("ExportClient exportAllSessions works with empty sessions list")
+    func testExportAllSessionsWithEmptySessions() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+
+        defer {
+            try? FileManager.default.removeItem(at: tempDir)
+        }
+
+        // Use a unique timestamp for this test to avoid conflicts
+        let uniqueDate = Date(timeIntervalSince1970: 1706144000) // Different from other tests
+
+        // Create client with no sessions
+        let client = withDependencies {
+            $0.databaseClient.fetchSessions = { [] }
+            $0.databaseClient.fetchPeople = { [] }
+            $0.fileClient = .liveValue
+            $0.preferencesClient.getAudioRetentionMode = { .both }
+            $0.date = .constant(uniqueDate)
+            $0.uuid = .constant(Self.testUUID)
+        } operation: {
+            ExportClient.live(appVersion: "1.0.0", buildNumber: "100")
+        }
+
+        // Call exportAllSessions - should succeed with empty bundle
+        let bundleURL = try await client.exportAllSessions()
+
+        // Verify zip was created
+        #expect(FileManager.default.fileExists(atPath: bundleURL.path))
+        #expect(bundleURL.pathExtension == "zip")
+
+        // Clean up
+        try? FileManager.default.removeItem(at: bundleURL)
+    }
 }

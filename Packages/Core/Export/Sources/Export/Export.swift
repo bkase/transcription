@@ -332,6 +332,8 @@ public struct ExportClient: Sendable {
     public var exportSession: @Sendable (_ sessionId: SessionID, _ format: ExportFormat) async throws -> ExportResult
     /// Export a session to all formats as a bundle
     public var exportBundle: @Sendable (_ sessionId: SessionID) async throws -> URL
+    /// Export all sessions to a combined zip bundle
+    public var exportAllSessions: @Sendable () async throws -> URL
     /// Get available export formats
     public var availableFormats: @Sendable () -> [ExportFormat] = { ExportFormat.allCases }
 }
@@ -452,6 +454,99 @@ extension ExportClient: DependencyKey {
                 )
 
                 return result.url
+            },
+            exportAllSessions: {
+                // Fetch all sessions
+                let sessions = try await databaseClient.fetchSessions()
+                let people = try await databaseClient.fetchPeople()
+
+                // Get privacy mode
+                let retentionMode = preferencesClient.getAudioRetentionMode()
+
+                // Create a staging directory for all session bundles
+                let tempDir = fileClient.temporaryDirectory()
+                let timestamp = ISO8601DateFormatter().string(from: date.now)
+                    .replacingOccurrences(of: ":", with: "-")
+                let exportName = "vapor-export-\(timestamp)"
+                let stagingDirectory = tempDir.appendingPathComponent(exportName)
+                try await fileClient.createDirectory(stagingDirectory)
+
+                // Process each session
+                for session in sessions {
+                    let sessionId = SessionID(rawValue: session.id)
+                    let segments = try await databaseClient.fetchTranscriptSegments(sessionId)
+                    let speakerTracks = try await databaseClient.fetchSpeakerTracks(sessionId)
+
+                    // Determine audio source URL if available
+                    let audioSourceURL: URL?
+                    if let audioPath = session.audioPath {
+                        audioSourceURL = URL(fileURLWithPath: audioPath)
+                    } else {
+                        audioSourceURL = nil
+                    }
+
+                    // Assemble transcript and metadata
+                    let transcript = ExportAssembler.assembleTranscript(
+                        session: session,
+                        segments: segments,
+                        speakerTracks: speakerTracks,
+                        people: people,
+                        audioPath: audioSourceURL != nil ? ExportBundleWriter.BundleFile.audio : nil
+                    )
+
+                    let metadata = ExportAssembler.assembleMetadata(
+                        appVersion: appVersion,
+                        buildNumber: buildNumber,
+                        exportedAt: date.now,
+                        traceId: nil,
+                        segmentCount: segments.count,
+                        speakerTracks: speakerTracks,
+                        durationMs: session.durationMs
+                    )
+
+                    // Create session subdirectory
+                    let sessionName = session.title ?? session.id
+                    let safeName = sessionName.replacingOccurrences(of: "/", with: "-")
+                        .replacingOccurrences(of: ":", with: "-")
+                    let sessionDir = stagingDirectory.appendingPathComponent(safeName)
+                    try await fileClient.createDirectory(sessionDir)
+
+                    // Write session bundle files directly (not zipped)
+                    let metadataData = try JSONEncoder.exportEncoder.encode(metadata)
+                    let metadataURL = sessionDir.appendingPathComponent(ExportBundleWriter.BundleFile.metadata)
+                    try await fileClient.write(metadataData, metadataURL)
+
+                    // Include transcript artifacts unless audioOnly mode
+                    if retentionMode != .audioOnly {
+                        let transcriptData = try JSONEncoder.exportEncoder.encode(transcript)
+                        let transcriptURL = sessionDir.appendingPathComponent(ExportBundleWriter.BundleFile.transcript)
+                        try await fileClient.write(transcriptData, transcriptURL)
+
+                        let markdownContent = MarkdownWriter.write(transcript)
+                        let markdownURL = sessionDir.appendingPathComponent(ExportBundleWriter.BundleFile.markdown)
+                        try await fileClient.write(Data(markdownContent.utf8), markdownURL)
+
+                        let vttContent = VttWriter.write(transcript)
+                        let vttURL = sessionDir.appendingPathComponent(ExportBundleWriter.BundleFile.vtt)
+                        try await fileClient.write(Data(vttContent.utf8), vttURL)
+                    }
+
+                    // Include audio unless transcriptOnly mode
+                    if retentionMode != .transcriptOnly, let audioSourceURL = audioSourceURL, fileClient.exists(audioSourceURL) {
+                        let audioData = try await fileClient.read(audioSourceURL)
+                        let audioDestURL = sessionDir.appendingPathComponent(ExportBundleWriter.BundleFile.audio)
+                        try await fileClient.write(audioData, audioDestURL)
+                    }
+                }
+
+                // Create the final zip archive
+                let zipURL = tempDir.appendingPathComponent("\(exportName).zip")
+                try ExportBundleWriter.createZipArchiveRecursive(from: stagingDirectory, to: zipURL)
+
+                // Clean up staging directory
+                try await fileClient.delete(stagingDirectory)
+
+                return zipURL
             },
             availableFormats: { ExportFormat.allCases }
         )
@@ -887,6 +982,62 @@ public enum ExportBundleWriter {
                 with: fileURL.lastPathComponent,
                 relativeTo: sourceDirectory
             )
+        }
+    }
+
+    /// Create a zip archive recursively from a directory including subdirectories
+    public static func createZipArchiveRecursive(from sourceDirectory: URL, to destinationURL: URL) throws {
+        let fileManager = FileManager.default
+
+        // Remove existing zip if present
+        if fileManager.fileExists(atPath: destinationURL.path) {
+            try fileManager.removeItem(at: destinationURL)
+        }
+
+        // Create the archive using ZIPFoundation
+        let archive = try Archive(url: destinationURL, accessMode: .create)
+
+        // Standardize the source directory path to handle /private/var vs /var differences
+        let standardizedSourcePath = sourceDirectory.standardizedFileURL.path
+
+        // Get all contents recursively
+        guard let enumerator = fileManager.enumerator(
+            at: sourceDirectory.standardizedFileURL,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            throw ExportError.exportFailed("Failed to enumerate directory")
+        }
+
+        for case let fileURL as URL in enumerator {
+            // Standardize the file URL path
+            let standardizedFilePath = fileURL.standardizedFileURL.path
+
+            // Get the relative path from source directory
+            let relativePath = standardizedFilePath.replacingOccurrences(
+                of: standardizedSourcePath + "/",
+                with: ""
+            )
+
+            // Check if it's a directory
+            var isDirectory: ObjCBool = false
+            if fileManager.fileExists(atPath: fileURL.path, isDirectory: &isDirectory) {
+                if isDirectory.boolValue {
+                    // Add directory entry
+                    try archive.addEntry(
+                        with: relativePath + "/",
+                        type: .directory,
+                        uncompressedSize: Int64(0),
+                        provider: { (_: Int64, _: Int) in return Data() }
+                    )
+                } else {
+                    // Add file entry using the standardized source directory
+                    try archive.addEntry(
+                        with: relativePath,
+                        relativeTo: sourceDirectory.standardizedFileURL
+                    )
+                }
+            }
         }
     }
 

@@ -65,6 +65,18 @@ public struct ProfileView: View {
         ) {
             MockPhotoPickerSheet(store: store)
         }
+        #if os(iOS)
+        .sheet(
+            isPresented: Binding(
+                get: { store.shareURL != nil },
+                set: { if !$0 { store.send(.shareSheetDismissed) } }
+            )
+        ) {
+            if let shareURL = store.shareURL {
+                ShareSheet(items: [shareURL])
+            }
+        }
+        #endif
         .accessibilityIdentifier("profileScreen")
     }
 
@@ -179,6 +191,9 @@ public struct ProfileView: View {
 
             // Account section
             accountSection
+
+            // Data section
+            dataSection
         }
         .padding(.horizontal, VaporSpacing.lg)
     }
@@ -299,6 +314,57 @@ public struct ProfileView: View {
         }
     }
 
+    // MARK: - Data Section
+
+    private var dataSection: some View {
+        VStack(alignment: .leading, spacing: VaporSpacing.sm) {
+            Text("Data")
+                .font(.system(size: 16, weight: .medium))
+                .tracking(0.16)
+                .foregroundColor(VaporColor.textPrimary)
+
+            // Export All Conversations button
+            Button {
+                store.send(.exportAllTapped)
+            } label: {
+                HStack {
+                    HStack(spacing: VaporSpacing.sm) {
+                        if store.isExporting {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                                .tint(VaporColor.textSecondary)
+                        } else {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.system(size: 20))
+                                .foregroundColor(VaporColor.textSecondary)
+                        }
+
+                        Text(store.isExporting ? "Exporting..." : "Export All Conversations")
+                            .font(.system(size: 16, weight: .light))
+                            .foregroundColor(VaporColor.textPrimary)
+                    }
+
+                    Spacer()
+
+                    if !store.isExporting {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 18))
+                            .foregroundColor(VaporColor.textTertiary)
+                    }
+                }
+                .padding(VaporSpacing.md)
+                .background(
+                    RoundedRectangle(cornerRadius: VaporRadius.sm)
+                        .fill(VaporColor.cloud)
+                        .shadow(color: Color.black.opacity(0.03), radius: 8, x: 0, y: 2)
+                )
+            }
+            .buttonStyle(PlainButtonStyle())
+            .disabled(store.isExporting)
+            .accessibilityIdentifier("exportAllConversationsButton")
+        }
+    }
+
     private func accountRow(icon: String, title: String) -> some View {
         HStack {
             HStack(spacing: VaporSpacing.sm) {
@@ -413,6 +479,21 @@ struct MockPhotoPickerSheet: View {
         }
     }
 }
+
+// MARK: - Share Sheet (UIActivityViewController wrapper)
+
+#if os(iOS)
+/// A SwiftUI wrapper for UIActivityViewController to share files
+struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+#endif
 
 // MARK: - Previews
 
