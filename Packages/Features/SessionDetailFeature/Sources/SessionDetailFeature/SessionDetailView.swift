@@ -173,7 +173,7 @@ public struct SessionDetailView: View {
 
             avatarView
         }
-        .padding(.top, VaporSpacing.md)
+        .padding(.top, 56)
         .padding(.horizontal, VaporSpacing.lg)
         .padding(.bottom, VaporSpacing.sm)
     }
@@ -184,16 +184,21 @@ public struct SessionDetailView: View {
         if let imageData = store.userProfile.avatar.imageData,
            let uiImage = UIImage(data: imageData) {
             Avatar(image: Image(uiImage: uiImage), size: .large)
+                .accessibilityIdentifier("sessionDetailAvatarWithPhoto")
         } else if !store.initials.isEmpty {
             Avatar(initials: store.initials, size: .large)
+                .accessibilityIdentifier("sessionDetailAvatarWithInitials")
         } else {
             Avatar(size: .large)
+                .accessibilityIdentifier("sessionDetailAvatarEmpty")
         }
         #else
         if !store.initials.isEmpty {
             Avatar(initials: store.initials, size: .large)
+                .accessibilityIdentifier("sessionDetailAvatarWithInitials")
         } else {
             Avatar(size: .large)
+                .accessibilityIdentifier("sessionDetailAvatarEmpty")
         }
         #endif
     }
@@ -605,7 +610,7 @@ public struct SessionDetailViewPreview: View {
 
                     Avatar(size: .large)
                 }
-                .padding(.top, VaporSpacing.md)
+                .padding(.top, 56)
                 .padding(.horizontal, VaporSpacing.lg)
                 .padding(.bottom, VaporSpacing.sm)
 

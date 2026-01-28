@@ -1098,3 +1098,9 @@
 - LanguageModelSession() creates a session for text generation
 - session.respond(to: String) returns Response<String> with generated content in .content property
 - Use @available(iOS 26.0, *) guard and #if os(iOS) for cross-platform builds
+
+## Consistent header padding across features
+- Navigation headers in different features should use consistent top padding for visual alignment
+- ProfileView uses `.padding(.top, 56)` to account for safe area
+- Other features (SessionDetailView, etc.) should match this padding rather than using VaporSpacing.md (16pt)
+- Add accessibility identifiers to avatar views for different states (withPhoto, withInitials, empty) to enable E2E testing

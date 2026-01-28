@@ -105,4 +105,5 @@ final class ProfilePhotoE2ETests: XCTestCase {
         let profileScreen = app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'profileScreen'")).firstMatch
         XCTAssertTrue(profileScreen.waitForExistence(timeout: 5), "Profile screen should still be visible after canceling picker")
     }
+
 }
