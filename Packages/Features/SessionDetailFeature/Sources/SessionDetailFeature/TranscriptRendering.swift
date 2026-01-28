@@ -7,6 +7,10 @@ public enum TranscriptRendering {
 
     // MARK: - Segment Merging
 
+    /// Default max characters for segment merging (approximately half screen height at typical font size).
+    /// This allows for roughly 10-15 lines of text before splitting.
+    public static let defaultMaxCharacters: Int = 600
+
     /// Merge consecutive transcript segments from the same speaker for cleaner display.
     ///
     /// Rules:
@@ -18,11 +22,11 @@ public enum TranscriptRendering {
     ///
     /// - Parameters:
     ///   - segments: The transcript segments to merge
-    ///   - maxCharacters: Maximum character length before splitting (default 180)
+    ///   - maxCharacters: Maximum character length before splitting (default 600)
     /// - Returns: Array of merged segments
     public static func mergeConsecutiveSegments(
         _ segments: [DetailSegment],
-        maxCharacters: Int = 180
+        maxCharacters: Int = defaultMaxCharacters
     ) -> [DetailSegment] {
         guard !segments.isEmpty else { return [] }
 

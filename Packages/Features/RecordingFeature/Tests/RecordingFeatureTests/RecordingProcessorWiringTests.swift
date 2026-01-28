@@ -397,4 +397,139 @@ struct RecordingProcessorWiringTests {
         // Clean up
         eventContinuation?.finish()
     }
+
+    // MARK: - testSegmentsMergedDuringLiveRecording
+
+    /// Tests that consecutive same-speaker segments are merged during live recording
+    /// for cleaner display (bug fix: bd-25m).
+    @Test
+    func testSegmentsMergedDuringLiveRecording() async {
+        let audioDirectory = FileManager.default.temporaryDirectory
+        let mockSessionID = SessionID("test-session-merge")
+        let mockSegmentID1 = TranscriptSegmentID("segment-merge-1")
+        let mockSegmentID2 = TranscriptSegmentID("segment-merge-2")
+        let mockSegmentID3 = TranscriptSegmentID("segment-merge-3")
+
+        var eventContinuation: AsyncStream<RecordingProcessorEvent>.Continuation?
+        let eventStream = AsyncStream<RecordingProcessorEvent> { continuation in
+            eventContinuation = continuation
+        }
+
+        let clock = TestClock()
+
+        let store = TestStore(initialState: RecordingFeature.State()) {
+            RecordingFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+            $0.microphonePermissionClient.getStatus = { .authorized }
+            $0.recordingProcessorClient.startRecording = { _ in eventStream }
+            $0.recordingProcessorClient.stopRecording = { }
+            $0.feedbackClient.playStartSound = { }
+            $0.feedbackClient.playStopSound = { }
+            $0.feedbackClient.triggerStartHaptic = { }
+            $0.feedbackClient.triggerStopHaptic = { }
+            // Return 3 consecutive segments from the same speaker
+            $0.databaseClient.fetchTranscriptSegments = { _ in
+                [
+                    TranscriptSegmentRecord(
+                        id: mockSegmentID1.rawValue,
+                        sessionId: mockSessionID.rawValue,
+                        startMs: 0,
+                        endMs: 2000,
+                        machineSpeakerId: "speaker_0",
+                        text: "Hello",
+                        confidence: 0.95,
+                        isFinal: true,
+                        createdAt: Date(),
+                        updatedAt: Date()
+                    ),
+                    TranscriptSegmentRecord(
+                        id: mockSegmentID2.rawValue,
+                        sessionId: mockSessionID.rawValue,
+                        startMs: 2000,
+                        endMs: 4000,
+                        machineSpeakerId: "speaker_0",
+                        text: "how are you",
+                        confidence: 0.90,
+                        isFinal: true,
+                        createdAt: Date(),
+                        updatedAt: Date()
+                    ),
+                    TranscriptSegmentRecord(
+                        id: mockSegmentID3.rawValue,
+                        sessionId: mockSessionID.rawValue,
+                        startMs: 4000,
+                        endMs: 6000,
+                        machineSpeakerId: "speaker_0",
+                        text: "doing today?",
+                        confidence: 0.92,
+                        isFinal: true,
+                        createdAt: Date(),
+                        updatedAt: Date()
+                    )
+                ]
+            }
+            $0.databaseClient.fetchSpeakerTracks = { _ in
+                [
+                    SpeakerTrackRecord(
+                        id: "track-1",
+                        sessionId: mockSessionID.rawValue,
+                        machineSpeakerId: "speaker_0",
+                        displayOrder: 1
+                    )
+                ]
+            }
+            $0.databaseClient.fetchPeople = { [] }
+        }
+
+        // Start recording
+        await store.send(.startRecording(audioDirectory: audioDirectory))
+
+        await store.receive(\.permissionGranted) {
+            $0.isRecording = true
+            $0.audioDirectory = audioDirectory
+        }
+
+        // Processor emits didStart
+        eventContinuation?.yield(.didStart(mockSessionID))
+        await store.receive(\.processorEvent) {
+            $0.sessionID = mockSessionID
+        }
+
+        // Processor emits didAppendSegment - triggers segment loading
+        eventContinuation?.yield(.didAppendSegment(mockSegmentID3))
+        await store.receive(\.processorEvent)
+
+        // Should receive segmentsLoaded with MERGED segments (3 segments -> 1 merged)
+        await store.receive(\.segmentsLoaded) {
+            // All 3 consecutive same-speaker segments should be merged into one
+            $0.liveSegments = [
+                LiveSegment(
+                    id: mockSegmentID1,  // Uses first segment's ID
+                    machineSpeakerId: "speaker_0",
+                    startMs: 0,          // Earliest startMs
+                    endMs: 6000,         // Latest endMs
+                    text: "Hello how are you doing today?",  // Combined text
+                    isFinal: true        // Last segment's isFinal
+                )
+            ]
+            $0.speakerTracks = [
+                LiveSpeakerTrack(
+                    machineSpeakerId: "speaker_0",
+                    displayOrder: 1,
+                    personName: nil
+                )
+            ]
+        }
+
+        // Verify the merge happened correctly
+        #expect(store.state.liveSegments.count == 1)
+        #expect(store.state.liveSegments[0].text == "Hello how are you doing today?")
+        #expect(store.state.liveSegments[0].startMs == 0)
+        #expect(store.state.liveSegments[0].endMs == 6000)
+
+        // Clean up - finish event stream and in-flight effects
+        eventContinuation?.finish()
+        await store.skipInFlightEffects()
+    }
 }

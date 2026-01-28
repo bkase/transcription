@@ -90,7 +90,7 @@ struct TranscriptRenderingTests {
     @Test
     func testMergeConsecutiveSegments_maxCharSplit() {
         // Test that segments split when combined text exceeds maxCharacters
-        let longText = String(repeating: "a", count: 100)
+        let longText = String(repeating: "a", count: 350)
 
         let segments = [
             DetailSegment(
@@ -105,15 +105,50 @@ struct TranscriptRenderingTests {
                 machineSpeakerId: "spk_0",
                 startMs: 5000,
                 endMs: 10000,
-                text: longText // Combined would be 201 chars (100 + space + 100)
+                text: longText // Combined would be 701 chars (350 + space + 350)
             )
         ]
 
-        let result = TranscriptRendering.mergeConsecutiveSegments(segments, maxCharacters: 180)
+        // New default is 600, so this should split
+        let result = TranscriptRendering.mergeConsecutiveSegments(segments)
 
         #expect(result.count == 2)
         #expect(result[0].text == longText)
         #expect(result[1].text == longText)
+    }
+
+    @Test
+    func testMergeConsecutiveSegments_defaultMaxCharactersIs600() {
+        // Verify default max characters is 600
+        #expect(TranscriptRendering.defaultMaxCharacters == 600)
+    }
+
+    @Test
+    func testMergeConsecutiveSegments_largeTextWithin600Limit() {
+        // Test that segments up to 600 chars merge correctly with default limit
+        let text400 = String(repeating: "a", count: 400)
+
+        let segments = [
+            DetailSegment(
+                id: TranscriptSegmentID("seg-1"),
+                machineSpeakerId: "spk_0",
+                startMs: 0,
+                endMs: 5000,
+                text: text400
+            ),
+            DetailSegment(
+                id: TranscriptSegmentID("seg-2"),
+                machineSpeakerId: "spk_0",
+                startMs: 5000,
+                endMs: 10000,
+                text: "short" // 400 + 1 (space) + 5 = 406 chars, under 600
+            )
+        ]
+
+        let result = TranscriptRendering.mergeConsecutiveSegments(segments)
+
+        #expect(result.count == 1)
+        #expect(result[0].text.count == 406) // 400 + space + 5
     }
 
     @Test

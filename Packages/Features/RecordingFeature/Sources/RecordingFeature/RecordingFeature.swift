@@ -488,7 +488,8 @@ public struct RecordingFeature {
                 return .none
 
             case let .segmentsLoaded(segments, tracks):
-                state.liveSegments = segments
+                // Merge consecutive same-speaker segments for cleaner display
+                state.liveSegments = RecordingSpeakerRendering.mergeConsecutiveSegments(segments)
                 state.speakerTracks = tracks
                 return .none
 
