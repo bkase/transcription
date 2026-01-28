@@ -1104,3 +1104,10 @@
 - ProfileView uses `.padding(.top, 56)` to account for safe area
 - Other features (SessionDetailView, etc.) should match this padding rather than using VaporSpacing.md (16pt)
 - Add accessibility identifiers to avatar views for different states (withPhoto, withInitials, empty) to enable E2E testing
+
+## TCA cross-feature state sync for nested presentation actions
+- When child features use @Presents for modal state, parent can intercept presentation actions for coordination
+- Pattern: `.path(.element(id: _, action: .childFeature(.presentedFeature(.presented(.action)))))`
+- Example: speakerPicker confirmation in session detail triggers timeline reload in AppFeature
+- Test setup for @Presents actions: initialize the presented state in the child to avoid "destination state absent" errors
+- Use `skipReceivedActions()` when multiple child effects fire (e.g., child reload + parent trigger)

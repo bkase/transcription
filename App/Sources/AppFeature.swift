@@ -154,6 +154,10 @@ public struct AppFeature {
                 // Reload timeline when session title is saved so the updated title is visible
                 return .send(.timeline(.loadSessions))
 
+            case .path(.element(id: _, action: .sessionDetail(.speakerPicker(.presented(.selectionConfirmed))))):
+                // Reload timeline when speaker assignment changes so avatar circles update
+                return .send(.timeline(.loadSessions))
+
             case .path(.element(id: _, action: .personTimeline(.backTapped))):
                 // Pop the navigation stack when back is tapped in person timeline
                 _ = state.path.popLast()

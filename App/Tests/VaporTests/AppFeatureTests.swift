@@ -4,6 +4,7 @@ import Dependencies
 import Foundation
 import Models
 import SessionDetailFeature
+import SpeakerPickerFeature
 import ProfileFeature
 import PersonTimelineFeature
 import Persistence
@@ -242,6 +243,62 @@ struct AppFeatureTests {
             $0.timeline.sessionGroups = []
             $0.timeline.speakerInfoBySession = [:]
         }
+
+        // Session detail should remain on the path
+        #expect(store.state.path.count == 1)
+    }
+
+    @Test
+    func testSpeakerAssignmentRefreshesTimeline() async {
+        // This test verifies that when a speaker is assigned in session detail (via speaker picker),
+        // the AppFeature forwards a timeline reload so the avatar circles update on the timeline.
+        let sessionID = SessionID(rawValue: "test-session-123")
+        let fixedDate = Date(timeIntervalSince1970: 1000000)
+
+        // Create session detail state with an active speaker picker
+        // to avoid the "destination state was absent" error
+        var sessionDetailState = SessionDetailFeature.State(sessionID: sessionID)
+        sessionDetailState.speakerPicker = SpeakerPickerFeature.State(
+            speakerTrackId: "track-1",
+            sessionId: sessionID,
+            displayOrder: 1
+        )
+
+        let store = TestStore(
+            initialState: AppFeature.State(
+                path: StackState([.sessionDetail(sessionDetailState)])
+            )
+        ) {
+            AppFeature()
+        } withDependencies: {
+            // Mock date for timeline reload
+            $0.date = .constant(fixedDate)
+            // Mock database client for timeline reload
+            $0.databaseClient.fetchSessionsGroupedByDate = { _ in [] }
+            $0.databaseClient.fetchSpeakerInfoForSessions = { _ in [:] }
+            // Mock session detail load methods (triggered by selectionConfirmed sending loadSession)
+            $0.databaseClient.fetchSession = { _ in nil }
+            $0.databaseClient.fetchTranscriptSegments = { _ in [] }
+            $0.databaseClient.fetchSpeakerTracks = { _ in [] }
+            $0.databaseClient.fetchPeople = { [] }
+        }
+
+        // When speaker is assigned in speaker picker within session detail:
+        // 1. SessionDetailFeature handles the action, dismisses the picker, and triggers loadSession
+        // 2. AppFeature intercepts the action and triggers timeline.loadSessions
+        // We use skipReceivedActions() because multiple effects fire in interleaved order
+        await store.send(.path(.element(id: 0, action: .sessionDetail(.speakerPicker(.presented(.selectionConfirmed(PersonID("person-1")))))))) {
+            // SessionDetailFeature dismisses the speaker picker
+            if case var .sessionDetail(detail) = $0.path[id: 0] {
+                detail.speakerPicker = nil
+                $0.path[id: 0] = .sessionDetail(detail)
+            }
+        }
+
+        // Skip received actions since multiple effects fire:
+        // - session detail's loadSession and sessionLoaded
+        // - timeline's loadSessions and sessionsLoaded
+        await store.skipReceivedActions()
 
         // Session detail should remain on the path
         #expect(store.state.path.count == 1)
