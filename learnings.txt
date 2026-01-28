@@ -1060,3 +1060,9 @@
 - Fix: Use opacity 0/1 instead of conditional to keep view in hierarchy, preventing insertion animation
 - Also add `.animation(nil, value: condition)` to explicitly disable animation on the controlling value
 - This approach prevents unwanted animations while keeping the view always present in the layout
+
+## SwiftUI breathing animation exit transitions
+- When stopping a repeating `.scaleEffect()` breathing animation, don't set scale directly without animation
+- Abrupt state changes cause visible bounce/snap when animation stops
+- Wrap exit in `withAnimation(VaporAnimation.exitCurve.animation(duration:))` for smooth deceleration
+- exitCurve (0.7, 0, 0.84, 0) provides smooth ease-out for stopping animations

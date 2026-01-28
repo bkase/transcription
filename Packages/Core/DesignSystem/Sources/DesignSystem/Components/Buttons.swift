@@ -105,7 +105,10 @@ public struct RecordButton: View {
             if newValue && isEnabled {
                 startBreathingAnimation()
             } else {
-                breatheScale = 1.0
+                // Use exit curve to smoothly transition to final scale
+                withAnimation(VaporAnimation.exitCurve.animation(duration: VaporAnimation.normalDuration)) {
+                    breatheScale = 1.0
+                }
             }
         }
         .onAppear {
