@@ -1111,3 +1111,10 @@
 - Example: speakerPicker confirmation in session detail triggers timeline reload in AppFeature
 - Test setup for @Presents actions: initialize the presented state in the child to avoid "destination state absent" errors
 - Use `skipReceivedActions()` when multiple child effects fire (e.g., child reload + parent trigger)
+
+## TabView with NavigationStack per tab
+- Each tab that needs navigation must wrap its content in its own NavigationStack
+- Multiple tabs can share the same StackState path if they need coordinated navigation
+- Without NavigationStack wrapper, appending to path won't trigger visible navigation in that tab
+- Pattern: Both Timeline and People tabs wrap their content in `NavigationStack(path: $store.scope(state: \.path, action: \.path)) { ... }`
+- Share navigation destinations across tabs by duplicating the `destination:` closure

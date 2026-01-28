@@ -340,6 +340,7 @@ public struct PersonCard: View {
                     y: 2
                 )
         )
+        .accessibilityIdentifier("personCard")
     }
 
     @ViewBuilder

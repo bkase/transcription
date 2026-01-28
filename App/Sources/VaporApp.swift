@@ -112,12 +112,32 @@ struct AppView: View {
                 }
                 .tag(AppFeature.Tab.timeline)
 
-                // People tab
-                PeopleView(store: store.scope(state: \.people, action: \.people))
-                    .tabItem {
-                        Label("People", systemImage: "person.2")
+                // People tab with NavigationStack
+                NavigationStack(
+                    path: $store.scope(state: \.path, action: \.path)
+                ) {
+                    PeopleView(store: store.scope(state: \.people, action: \.people))
+                        .navigationBarHidden(true)
+                } destination: { store in
+                    switch store.case {
+                    case let .sessionDetail(sessionDetailStore):
+                        SessionDetailView(store: sessionDetailStore)
+                            .navigationBarHidden(true)
+                            .vaporNavigationTransition()
+                    case let .profile(profileStore):
+                        ProfileView(store: profileStore)
+                            .navigationBarHidden(true)
+                            .vaporNavigationTransition()
+                    case let .personTimeline(personTimelineStore):
+                        PersonTimelineView(store: personTimelineStore)
+                            .navigationBarHidden(true)
+                            .vaporNavigationTransition()
                     }
-                    .tag(AppFeature.Tab.people)
+                }
+                .tabItem {
+                    Label("People", systemImage: "person.2")
+                }
+                .tag(AppFeature.Tab.people)
             }
             .onAppear {
                 store.send(.onAppear)

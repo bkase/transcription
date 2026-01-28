@@ -56,6 +56,7 @@ public struct PersonTimelineView: View {
                 Text(store.personName)
                     .font(.system(size: 24, weight: .light))
                     .foregroundColor(VaporColor.textPrimary)
+                    .accessibilityIdentifier("personTimelineName")
             }
 
             Spacer()
