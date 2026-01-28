@@ -50,11 +50,12 @@ def run_gen(env: dict[str, str]) -> bool:
     return True
 
 
-def run_build(env: dict[str, str]) -> bool:
+def run_build(env: dict[str, str], project_root: str) -> bool:
     print("build...", end=" ", flush=True)
+    project_path = os.path.join(project_root, "xcodegen/Vapor.xcodeproj")
     cmd = [
         "xcodebuild", "build-for-testing",
-        "-project", "xcodegen/Vapor.xcodeproj", "-scheme", "Vapor",
+        "-project", project_path, "-scheme", "Vapor",
         "-destination", f"id={env['AGENT_SIM_UDID']}",
         "-derivedDataPath", env["AGENT_DERIVED_DATA"],
         "-skipMacroValidation", "-skipPackagePluginValidation", "-quiet",
@@ -73,11 +74,10 @@ def run_single_package_test(package_path: str, env: dict[str, str], project_root
     Run tests for a single SPM package.
     Returns: (passed_count, failed_count, success, output)
     """
-    old_cwd = os.getcwd()
     try:
         full_path = os.path.join(project_root, package_path)
-        os.chdir(full_path)
-        proc = subprocess.run(["swift", "test", "--quiet"], env=env, capture_output=True, text=True, timeout=120)
+        # Use subprocess cwd parameter instead of os.chdir to avoid thread-safety issues
+        proc = subprocess.run(["swift", "test", "--quiet"], env=env, capture_output=True, text=True, timeout=120, cwd=full_path)
         output = proc.stdout + proc.stderr
 
         match = re.search(r"Test run with (\d+) tests? .* (passed|failed)", output)
@@ -98,8 +98,6 @@ def run_single_package_test(package_path: str, env: dict[str, str], project_root
         return (0, 0, True, "")
     except subprocess.TimeoutExpired:
         return (0, 0, False, f"{package_path}: TIMEOUT")
-    finally:
-        os.chdir(old_cwd)
 
 
 def run_spm_tests(env: dict[str, str]) -> TestResult:
@@ -138,11 +136,12 @@ def run_spm_tests(env: dict[str, str]) -> TestResult:
     return result
 
 
-def run_xcode_tests(env: dict[str, str], targets: list[str], name: str, parallel: bool) -> TestResult:
+def run_xcode_tests(env: dict[str, str], targets: list[str], name: str, parallel: bool, project_root: str) -> TestResult:
     print(f"{name}...", end=" ", flush=True)
+    project_path = os.path.join(project_root, "xcodegen/Vapor.xcodeproj")
     cmd = [
         "xcodebuild", "test-without-building",
-        "-project", "xcodegen/Vapor.xcodeproj", "-scheme", "Vapor",
+        "-project", project_path, "-scheme", "Vapor",
         "-destination", f"id={env['AGENT_SIM_UDID']}",
     ]
     if parallel:
@@ -188,15 +187,18 @@ def main() -> int:
     env = get_env_vars()
     results = []
 
+    # Capture project root before any potential directory changes
+    project_root = os.path.abspath(os.getcwd())
+
     # Note: gen is now handled by Makefile dependency (test: gen)
     # so we skip running it here to avoid running twice
-    if not run_build(env):
+    if not run_build(env, project_root):
         return 1
 
     results.append(run_spm_tests(env))
-    results.append(run_xcode_tests(env, ["VaporTests", "SnapshotTests"], "unit/snapshot", parallel=True))
+    results.append(run_xcode_tests(env, ["VaporTests", "SnapshotTests"], "unit/snapshot", parallel=True, project_root=project_root))
     # E2E tests run serially for now - RecordingE2ETests.testLiveSegmentsAppear has timing issues in parallel
-    results.append(run_xcode_tests(env, ["E2ETests"], "e2e", parallel=False))
+    results.append(run_xcode_tests(env, ["E2ETests"], "e2e", parallel=False, project_root=project_root))
 
     total_passed = sum(r.passed for r in results)
     total_failed = sum(r.failed for r in results)

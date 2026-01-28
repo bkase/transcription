@@ -964,3 +964,9 @@
 - Extract modifiers into separate ViewBuilder methods or View extensions
 - Breaking body into `mainContent` and modifier chains helps type checker
 - Pass `store` or bindings to extension methods to maintain access to state
+
+## Python subprocess threading
+- `os.chdir()` is process-global - not thread-safe when using ThreadPoolExecutor
+- Use `subprocess.run(..., cwd=path)` instead of `os.chdir()` for thread-safe directory changes
+- Capture project root with `os.path.abspath(os.getcwd())` early in main() before parallel work
+- Use absolute paths for subsequent subprocess calls to avoid race condition issues
