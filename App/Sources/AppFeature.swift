@@ -123,6 +123,10 @@ public struct AppFeature {
                 _ = state.path.popLast()
                 return .send(.timeline(.loadSessions))
 
+            case .path(.element(id: _, action: .sessionDetail(.retryTranscriptionCompleted))):
+                // Reload timeline when retry transcription completes so the partial chip is removed
+                return .send(.timeline(.loadSessions))
+
             case .path:
                 // Other path actions are handled by forEach below
                 return .none

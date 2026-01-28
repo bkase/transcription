@@ -970,3 +970,9 @@
 - Use `subprocess.run(..., cwd=path)` instead of `os.chdir()` for thread-safe directory changes
 - Capture project root with `os.path.abspath(os.getcwd())` early in main() before parallel work
 - Use absolute paths for subsequent subprocess calls to avoid race condition issues
+
+## TCA cross-feature coordination via AppFeature
+- When child feature actions need to trigger sibling feature updates, parent coordinates via action interception
+- Pattern: `.path(.element(id: _, action: .childFeature(.someAction)))` triggers `.send(.sibling(.loadData))`
+- Used for: SessionDetailFeature.retryTranscriptionCompleted triggers TimelineFeature.loadSessions
+- Similar to existing patterns for deleteCompleted, profile delegate updates

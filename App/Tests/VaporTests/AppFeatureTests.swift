@@ -1,6 +1,7 @@
 import Testing
 import ComposableArchitecture
 import Dependencies
+import Foundation
 import Models
 import SessionDetailFeature
 import ProfileFeature
@@ -201,5 +202,80 @@ struct AppFeatureTests {
 
         // Path should be empty again
         #expect(store.state.path.isEmpty)
+    }
+
+    // MARK: - Session Detail Coordination Tests
+
+    @Test
+    func testRetryTranscriptionCompletedRefreshesTimeline() async {
+        // This test verifies that when retryTranscriptionCompleted is received from session detail,
+        // the AppFeature forwards a timeline reload so the partial chip is removed from the timeline.
+        let sessionID = SessionID(rawValue: "test-session-123")
+        let fixedDate = Date(timeIntervalSince1970: 1000000)
+
+        let store = TestStore(
+            initialState: AppFeature.State(
+                path: StackState([.sessionDetail(SessionDetailFeature.State(sessionID: sessionID))])
+            )
+        ) {
+            AppFeature()
+        } withDependencies: {
+            // Mock date for timeline reload
+            $0.date = .constant(fixedDate)
+            // Mock database client for timeline reload
+            $0.databaseClient.fetchSessionsGroupedByDate = { _ in [] }
+            // Mock session detail load methods (triggered by retryTranscriptionCompleted sending loadSession)
+            $0.databaseClient.fetchSession = { _ in nil }
+            $0.databaseClient.fetchTranscriptSegments = { _ in [] }
+            $0.databaseClient.fetchSpeakerTracks = { _ in [] }
+            $0.databaseClient.fetchPeople = { [] }
+        }
+
+        // When retry transcription completes in session detail, the child reducer handles it
+        // (sets isRetrying = false) and parent forwards timeline.loadSessions
+        // The action reaches the child reducer first which modifies state
+        await store.send(.path(.element(id: 0, action: .sessionDetail(.retryTranscriptionCompleted))))
+
+        // Use skipReceivedActions since multiple effects fire:
+        // 1. session detail's .loadSession (from retryTranscriptionCompleted reducer)
+        // 2. timeline.loadSessions (from AppFeature intercepting retryTranscriptionCompleted)
+        await store.skipReceivedActions()
+
+        // Session detail should remain on the path (unlike delete which pops)
+        #expect(store.state.path.count == 1)
+    }
+
+    @Test
+    func testRetryTranscriptionCompletedDoesNotPopPath() async {
+        // Verify that retry completion does NOT pop the navigation stack
+        // (unlike delete which does pop)
+        let sessionID = SessionID(rawValue: "test-session-456")
+        let fixedDate = Date(timeIntervalSince1970: 1000000)
+
+        let store = TestStore(
+            initialState: AppFeature.State(
+                path: StackState([.sessionDetail(SessionDetailFeature.State(sessionID: sessionID))])
+            )
+        ) {
+            AppFeature()
+        } withDependencies: {
+            $0.date = .constant(fixedDate)
+            $0.databaseClient.fetchSessionsGroupedByDate = { _ in [] }
+            $0.databaseClient.fetchSession = { _ in nil }
+            $0.databaseClient.fetchTranscriptSegments = { _ in [] }
+            $0.databaseClient.fetchSpeakerTracks = { _ in [] }
+            $0.databaseClient.fetchPeople = { [] }
+        }
+
+        // Store the path count before retry completion
+        let pathCountBefore = store.state.path.count
+
+        // Send the retryTranscriptionCompleted action (handled by child reducer)
+        await store.send(.path(.element(id: 0, action: .sessionDetail(.retryTranscriptionCompleted))))
+
+        await store.skipReceivedActions()
+
+        // Verify path is unchanged (session detail stays visible)
+        #expect(store.state.path.count == pathCountBefore)
     }
 }

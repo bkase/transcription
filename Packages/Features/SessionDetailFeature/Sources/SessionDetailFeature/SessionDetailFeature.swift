@@ -545,6 +545,7 @@ public struct SessionDetailFeature {
             case .retryTranscriptionCompleted:
                 state.isRetrying = false
                 // Reload session to get updated state and segments
+                // Note: Parent (AppFeature) listens for this action to refresh the timeline
                 return .send(.loadSession)
 
             case let .retryTranscriptionFailed(errorMessage):
