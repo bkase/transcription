@@ -939,3 +939,13 @@
 - Pass userProfile to child features when initializing them (e.g., RecordingFeature.State(userProfile: state.userProfile))
 - View layer extracts image from profile.avatar.imageData or displays initials as fallback
 - Use #if os(iOS) for UIImage(data:) since UIKit isn't available on macOS
+
+## Transcription timeout and recovery patterns
+- Offline transcription timeout: use `withThrowingTaskGroup` to race transcription vs sleep, cancel loser
+- OfflineTranscriptionError.timeout provides user-friendly error description
+- Recovery routine uses `updatedAt` (not `startedAt`) to detect stuck sessions - set when entering transcribing state
+- Stuck sessions marked as `.partial` (not `.processed`) with error message for transparency
+- Recovery cutoff: 6 minutes (360 seconds) to account for 5-minute transcription timeout + buffer
+- TimelineFeature polling: check `hasTranscribingSessions`, poll every 5 seconds if true, cancel when no more transcribing
+- MockFluidAudioClient.offlineHang() for testing timeout behavior (sleeps 1 hour, will be cancelled by timeout)
+- OfflineTranscriptionBehavior.hang case added to mock actor for timeout testing

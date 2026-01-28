@@ -587,6 +587,110 @@ struct TimelineFeatureTests {
         #expect(store.state.sessionGroups[0].sessions.count == 1)
     }
 
+    // MARK: - Transcription Polling Tests
+
+    @Test
+    func testHasTranscribingSessionsComputedProperty() async {
+        let mockDate = Date(timeIntervalSince1970: 1000000)
+
+        // Session in transcribing state
+        let transcribingSession = SessionRecord(
+            id: "transcribing-session",
+            startedAt: mockDate,
+            title: nil,
+            processingState: .transcribing,
+            speakerCount: 0,
+            updatedAt: mockDate
+        )
+
+        // Session that's processed
+        let processedSession = SessionRecord(
+            id: "processed-session",
+            startedAt: mockDate.addingTimeInterval(-3600),
+            title: "Done",
+            processingState: .processed,
+            speakerCount: 1,
+            updatedAt: mockDate
+        )
+
+        // State with transcribing session
+        let stateWithTranscribing = TimelineFeature.State(
+            sessionGroups: [SessionGroup(bucket: .today, sessions: [transcribingSession, processedSession])]
+        )
+        #expect(stateWithTranscribing.hasTranscribingSessions == true)
+
+        // State without transcribing session
+        let stateWithoutTranscribing = TimelineFeature.State(
+            sessionGroups: [SessionGroup(bucket: .today, sessions: [processedSession])]
+        )
+        #expect(stateWithoutTranscribing.hasTranscribingSessions == false)
+
+        // Empty state
+        let emptyState = TimelineFeature.State()
+        #expect(emptyState.hasTranscribingSessions == false)
+    }
+
+    @Test
+    func testOnDisappearCancelsPolling() async {
+        let store = TestStore(
+            initialState: TimelineFeature.State()
+        ) {
+            TimelineFeature()
+        }
+
+        // onDisappear should cancel polling and return no state change
+        await store.send(.onDisappear)
+    }
+
+    @Test
+    func testPollTranscribingSessionsStopsWhenNoMoreTranscribing() async {
+        let mockDate = Date(timeIntervalSince1970: 1000000)
+
+        // Start with a transcribing session
+        let transcribingSession = SessionRecord(
+            id: "session-1",
+            startedAt: mockDate,
+            processingState: .transcribing,
+            speakerCount: 0,
+            updatedAt: mockDate
+        )
+
+        // When we poll, the session is now processed
+        let processedSession = SessionRecord(
+            id: "session-1",
+            startedAt: mockDate,
+            processingState: .processed,
+            speakerCount: 1,
+            updatedAt: mockDate
+        )
+        let updatedGroups = [SessionGroup(bucket: .today, sessions: [processedSession])]
+
+        let store = TestStore(
+            initialState: TimelineFeature.State(
+                sessionGroups: [SessionGroup(bucket: .today, sessions: [transcribingSession])]
+            )
+        ) {
+            TimelineFeature()
+        } withDependencies: {
+            $0.date = .constant(mockDate)
+            $0.databaseClient.fetchSessionsGroupedByDate = { _ in updatedGroups }
+        }
+
+        // Verify initial state has transcribing session
+        #expect(store.state.hasTranscribingSessions == true)
+
+        // Send poll action
+        await store.send(.pollTranscribingSessions)
+
+        // Should receive updated sessions (no more transcribing)
+        await store.receive(\.sessionsLoaded) {
+            $0.sessionGroups = updatedGroups
+        }
+
+        // Now hasTranscribingSessions should be false
+        #expect(store.state.hasTranscribingSessions == false)
+    }
+
     @Test
     func testDeleteRemovesFromSearchResults() async {
         let mockDate = Date(timeIntervalSince1970: 1000000)

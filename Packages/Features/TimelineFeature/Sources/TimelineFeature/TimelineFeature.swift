@@ -18,6 +18,10 @@ public struct TimelineFeature {
     @Dependency(\.uuid) var uuid
     @Dependency(\.fluidAudioClient) var fluidAudioClient
 
+    private enum CancelID {
+        case transcriptionPolling
+    }
+
     @ObservableState
     public struct State: Equatable {
         public var searchQuery: String = ""
@@ -47,6 +51,13 @@ public struct TimelineFeature {
         /// Whether recording is enabled (models ready)
         public var isRecordEnabled: Bool {
             modelPreparationState == .ready
+        }
+
+        /// Whether any visible sessions are currently being transcribed
+        public var hasTranscribingSessions: Bool {
+            sessionGroups.contains { group in
+                group.sessions.contains { $0.processingState == .transcribing }
+            }
         }
 
         /// Compute initials from the profile name for avatar display
@@ -91,6 +102,7 @@ public struct TimelineFeature {
 
     public enum Action: Equatable, Sendable {
         case onAppear
+        case onDisappear
         case searchQueryChanged(String)
         case loadSessions
         case sessionsLoaded([SessionGroup])
@@ -116,6 +128,9 @@ public struct TimelineFeature {
         case prepareModels
         case modelPreparationSucceeded
         case modelPreparationFailed(String)
+
+        // Transcription polling actions
+        case pollTranscribingSessions
     }
 
     public var body: some ReducerOf<Self> {
@@ -128,17 +143,32 @@ public struct TimelineFeature {
                 // Load sessions if needed
                 let shouldLoadSessions = state.sessionGroups.isEmpty && !state.isLoading
 
-                if shouldPrepareModels && shouldLoadSessions {
-                    return .merge(
-                        .send(.prepareModels),
-                        .send(.loadSessions)
-                    )
-                } else if shouldPrepareModels {
-                    return .send(.prepareModels)
-                } else if shouldLoadSessions {
-                    return .send(.loadSessions)
+                // Start polling if there are transcribing sessions
+                let shouldStartPolling = state.hasTranscribingSessions
+
+                var effects: [Effect<Action>] = []
+                if shouldPrepareModels {
+                    effects.append(.send(.prepareModels))
                 }
-                return .none
+                if shouldLoadSessions {
+                    effects.append(.send(.loadSessions))
+                }
+                if shouldStartPolling {
+                    effects.append(
+                        .run { send in
+                            try? await Task.sleep(for: .seconds(5))
+                            await send(.pollTranscribingSessions)
+                        }
+                        .cancellable(id: CancelID.transcriptionPolling, cancelInFlight: true)
+                    )
+                }
+
+                guard !effects.isEmpty else { return .none }
+                return .merge(effects)
+
+            case .onDisappear:
+                // Cancel polling when view disappears
+                return .cancel(id: CancelID.transcriptionPolling)
 
             case let .searchQueryChanged(query):
                 state.searchQuery = query
@@ -171,6 +201,18 @@ public struct TimelineFeature {
             case let .sessionsLoaded(groups):
                 state.isLoading = false
                 state.sessionGroups = groups
+
+                // Start polling if any sessions are transcribing
+                let hasTranscribing = groups.contains { group in
+                    group.sessions.contains { $0.processingState == .transcribing }
+                }
+                if hasTranscribing {
+                    return .run { send in
+                        try? await Task.sleep(for: .seconds(5))
+                        await send(.pollTranscribingSessions)
+                    }
+                    .cancellable(id: CancelID.transcriptionPolling, cancelInFlight: true)
+                }
                 return .none
 
             case let .sessionsFailed(errorMessage):
@@ -311,6 +353,22 @@ public struct TimelineFeature {
             case let .modelPreparationFailed(message):
                 state.modelPreparationState = .failed(message)
                 return .none
+
+            // MARK: - Transcription Polling
+
+            case .pollTranscribingSessions:
+                // Only poll if there are transcribing sessions visible
+                guard state.hasTranscribingSessions else {
+                    return .cancel(id: CancelID.transcriptionPolling)
+                }
+
+                // Reload sessions to get updated processing states
+                return .run { [date] send in
+                    let groups = try await databaseClient.fetchSessionsGroupedByDate(date.now)
+                    await send(.sessionsLoaded(groups))
+                } catch: { _, _ in
+                    // Silently continue polling on error
+                }
             }
         }
     }

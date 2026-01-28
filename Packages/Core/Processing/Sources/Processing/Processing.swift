@@ -746,6 +746,9 @@ public actor RecordingProcessor {
         }
     }
 
+    /// Timeout for offline transcription (5 minutes)
+    private static let offlineTranscriptionTimeout: TimeInterval = 5 * 60
+
     /// Run offline transcription on the saved audio file
     /// This provides a higher quality full-pass transcription after recording stops
     private func runOfflineTranscription(sessionId: SessionID, audioFileURL: URL) async {
@@ -772,10 +775,24 @@ public actor RecordingProcessor {
         }
 
         do {
-            // Run offline transcription on the saved audio file
+            // Run offline transcription on the saved audio file with timeout
             // Do this BEFORE deleting live segments so we don't lose them on failure
-            NSLog("[OfflineTranscription] Calling transcribeFile...")
-            let segments = try await fluidAudioClient.transcribeFile(audioFileURL)
+            NSLog("[OfflineTranscription] Calling transcribeFile with \(Self.offlineTranscriptionTimeout)s timeout...")
+            let segments = try await withThrowingTaskGroup(of: [TranscriptSegment].self) { group in
+                group.addTask { [fluidAudioClient] in
+                    try await fluidAudioClient.transcribeFile(audioFileURL)
+                }
+                group.addTask {
+                    try await Task.sleep(for: .seconds(Self.offlineTranscriptionTimeout))
+                    throw OfflineTranscriptionError.timeout
+                }
+                // Return result from whichever task finishes first
+                guard let result = try await group.next() else {
+                    throw OfflineTranscriptionError.timeout
+                }
+                group.cancelAll()
+                return result
+            }
             NSLog("[OfflineTranscription] Got \(segments.count) segments from file")
 
             // If offline transcription returned no segments, keep the live transcription
@@ -931,8 +948,22 @@ public actor RecordingProcessor {
         NSLog("[RetryOfflineTranscription] Starting retry for session \(sessionId.rawValue)")
 
         do {
-            // Run offline transcription on the saved audio file
-            let segments = try await fluidAudioClient.transcribeFile(audioFileURL)
+            // Run offline transcription on the saved audio file with timeout
+            let segments = try await withThrowingTaskGroup(of: [TranscriptSegment].self) { group in
+                group.addTask { [fluidAudioClient] in
+                    try await fluidAudioClient.transcribeFile(audioFileURL)
+                }
+                group.addTask {
+                    try await Task.sleep(for: .seconds(Self.offlineTranscriptionTimeout))
+                    throw OfflineTranscriptionError.timeout
+                }
+                // Return result from whichever task finishes first
+                guard let result = try await group.next() else {
+                    throw OfflineTranscriptionError.timeout
+                }
+                group.cancelAll()
+                return result
+            }
             NSLog("[RetryOfflineTranscription] Got \(segments.count) segments from file")
 
             // If offline transcription returned no segments, mark as failed
@@ -1044,6 +1075,20 @@ public enum RecordingProcessorError: Error, Equatable, Sendable {
     case invalidStateForRetry(ProcessingState)
 }
 
+// MARK: - OfflineTranscriptionError
+
+/// Errors specific to offline transcription
+public enum OfflineTranscriptionError: Error, LocalizedError, Sendable {
+    case timeout
+
+    public var errorDescription: String? {
+        switch self {
+        case .timeout:
+            return "Transcription timed out after 5 minutes"
+        }
+    }
+}
+
 // MARK: - RecoveryRoutine
 
 /// Result of running the recovery routine at app startup
@@ -1092,7 +1137,8 @@ extension RecoveryRoutineClient: DependencyKey {
                     )
 
                     // Still check for stuck transcriptions
-                    let cutoffDate = date.now.addingTimeInterval(-60)
+                    // Use 6 minutes (360 seconds) as cutoff to account for 5-minute transcription timeout plus buffer
+                    let cutoffDate = date.now.addingTimeInterval(-360)
                     let transcriptionRecovered = try await databaseClient.recoverStuckTranscriptions(cutoffDate)
 
                     if transcriptionRecovered > 0 {
@@ -1127,8 +1173,8 @@ extension RecoveryRoutineClient: DependencyKey {
                 )
 
                 // Also recover sessions stuck in transcribing state
-                // Consider anything older than 5 minutes as stuck
-                let cutoffDate = date.now.addingTimeInterval(-60)
+                // Use 6 minutes (360 seconds) as cutoff to account for 5-minute transcription timeout plus buffer
+                let cutoffDate = date.now.addingTimeInterval(-360)
                 let transcriptionRecovered = try await databaseClient.recoverStuckTranscriptions(cutoffDate)
 
                 if transcriptionRecovered > 0 {

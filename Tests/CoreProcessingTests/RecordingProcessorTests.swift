@@ -1115,3 +1115,64 @@ import Persistence
     // Clean up
     await processor.stopRecording()
 }
+
+// MARK: - Timeout Error Tests
+
+@Test func testOfflineTranscriptionTimeoutErrorDescription() {
+    // Verify the timeout error has a descriptive message
+    let error = OfflineTranscriptionError.timeout
+    #expect(error.errorDescription?.contains("timed out") == true)
+    #expect(error.errorDescription?.contains("5 minutes") == true)
+}
+
+// MARK: - Recovery Routine Tests
+
+@Test func testRecoveryRoutineRecoverStuckTranscriptions() async throws {
+    // This test verifies that the recovery routine properly recovers sessions
+    // that are stuck in the transcribing state.
+
+    let dbQueue = try makeDatabase(configuration: .inMemory)
+    let databaseClient = DatabaseClient.live(dbQueue: dbQueue)
+
+    // Create a session stuck in transcribing state (old updatedAt time)
+    let stuckTime = Date(timeIntervalSince1970: 1000) // Old time
+    let stuckSession = SessionRecord(
+        id: "stuck-transcribing-session",
+        startedAt: stuckTime,
+        endedAt: stuckTime.addingTimeInterval(60),
+        audioPath: "/tmp/stuck.caf",
+        processingState: .transcribing,
+        speakerCount: 0,
+        updatedAt: stuckTime // Key: updatedAt is old
+    )
+    try await databaseClient.createSession(stuckSession)
+
+    // Create a recent session in transcribing state (should NOT be recovered)
+    let recentTime = Date() // Now
+    let recentSession = SessionRecord(
+        id: "recent-transcribing-session",
+        startedAt: recentTime,
+        endedAt: nil,
+        audioPath: "/tmp/recent.caf",
+        processingState: .transcribing,
+        speakerCount: 0,
+        updatedAt: recentTime // Key: updatedAt is recent
+    )
+    try await databaseClient.createSession(recentSession)
+
+    // Run recovery - should only recover the stuck session
+    // The cutoff is 6 minutes (360 seconds) ago
+    let cutoff = Date().addingTimeInterval(-360)
+    let recoveredCount = try await databaseClient.recoverStuckTranscriptions(cutoff)
+
+    #expect(recoveredCount == 1, "Should have recovered exactly 1 stuck session")
+
+    // Verify the stuck session was marked as partial
+    let updatedStuck = try await databaseClient.fetchSession(SessionID(rawValue: "stuck-transcribing-session"))
+    #expect(updatedStuck?.processingState == .partial)
+    #expect(updatedStuck?.processingError?.contains("interrupted") == true || updatedStuck?.processingError?.contains("timed out") == true)
+
+    // Verify the recent session is still transcribing
+    let updatedRecent = try await databaseClient.fetchSession(SessionID(rawValue: "recent-transcribing-session"))
+    #expect(updatedRecent?.processingState == .transcribing)
+}

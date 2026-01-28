@@ -134,6 +134,8 @@ public enum OfflineTranscriptionBehavior: Sendable {
     case empty
     /// Throw an error
     case failure(String)
+    /// Hang indefinitely (for timeout testing)
+    case hang
 }
 
 /// Actor that manages mock transcription state
@@ -295,6 +297,11 @@ public struct MockFluidAudioClient {
                     return []
                 case .failure(let message):
                     throw MockOfflineTranscriptionError(message: message)
+                case .hang:
+                    // Hang indefinitely (for timeout testing)
+                    // Sleep for a very long time (effectively forever)
+                    try await Task.sleep(for: .seconds(3600))
+                    return []
                 }
             }
         )
@@ -338,5 +345,12 @@ public struct MockFluidAudioClient {
         script: MockFluidAudioScript = .twoSpeakerConversation
     ) -> FluidAudioClient {
         client(script: script, modelState: .ready, offlineBehavior: .empty)
+    }
+
+    /// Create a FluidAudioClient where offline transcription hangs indefinitely (for timeout testing)
+    public static func offlineHang(
+        script: MockFluidAudioScript = .twoSpeakerConversation
+    ) -> FluidAudioClient {
+        client(script: script, modelState: .ready, offlineBehavior: .hang)
     }
 }

@@ -675,19 +675,22 @@ extension DatabaseClient: DependencyKey {
             },
             recoverStuckTranscriptions: { olderThan in
                 try await dbQueue.write { db in
-                    // Find sessions stuck in 'transcribing' state that started before the cutoff
-                    // These are sessions where transcription was interrupted
+                    // Find sessions stuck in 'transcribing' state that were updated before the cutoff
+                    // These are sessions where transcription was interrupted or timed out
+                    // We use updatedAt because that's when the session entered transcribing state
                     let updateSQL = """
                         UPDATE sessions
                         SET processingState = ?,
+                            processingError = ?,
                             updatedAt = ?
                         WHERE processingState = ?
-                        AND startedAt < ?
+                        AND updatedAt < ?
                         """
                     try db.execute(
                         sql: updateSQL,
                         arguments: [
-                            ProcessingState.processed.rawValue,
+                            ProcessingState.partial.rawValue,
+                            "Transcription was interrupted or timed out",
                             Date(),
                             ProcessingState.transcribing.rawValue,
                             olderThan
