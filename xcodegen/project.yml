@@ -78,6 +78,10 @@ targets:
     platform: iOS
     sources:
       - path: ../App/Sources
+    settings:
+      base:
+        DEVELOPMENT_TEAM: Y4U5GF9JQQ
+        CODE_SIGN_STYLE: Automatic
     dependencies:
       - package: swift-composable-architecture
         product: ComposableArchitecture

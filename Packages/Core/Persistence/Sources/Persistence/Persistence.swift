@@ -331,8 +331,9 @@ public enum AppMigrations {
             // Create FTS5 virtual table for transcript search
             // NOT using external content table because the column mapping differs (segmentId vs id)
             // We use triggers to keep it in sync manually
+            // Use IF NOT EXISTS for idempotency in case of partial migration
             try db.execute(sql: """
-                CREATE VIRTUAL TABLE transcript_fts USING fts5(
+                CREATE VIRTUAL TABLE IF NOT EXISTS transcript_fts USING fts5(
                     text,
                     sessionId UNINDEXED,
                     segmentId UNINDEXED
@@ -340,21 +341,22 @@ public enum AppMigrations {
                 """)
 
             // Triggers to keep FTS index in sync with transcript_segments
+            // Use IF NOT EXISTS for idempotency
             try db.execute(sql: """
-                CREATE TRIGGER transcript_fts_ai AFTER INSERT ON transcript_segments BEGIN
+                CREATE TRIGGER IF NOT EXISTS transcript_fts_ai AFTER INSERT ON transcript_segments BEGIN
                     INSERT INTO transcript_fts(text, sessionId, segmentId)
                     VALUES (NEW.text, NEW.sessionId, NEW.id);
                 END
                 """)
 
             try db.execute(sql: """
-                CREATE TRIGGER transcript_fts_ad AFTER DELETE ON transcript_segments BEGIN
+                CREATE TRIGGER IF NOT EXISTS transcript_fts_ad AFTER DELETE ON transcript_segments BEGIN
                     DELETE FROM transcript_fts WHERE segmentId = OLD.id;
                 END
                 """)
 
             try db.execute(sql: """
-                CREATE TRIGGER transcript_fts_au AFTER UPDATE ON transcript_segments BEGIN
+                CREATE TRIGGER IF NOT EXISTS transcript_fts_au AFTER UPDATE ON transcript_segments BEGIN
                     DELETE FROM transcript_fts WHERE segmentId = OLD.id;
                     INSERT INTO transcript_fts(text, sessionId, segmentId)
                     VALUES (NEW.text, NEW.sessionId, NEW.id);
