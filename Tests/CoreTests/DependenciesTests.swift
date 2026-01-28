@@ -42,6 +42,7 @@ import Dependencies
             searchSessionsWithDetails: { _ in [] },
             fetchSessionsGroupedByDate: { _ in [] },
             fetchPersonConversationCounts: { [:] },
+            fetchSessionsForPerson: { _ in [] },
             fetchStaleRecordings: { [] },
             reconcileStaleRecordings: { _, _ in 0 },
             recoverStuckTranscriptions: { _ in 0 }

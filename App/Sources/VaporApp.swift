@@ -5,6 +5,7 @@ import RecordingFeature
 import SessionDetailFeature
 import PeopleFeature
 import ProfileFeature
+import PersonTimelineFeature
 import Dependencies
 import Audio
 import Processing
@@ -98,6 +99,10 @@ struct AppView: View {
                             .vaporNavigationTransition()
                     case let .profile(profileStore):
                         ProfileView(store: profileStore)
+                            .navigationBarHidden(true)
+                            .vaporNavigationTransition()
+                    case let .personTimeline(personTimelineStore):
+                        PersonTimelineView(store: personTimelineStore)
                             .navigationBarHidden(true)
                             .vaporNavigationTransition()
                     }

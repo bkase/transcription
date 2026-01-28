@@ -5,6 +5,7 @@ import Foundation
 import Models
 import SessionDetailFeature
 import ProfileFeature
+import PersonTimelineFeature
 import Persistence
 import Processing
 @testable import Vapor
@@ -277,5 +278,150 @@ struct AppFeatureTests {
 
         // Verify path is unchanged (session detail stays visible)
         #expect(store.state.path.count == pathCountBefore)
+    }
+
+    // MARK: - Person Timeline Navigation Tests
+
+    @Test
+    func testNavigateToPersonTimeline() async {
+        let mockDate = Date(timeIntervalSince1970: 1000000)
+        let testProfile = UserProfile(name: "Test User")
+        let personId = PersonID("person-123")
+        let mockPerson = PersonRecord(
+            id: personId.rawValue,
+            name: "Sarah Chen",
+            colorToken: "sky",
+            createdAt: mockDate,
+            updatedAt: mockDate
+        )
+
+        let store = TestStore(
+            initialState: AppFeature.State(currentTab: .people, userProfile: testProfile)
+        ) {
+            AppFeature()
+        } withDependencies: {
+            $0.databaseClient.fetchPerson = { _ in mockPerson }
+        }
+
+        // Initially, path should be empty
+        #expect(store.state.path.isEmpty)
+
+        // When a person is tapped in people view, it should fetch the person and navigate
+        await store.send(.people(.personTapped(personId)))
+
+        // Wait for personLoaded action to be received
+        await store.skipReceivedActions()
+
+        // Verify path contains the person timeline screen
+        #expect(store.state.path.count == 1)
+
+        // Verify the person timeline has correct data
+        if case let .personTimeline(personTimelineState) = store.state.path.first {
+            #expect(personTimelineState.personId == personId)
+            #expect(personTimelineState.personName == "Sarah Chen")
+            #expect(personTimelineState.userProfile == testProfile)
+        } else {
+            Issue.record("Expected personTimeline state in path")
+        }
+
+        // When back is tapped in person timeline, path should pop
+        await store.send(.path(.element(id: 0, action: .personTimeline(.backTapped)))) {
+            _ = $0.path.popLast()
+        }
+
+        // Path should be empty again
+        #expect(store.state.path.isEmpty)
+    }
+
+    @Test
+    func testNavigateFromPersonTimelineToSessionDetail() async {
+        let mockDate = Date(timeIntervalSince1970: 1000000)
+        let testProfile = UserProfile(name: "Test User")
+        let personId = PersonID("person-123")
+        let sessionId = SessionID(rawValue: "session-456")
+
+        let store = TestStore(
+            initialState: AppFeature.State(
+                currentTab: .people,
+                path: StackState([.personTimeline(PersonTimelineFeature.State(
+                    personId: personId,
+                    personName: "Sarah Chen",
+                    userProfile: testProfile
+                ))]),
+                userProfile: testProfile
+            )
+        ) {
+            AppFeature()
+        }
+
+        // Verify we start with person timeline on path
+        #expect(store.state.path.count == 1)
+
+        // When a session is tapped in person timeline, it should push session detail
+        await store.send(.path(.element(id: 0, action: .personTimeline(.sessionTapped(sessionId))))) {
+            $0.path.append(.sessionDetail(SessionDetailFeature.State(
+                sessionID: sessionId,
+                userProfile: testProfile
+            )))
+        }
+
+        // Verify path contains both person timeline and session detail
+        #expect(store.state.path.count == 2)
+    }
+
+    @Test
+    func testNavigateFromPersonTimelineToProfile() async {
+        let testProfile = UserProfile(name: "Test User", email: "test@example.com")
+        let personId = PersonID("person-123")
+
+        let store = TestStore(
+            initialState: AppFeature.State(
+                currentTab: .people,
+                path: StackState([.personTimeline(PersonTimelineFeature.State(
+                    personId: personId,
+                    personName: "Sarah Chen",
+                    userProfile: testProfile
+                ))]),
+                userProfile: testProfile
+            )
+        ) {
+            AppFeature()
+        }
+
+        // Verify we start with person timeline on path
+        #expect(store.state.path.count == 1)
+
+        // When avatar is tapped in person timeline, it should push profile
+        await store.send(.path(.element(id: 0, action: .personTimeline(.avatarTapped)))) {
+            $0.path.append(.profile(ProfileFeature.State(profile: testProfile)))
+        }
+
+        // Verify path contains both person timeline and profile
+        #expect(store.state.path.count == 2)
+    }
+
+    @Test
+    func testPersonLoadFailureHandledGracefully() async {
+        let personId = PersonID("person-123")
+
+        let store = TestStore(
+            initialState: AppFeature.State(currentTab: .people)
+        ) {
+            AppFeature()
+        } withDependencies: {
+            $0.databaseClient.fetchPerson = { _ in nil }
+        }
+
+        // Initially, path should be empty
+        #expect(store.state.path.isEmpty)
+
+        // When a person is tapped but doesn't exist, should handle gracefully
+        await store.send(.people(.personTapped(personId)))
+
+        // Wait for failure
+        await store.receive(\.personLoadFailed)
+
+        // Path should still be empty (no navigation happened)
+        #expect(store.state.path.isEmpty)
     }
 }

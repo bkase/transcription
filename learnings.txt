@@ -993,3 +993,19 @@
 - Use .onTapGesture on the overlay to dismiss when tapping outside the modal
 - Transitions work naturally with fullScreenCover (fade-in/fade-out)
 - For alignment near trigger button, use ZStack(alignment: .topTrailing) with padding
+
+## SpeakerPickerFeature with current user
+- Pass userProfile: UserProfile to SpeakerPickerFeature.State when initializing from parent features
+- Use special PersonID (currentUserPersonId) to represent "You" option - allows distinguishing from actual person IDs
+- showCurrentUserOption computed property: only show "You" if user has non-empty profile name
+- confirmSelection handles current user: checks for existing person by name (case-insensitive), creates new if needed
+- CurrentUserOption component in DesignSystem displays avatar or initials with "You" label
+- Tests for confirmSelection need uuid and date mocks since current user selection may create a new person
+
+## TCA Navigation Stack patterns for filtered lists
+- Create new feature (e.g., PersonTimelineFeature) for filtered views with specific header/context
+- Add new case to AppFeature.Path enum (e.g., `case personTimeline(PersonTimelineFeature)`)
+- Handle parent action (e.g., personTapped) with async fetch, then navigate in response action (personLoaded)
+- Test async navigation: use `skipReceivedActions()` and verify final state instead of matching StackState IDs
+- StackState ID matching can fail in receive blocks - IDs generated at runtime may differ from test expectations
+- Reuse existing views/components (SessionCard, SessionCardViewModel) via package dependencies

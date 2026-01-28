@@ -112,6 +112,7 @@ targets:
       - target: SpeakerPickerFeature
       - target: AudioPlayerFeature
       - target: ProfileFeature
+      - target: PersonTimelineFeature
     settings:
       base:
         INFOPLIST_FILE: ../App/Sources/Info.plist
@@ -446,6 +447,30 @@ targets:
         PRODUCT_MODULE_NAME: ProfileFeature
         DYLIB_INSTALL_NAME_BASE: "@rpath"
 
+  PersonTimelineFeature:
+    type: framework
+    platform: iOS
+    sources:
+      - path: ../Packages/Features/PersonTimelineFeature/Sources/PersonTimelineFeature
+    dependencies:
+      - target: Models
+      - target: Persistence
+      - target: DesignSystem
+      - target: TimelineFeature
+      - package: swift-tagged
+        product: Tagged
+      - package: swift-composable-architecture
+        product: ComposableArchitecture
+      - package: swift-case-paths
+        product: CasePaths
+      - package: swift-dependencies
+        product: Dependencies
+    settings:
+      base:
+        PRODUCT_NAME: PersonTimelineFeature
+        PRODUCT_MODULE_NAME: PersonTimelineFeature
+        DYLIB_INSTALL_NAME_BASE: "@rpath"
+
   # Test targets
   VaporTests:
     type: bundle.unit-test
@@ -459,6 +484,7 @@ targets:
       - target: Processing
       - target: SessionDetailFeature
       - target: ProfileFeature
+      - target: PersonTimelineFeature
       - package: swift-snapshot-testing
         product: SnapshotTesting
       - package: swift-composable-architecture

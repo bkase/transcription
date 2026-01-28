@@ -63,6 +63,19 @@ public struct SpeakerPickerView: View {
                 .padding(.vertical, 8)
         }
 
+        // "You" option at top (if user has a profile name)
+        if store.showCurrentUserOption {
+            SpeakerPickerSectionLabel("You")
+
+            currentUserOption
+
+            // Divider
+            Rectangle()
+                .fill(VaporColor.fog)
+                .frame(height: 1)
+                .padding(.vertical, 4)
+        }
+
         // Existing speakers section
         if !store.people.isEmpty {
             SpeakerPickerSectionLabel("Existing Speakers")
@@ -93,6 +106,20 @@ public struct SpeakerPickerView: View {
         if store.selectedPersonId != nil && store.selectedPersonId != store.currentPersonId {
             confirmButton
         }
+    }
+
+    private var currentUserOption: some View {
+        Button {
+            store.send(.personSelected(SpeakerPickerFeature.State.currentUserPersonId))
+        } label: {
+            CurrentUserOption(
+                name: store.userProfile.name,
+                avatarData: store.userProfile.avatar.imageData,
+                isSelected: store.isCurrentUserSelected
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("currentUserOption")
     }
 
     private func personOption(for person: PersonRecord) -> some View {
@@ -250,9 +277,21 @@ public struct SpeakerPickerViewPreview: View {
         }
     }
 
+    public struct CurrentUserData {
+        public let name: String
+        public let avatarData: Data?
+        public let isSelected: Bool
+
+        public init(name: String, avatarData: Data? = nil, isSelected: Bool = false) {
+            self.name = name
+            self.avatarData = avatarData
+            self.isSelected = isSelected
+        }
+    }
+
     public enum DisplayMode {
         case loading
-        case picker(people: [PersonData], showNewOption: Bool)
+        case picker(people: [PersonData], showNewOption: Bool, currentUser: CurrentUserData? = nil)
         case newPersonForm(name: String)
     }
 
@@ -285,8 +324,8 @@ public struct SpeakerPickerViewPreview: View {
                 Spacer()
             }
 
-        case let .picker(people, showNewOption):
-            pickerContent(people: people, showNewOption: showNewOption)
+        case let .picker(people, showNewOption, currentUser):
+            pickerContent(people: people, showNewOption: showNewOption, currentUser: currentUser)
 
         case let .newPersonForm(name):
             newPersonFormContent(name: name)
@@ -294,7 +333,24 @@ public struct SpeakerPickerViewPreview: View {
     }
 
     @ViewBuilder
-    private func pickerContent(people: [PersonData], showNewOption: Bool) -> some View {
+    private func pickerContent(people: [PersonData], showNewOption: Bool, currentUser: CurrentUserData?) -> some View {
+        // "You" option at top
+        if let currentUser = currentUser {
+            SpeakerPickerSectionLabel("You")
+
+            CurrentUserOption(
+                name: currentUser.name,
+                avatarData: currentUser.avatarData,
+                isSelected: currentUser.isSelected
+            )
+
+            Rectangle()
+                .fill(VaporColor.fog)
+                .frame(height: 1)
+                .padding(.vertical, 4)
+        }
+
+        // Existing speakers section
         if !people.isEmpty {
             SpeakerPickerSectionLabel("Existing Speakers")
 

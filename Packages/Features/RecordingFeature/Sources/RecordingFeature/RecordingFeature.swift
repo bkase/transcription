@@ -586,7 +586,8 @@ public struct RecordingFeature {
                     speakerTrackId: track.id,
                     sessionId: sessionId,
                     displayOrder: track.displayOrder,
-                    currentPersonId: track.personId.map { PersonID($0) }
+                    currentPersonId: track.personId.map { PersonID($0) },
+                    userProfile: state.userProfile
                 )
                 return .none
 

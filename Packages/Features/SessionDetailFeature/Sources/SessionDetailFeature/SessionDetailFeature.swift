@@ -396,7 +396,8 @@ public struct SessionDetailFeature {
                     speakerTrackId: track.id,
                     sessionId: state.sessionID,
                     displayOrder: track.displayOrder,
-                    currentPersonId: track.personId.map { PersonID($0) }
+                    currentPersonId: track.personId.map { PersonID($0) },
+                    userProfile: state.userProfile
                 )
                 return .none
 

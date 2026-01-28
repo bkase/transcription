@@ -7,6 +7,11 @@ import Observability
 @testable import Processing
 
 // MARK: - Recovery Routine Tests
+// Note: These tests must run serially because they use withDependencies
+// which can have race conditions when tests run in parallel.
+
+@Suite(.serialized)
+struct RecoveryRoutineTests {
 
 @Test func testInterruptedRecordingReconciled() async throws {
     // Create an in-memory database
@@ -196,3 +201,4 @@ import Observability
     #expect(result.staleSessionIds.first?.rawValue == "stale-session")
     #expect(result.reconciledCount == 1)
 }
+} // end RecoveryRoutineTests

@@ -95,6 +95,7 @@ struct RecordingSpeakerPickerTests {
     @Test
     func testSpeakerLabelTappedOpensSpeakerPicker() async {
         let sessionID = SessionID("test-session")
+        let userProfile = UserProfile(name: "Test User")
         let store = TestStore(
             initialState: RecordingFeature.State(
                 isRecording: true,
@@ -107,7 +108,8 @@ struct RecordingSpeakerPickerTests {
                         personId: nil,
                         personName: nil
                     )
-                ]
+                ],
+                userProfile: userProfile
             )
         ) {
             RecordingFeature()
@@ -122,7 +124,8 @@ struct RecordingSpeakerPickerTests {
                 speakerTrackId: "track-1",
                 sessionId: sessionID,
                 displayOrder: 1,
-                currentPersonId: nil
+                currentPersonId: nil,
+                userProfile: userProfile
             )
         }
 
@@ -134,6 +137,7 @@ struct RecordingSpeakerPickerTests {
     func testSpeakerLabelTappedWithExistingPersonIdOpensSpeakerPicker() async {
         let sessionID = SessionID("test-session")
         let personId = "person-alice"
+        let userProfile = UserProfile(name: "Test User")
         let store = TestStore(
             initialState: RecordingFeature.State(
                 isRecording: true,
@@ -146,7 +150,8 @@ struct RecordingSpeakerPickerTests {
                         personId: personId,
                         personName: "Alice"
                     )
-                ]
+                ],
+                userProfile: userProfile
             )
         ) {
             RecordingFeature()
@@ -161,7 +166,8 @@ struct RecordingSpeakerPickerTests {
                 speakerTrackId: "track-1",
                 sessionId: sessionID,
                 displayOrder: 1,
-                currentPersonId: PersonID(personId)
+                currentPersonId: PersonID(personId),
+                userProfile: userProfile
             )
         }
     }

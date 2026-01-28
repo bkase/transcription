@@ -435,6 +435,9 @@ public struct DatabaseClient: Sendable {
     // Conversation counts (distinct sessions per person via speaker_tracks)
     public var fetchPersonConversationCounts: @Sendable () async throws -> [String: Int] = { [:] }
 
+    // Fetch sessions where a person participated (via speaker_tracks)
+    public var fetchSessionsForPerson: @Sendable (_ personId: PersonID) async throws -> [SessionRecord] = { _ in [] }
+
     // Recovery: fetch sessions stuck in recording state (stale recordings)
     public var fetchStaleRecordings: @Sendable () async throws -> [SessionRecord] = { [] }
     // Recovery: mark stale recordings as partial with endedAt set
@@ -632,6 +635,19 @@ extension DatabaseClient: DependencyKey {
                         }
                     }
                     return counts
+                }
+            },
+            fetchSessionsForPerson: { personId in
+                try await dbQueue.read { db in
+                    // Fetch all sessions where the person participated via speaker_tracks
+                    let sql = """
+                        SELECT DISTINCT sessions.*
+                        FROM sessions
+                        INNER JOIN speaker_tracks ON sessions.id = speaker_tracks.sessionId
+                        WHERE speaker_tracks.personId = ?
+                        ORDER BY sessions.startedAt DESC
+                        """
+                    return try SessionRecord.fetchAll(db, sql: sql, arguments: [personId.rawValue])
                 }
             },
             fetchStaleRecordings: {

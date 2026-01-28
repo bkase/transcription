@@ -63,4 +63,40 @@ struct SpeakerPickerSnapshotTests {
 
         SnapshotHarness.assertSnapshot(of: view, named: "speaker_picker_loading")
     }
+
+    @Test func testSpeakerPickerWithCurrentUser() {
+        // Picker modal showing "You" option at the top
+        let view = SpeakerPickerViewPreview(
+            displayOrder: 1,
+            displayMode: .picker(
+                people: [
+                    .init(name: "Sarah Chen", color: .sky, isSelected: false),
+                    .init(name: "Marcus Kim", color: .lavender, isSelected: false)
+                ],
+                showNewOption: true,
+                currentUser: .init(name: "Jane Doe", isSelected: false)
+            )
+        )
+        .background(VaporColor.mist)
+
+        SnapshotHarness.assertSnapshot(of: view, named: "speaker_picker_with_current_user")
+    }
+
+    @Test func testSpeakerPickerWithCurrentUserSelected() {
+        // Picker modal with "You" option selected
+        let view = SpeakerPickerViewPreview(
+            displayOrder: 1,
+            displayMode: .picker(
+                people: [
+                    .init(name: "Sarah Chen", color: .sky, isSelected: false),
+                    .init(name: "Marcus Kim", color: .lavender, isSelected: false)
+                ],
+                showNewOption: true,
+                currentUser: .init(name: "Jane Doe", isSelected: true)
+            )
+        )
+        .background(VaporColor.mist)
+
+        SnapshotHarness.assertSnapshot(of: view, named: "speaker_picker_current_user_selected")
+    }
 }

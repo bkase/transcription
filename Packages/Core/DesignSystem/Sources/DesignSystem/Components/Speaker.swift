@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 // MARK: - Speaker Color
 
@@ -144,6 +147,108 @@ public struct SpeakerOptionPreview: View {
 
     public var body: some View {
         SpeakerOption(name: name, color: color, isSelected: isSelected)
+    }
+}
+
+// MARK: - Current User Option
+
+/// Option row for the current user (yourself) in the speaker picker modal.
+/// Shows "You" label with optional avatar image and selection state.
+public struct CurrentUserOption: View {
+    private let name: String
+    private let avatarData: Data?
+    private let isSelected: Bool
+
+    public init(name: String, avatarData: Data? = nil, isSelected: Bool = false) {
+        self.name = name
+        self.avatarData = avatarData
+        self.isSelected = isSelected
+    }
+
+    private var initials: String {
+        let components = name.split(separator: " ")
+        let first = components.first?.prefix(1) ?? ""
+        let last = components.count > 1 ? components.last?.prefix(1) ?? "" : ""
+        return String(first + last).uppercased()
+    }
+
+    public var body: some View {
+        HStack(spacing: 12) {
+            // Avatar (image or initials)
+            avatarView
+
+            // Name with "You" indicator
+            VStack(alignment: .leading, spacing: 2) {
+                Text("You")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(VaporColor.textPrimary)
+
+                Text(name)
+                    .font(.system(size: 12, weight: .light))
+                    .foregroundColor(VaporColor.textSecondary)
+            }
+
+            Spacer()
+
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(VaporColor.deep)
+            }
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 20)
+        .background(isSelected ? VaporColor.haze : Color.clear)
+        .contentShape(Rectangle())
+    }
+
+    @ViewBuilder
+    private var avatarView: some View {
+        Group {
+            #if os(iOS)
+            if let data = avatarData,
+               let uiImage = UIImage(data: data) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 32, height: 32)
+                    .clipShape(Circle())
+            } else {
+                initialsView
+            }
+            #else
+            initialsView
+            #endif
+        }
+    }
+
+    private var initialsView: some View {
+        ZStack {
+            Circle()
+                .fill(VaporColor.sky)
+                .frame(width: 32, height: 32)
+
+            Text(initials)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(VaporColor.cloud)
+        }
+    }
+}
+
+/// Preview variant for snapshot testing.
+public struct CurrentUserOptionPreview: View {
+    private let name: String
+    private let avatarData: Data?
+    private let isSelected: Bool
+
+    public init(name: String, avatarData: Data? = nil, isSelected: Bool = false) {
+        self.name = name
+        self.avatarData = avatarData
+        self.isSelected = isSelected
+    }
+
+    public var body: some View {
+        CurrentUserOption(name: name, avatarData: avatarData, isSelected: isSelected)
     }
 }
 

@@ -42,6 +42,22 @@ public struct SpeakerPickerFeature {
         /// Saving state for creating new person
         public var isSaving: Bool = false
 
+        /// Current user profile (for "You" option in picker)
+        public var userProfile: UserProfile = .empty
+
+        /// Special PersonID representing the current user ("You")
+        public static let currentUserPersonId = PersonID("__current_user__")
+
+        /// Whether the current user is selected
+        public var isCurrentUserSelected: Bool {
+            selectedPersonId == Self.currentUserPersonId
+        }
+
+        /// Whether to show the "You" option (only if user has a name)
+        public var showCurrentUserOption: Bool {
+            !userProfile.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+
         public init(
             speakerTrackId: String,
             sessionId: SessionID,
@@ -54,7 +70,8 @@ public struct SpeakerPickerFeature {
             isShowingNewPersonForm: Bool = false,
             newPersonName: String = "",
             newPersonColorToken: String = SpeakerColor.sky.rawValue,
-            isSaving: Bool = false
+            isSaving: Bool = false,
+            userProfile: UserProfile = .empty
         ) {
             self.speakerTrackId = speakerTrackId
             self.sessionId = sessionId
@@ -68,6 +85,7 @@ public struct SpeakerPickerFeature {
             self.newPersonName = newPersonName
             self.newPersonColorToken = newPersonColorToken
             self.isSaving = isSaving
+            self.userProfile = userProfile
         }
     }
 
@@ -135,8 +153,10 @@ public struct SpeakerPickerFeature {
                 // Update the speaker track with the selected person
                 let speakerTrackId = state.speakerTrackId
                 let sessionId = state.sessionId
+                let isCurrentUser = selectedPersonId == State.currentUserPersonId
+                let userProfile = state.userProfile
 
-                return .run { [speakerTrackId, sessionId] send in
+                return .run { [speakerTrackId, sessionId, isCurrentUser, userProfile, uuid, date] send in
                     // Fetch current speaker track to update it
                     let tracks = try await databaseClient.fetchSpeakerTracks(sessionId)
                     guard let track = tracks.first(where: { $0.id == speakerTrackId }) else {
@@ -144,16 +164,43 @@ public struct SpeakerPickerFeature {
                         return
                     }
 
+                    // Determine the actual person ID to use
+                    let actualPersonId: String
+                    if isCurrentUser {
+                        // Check if a person with this user's name already exists
+                        let existingPeople = try await databaseClient.fetchPeople()
+                        let userName = userProfile.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if let existingPerson = existingPeople.first(where: {
+                            $0.name.lowercased() == userName.lowercased()
+                        }) {
+                            // Use existing person
+                            actualPersonId = existingPerson.id
+                        } else {
+                            // Create a new person for the current user
+                            let newPerson = PersonRecord(
+                                id: uuid().uuidString,
+                                name: userName,
+                                colorToken: SpeakerColor.sky.rawValue,
+                                createdAt: date.now,
+                                updatedAt: date.now
+                            )
+                            try await databaseClient.createPerson(newPerson)
+                            actualPersonId = newPerson.id
+                        }
+                    } else {
+                        actualPersonId = selectedPersonId.rawValue
+                    }
+
                     let updatedTrack = SpeakerTrackRecord(
                         id: track.id,
                         sessionId: track.sessionId,
                         machineSpeakerId: track.machineSpeakerId,
                         displayOrder: track.displayOrder,
-                        personId: selectedPersonId.rawValue
+                        personId: actualPersonId
                     )
 
                     try await databaseClient.updateSpeakerTrack(updatedTrack)
-                    await send(.selectionConfirmed(selectedPersonId))
+                    await send(.selectionConfirmed(PersonID(actualPersonId)))
                 } catch: { error, send in
                     await send(.selectionFailed(error.localizedDescription))
                 }

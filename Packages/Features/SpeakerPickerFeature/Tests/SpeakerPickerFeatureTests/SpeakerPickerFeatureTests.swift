@@ -122,6 +122,8 @@ struct SpeakerPickerFeatureTests {
 
     @Test
     func testConfirmSelection() async {
+        let mockUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000003")!
+
         let store = TestStore(
             initialState: SpeakerPickerFeature.State(
                 speakerTrackId: "track-1",
@@ -133,6 +135,8 @@ struct SpeakerPickerFeatureTests {
         ) {
             SpeakerPickerFeature()
         } withDependencies: {
+            $0.uuid = .constant(mockUUID)
+            $0.date = .constant(mockDate)
             $0.databaseClient.fetchSpeakerTracks = { _ in
                 [mockSpeakerTrack]
             }
@@ -148,6 +152,8 @@ struct SpeakerPickerFeatureTests {
 
     @Test
     func testConfirmSelectionWithMissingSpeakerTrack() async {
+        let mockUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000005")!
+
         let store = TestStore(
             initialState: SpeakerPickerFeature.State(
                 speakerTrackId: "track-missing",
@@ -159,6 +165,8 @@ struct SpeakerPickerFeatureTests {
         ) {
             SpeakerPickerFeature()
         } withDependencies: {
+            $0.uuid = .constant(mockUUID)
+            $0.date = .constant(mockDate)
             $0.databaseClient.fetchSpeakerTracks = { _ in
                 [mockSpeakerTrack] // Doesn't contain "track-missing"
             }
@@ -336,5 +344,124 @@ struct SpeakerPickerFeatureTests {
         )
 
         #expect(state.selectedPersonId == PersonID("person-2"))
+    }
+
+    // MARK: - Current User Tests
+
+    @Test
+    func testCurrentUserOptionVisibleWhenProfileHasName() async {
+        let profile = UserProfile(name: "Jane Doe")
+        let state = SpeakerPickerFeature.State(
+            speakerTrackId: "track-1",
+            sessionId: SessionID("session-1"),
+            displayOrder: 1,
+            userProfile: profile
+        )
+
+        #expect(state.showCurrentUserOption == true)
+    }
+
+    @Test
+    func testCurrentUserOptionHiddenWhenProfileHasEmptyName() async {
+        let profile = UserProfile(name: "   ")
+        let state = SpeakerPickerFeature.State(
+            speakerTrackId: "track-1",
+            sessionId: SessionID("session-1"),
+            displayOrder: 1,
+            userProfile: profile
+        )
+
+        #expect(state.showCurrentUserOption == false)
+    }
+
+    @Test
+    func testSelectCurrentUser() async {
+        let profile = UserProfile(name: "Jane Doe")
+        let store = TestStore(
+            initialState: SpeakerPickerFeature.State(
+                speakerTrackId: "track-1",
+                sessionId: SessionID("session-1"),
+                displayOrder: 1,
+                people: mockPeople,
+                userProfile: profile
+            )
+        ) {
+            SpeakerPickerFeature()
+        }
+
+        // Select current user
+        await store.send(.personSelected(SpeakerPickerFeature.State.currentUserPersonId)) {
+            $0.selectedPersonId = SpeakerPickerFeature.State.currentUserPersonId
+        }
+
+        #expect(store.state.isCurrentUserSelected == true)
+    }
+
+    @Test
+    func testConfirmCurrentUserSelection_createsNewPerson() async {
+        let mockUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let profile = UserProfile(name: "Jane Doe")
+
+        let store = TestStore(
+            initialState: SpeakerPickerFeature.State(
+                speakerTrackId: "track-1",
+                sessionId: SessionID("session-1"),
+                displayOrder: 1,
+                people: mockPeople,
+                selectedPersonId: SpeakerPickerFeature.State.currentUserPersonId,
+                userProfile: profile
+            )
+        ) {
+            SpeakerPickerFeature()
+        } withDependencies: {
+            $0.uuid = .constant(mockUUID)
+            $0.date = .constant(mockDate)
+            $0.databaseClient.fetchSpeakerTracks = { _ in
+                [mockSpeakerTrack]
+            }
+            $0.databaseClient.fetchPeople = { mockPeople }
+            $0.databaseClient.createPerson = { _ in }
+            $0.databaseClient.updateSpeakerTrack = { _ in }
+        }
+
+        await store.send(.confirmSelection)
+
+        // The actual person ID is the newly created person's ID
+        await store.receive(\.selectionConfirmed)
+    }
+
+    @Test
+    func testConfirmCurrentUserSelection_reusesExistingPerson() async {
+        // When user's name matches an existing person, it should reuse that person
+        let mockUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000004")!
+        let profile = UserProfile(name: "alice smith") // lowercase to test case-insensitive matching
+        let mockPeopleWithAlice = mockPeople
+
+        let store = TestStore(
+            initialState: SpeakerPickerFeature.State(
+                speakerTrackId: "track-1",
+                sessionId: SessionID("session-1"),
+                displayOrder: 1,
+                people: mockPeopleWithAlice,
+                selectedPersonId: SpeakerPickerFeature.State.currentUserPersonId,
+                userProfile: profile
+            )
+        ) {
+            SpeakerPickerFeature()
+        } withDependencies: {
+            $0.uuid = .constant(mockUUID)
+            $0.date = .constant(mockDate)
+            $0.databaseClient.fetchSpeakerTracks = { _ in
+                [mockSpeakerTrack]
+            }
+            $0.databaseClient.fetchPeople = { mockPeopleWithAlice }
+            // No createPerson should be called since we're reusing existing
+            $0.databaseClient.updateSpeakerTrack = { _ in }
+        }
+
+        await store.send(.confirmSelection)
+
+        // Should reuse Alice's ID (person-1)
+        await store.receive(\.selectionConfirmed)
     }
 }

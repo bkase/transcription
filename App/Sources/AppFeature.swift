@@ -5,6 +5,7 @@ import RecordingFeature
 import SessionDetailFeature
 import PeopleFeature
 import ProfileFeature
+import PersonTimelineFeature
 import Persistence
 import Processing
 import Models
@@ -21,6 +22,7 @@ public struct AppFeature {
     public enum Path {
         case sessionDetail(SessionDetailFeature)
         case profile(ProfileFeature)
+        case personTimeline(PersonTimelineFeature)
     }
 
     @ObservableState
@@ -63,10 +65,13 @@ public struct AppFeature {
         case recording(PresentationAction<RecordingFeature.Action>)
         case dismissRecording
         case userProfileLoaded(UserProfile)
+        case personLoaded(PersonRecord)
+        case personLoadFailed(String)
     }
 
     @Dependency(\.recoveryRoutineClient) var recoveryRoutineClient
     @Dependency(\.userProfileClient) var userProfileClient
+    @Dependency(\.databaseClient) var databaseClient
 
     public var body: some ReducerOf<Self> {
         Scope(state: \.timeline, action: \.timeline) {
@@ -127,6 +132,21 @@ public struct AppFeature {
                 // Reload timeline when retry transcription completes so the partial chip is removed
                 return .send(.timeline(.loadSessions))
 
+            case .path(.element(id: _, action: .personTimeline(.backTapped))):
+                // Pop the navigation stack when back is tapped in person timeline
+                _ = state.path.popLast()
+                return .none
+
+            case let .path(.element(id: _, action: .personTimeline(.sessionTapped(sessionID)))):
+                // Push session detail onto navigation stack from person timeline
+                state.path.append(.sessionDetail(SessionDetailFeature.State(sessionID: sessionID, userProfile: state.userProfile)))
+                return .none
+
+            case .path(.element(id: _, action: .personTimeline(.avatarTapped))):
+                // Push profile onto navigation stack from person timeline
+                state.path.append(.profile(ProfileFeature.State(profile: state.userProfile)))
+                return .none
+
             case .path:
                 // Other path actions are handled by forEach below
                 return .none
@@ -161,6 +181,31 @@ public struct AppFeature {
             case .people(.avatarTapped):
                 // Push profile onto navigation stack with current user profile
                 state.path.append(.profile(ProfileFeature.State(profile: state.userProfile)))
+                return .none
+
+            case let .people(.personTapped(personId)):
+                // Fetch person record and navigate to person timeline
+                return .run { [databaseClient] send in
+                    if let person = try await databaseClient.fetchPerson(personId) {
+                        await send(.personLoaded(person))
+                    } else {
+                        await send(.personLoadFailed("Person not found"))
+                    }
+                } catch: { error, send in
+                    await send(.personLoadFailed(error.localizedDescription))
+                }
+
+            case let .personLoaded(person):
+                // Push person timeline onto navigation stack
+                state.path.append(.personTimeline(PersonTimelineFeature.State(
+                    personId: PersonID(person.id),
+                    personName: person.name,
+                    userProfile: state.userProfile
+                )))
+                return .none
+
+            case .personLoadFailed:
+                // Silently fail - could add error handling UI later
                 return .none
 
             case .people:
