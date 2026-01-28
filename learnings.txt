@@ -1030,3 +1030,11 @@
 - Pattern: `.path(.element(id: _, action: .sessionDetail(.titleSaved)))` triggers `.send(.timeline(.loadSessions))`
 - Same pattern used for: deleteCompleted, retryTranscriptionCompleted, titleSaved
 - This ensures sibling features (Timeline) reflect changes made in child features (SessionDetail)
+
+## Model download progress indicators
+- FluidAudio SDK does not expose download progress callbacks (uses URLSession.download internally without delegate)
+- For indeterminate downloads, use ProgressView with CircularProgressViewStyle and descriptive text
+- Show download status near disabled record button regardless of whether sessions exist
+- TimelineEmptyStateView.downloading variant uses larger (2.0x scaled) spinner instead of static cloud icon
+- TimelineViewPreview.downloadStatusPreviewView mirrors main view's downloadStatusView for snapshot testing
+- ScaleEffect(0.8) for inline progress spinners, scaleEffect(2.0) for empty state spinner

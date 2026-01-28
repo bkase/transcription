@@ -272,28 +272,35 @@ public struct TimelineView: View {
                 store.send(.newRecordingTapped)
             }
 
-            // Status text for downloading/error states
-            if let statusText = fabStatusText {
-                Text(statusText)
-                    .font(.system(size: 12, weight: .light))
-                    .foregroundColor(VaporColor.textTertiary)
-                    .accessibilityIdentifier("emptyStateStatus")
+            // Status indicator for downloading/error states (shown when record is disabled)
+            if !store.isRecordEnabled {
+                downloadStatusView
             }
         }
         .padding(.bottom, VaporSpacing.lg)
     }
 
-    private var fabStatusText: String? {
-        // Only show status text when there are no sessions (empty state)
-        guard store.sessionGroups.isEmpty && !store.isLoading else { return nil }
-
+    @ViewBuilder
+    private var downloadStatusView: some View {
         switch store.modelPreparationState {
         case .idle, .downloading:
-            return "Downloading models..."
+            HStack(spacing: VaporSpacing.xs) {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: VaporColor.overcast))
+                    .scaleEffect(0.8)
+                Text("Downloading models...")
+                    .font(.system(size: 12, weight: .light))
+                    .foregroundColor(VaporColor.textTertiary)
+            }
+            .accessibilityIdentifier("downloadingStatus")
+            .accessibilityLabel("Downloading speech models for transcription")
         case .failed:
-            return "Something went wrong"
+            Text("Unable to download models")
+                .font(.system(size: 12, weight: .light))
+                .foregroundColor(VaporColor.textTertiary)
+                .accessibilityIdentifier("downloadErrorStatus")
         case .ready:
-            return nil
+            EmptyView()
         }
     }
 
@@ -327,15 +334,25 @@ public struct TimelineEmptyStateView: View {
 
     @ViewBuilder
     private var iconView: some View {
-        Image(systemName: iconName)
-            .font(.system(size: 48, weight: .light))
-            .foregroundColor(iconColor)
+        ZStack {
+            if variant == .downloading {
+                // Show progress spinner for downloading state
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: VaporColor.overcast))
+                    .scaleEffect(2.0)
+            } else {
+                Image(systemName: iconName)
+                    .font(.system(size: 48, weight: .light))
+                    .foregroundColor(iconColor)
+            }
+        }
+        .frame(width: 60, height: 60)
     }
 
     private var iconName: String {
         switch variant {
         case .downloading:
-            return "icloud.and.arrow.down"
+            return "icloud.and.arrow.down" // Not used, but kept for completeness
         case .error:
             return "icloud.slash"
         case .ready:
@@ -553,11 +570,9 @@ public struct TimelineViewPreview: View {
         VStack(spacing: VaporSpacing.sm) {
             RecordButton(isRecording: false, isEnabled: isRecordEnabled) {}
 
-            // Status text for downloading/error states
-            if let statusText = fabStatusText {
-                Text(statusText)
-                    .font(.system(size: 12, weight: .light))
-                    .foregroundColor(VaporColor.textTertiary)
+            // Status indicator for downloading/error states (shown when record is disabled)
+            if !isRecordEnabled {
+                downloadStatusPreviewView
             }
         }
         .padding(.bottom, VaporSpacing.lg)
@@ -574,14 +589,24 @@ public struct TimelineViewPreview: View {
         }
     }
 
-    private var fabStatusText: String? {
+    @ViewBuilder
+    private var downloadStatusPreviewView: some View {
         switch displayMode {
-        case .emptyDownloading:
-            return "Downloading models..."
-        case .emptyError:
-            return "Something went wrong"
+        case .emptyDownloading, .sessionsWithDownloadError:
+            HStack(spacing: VaporSpacing.xs) {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: VaporColor.overcast))
+                    .scaleEffect(0.8)
+                Text("Downloading models...")
+                    .font(.system(size: 12, weight: .light))
+                    .foregroundColor(VaporColor.textTertiary)
+            }
+        case .emptyError, .sessionsWithConnectionError:
+            Text("Unable to download models")
+                .font(.system(size: 12, weight: .light))
+                .foregroundColor(VaporColor.textTertiary)
         default:
-            return nil
+            EmptyView()
         }
     }
 

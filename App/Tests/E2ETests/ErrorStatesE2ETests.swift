@@ -47,10 +47,10 @@ final class ErrorStatesE2ETests: XCTestCase {
         XCTAssertFalse(startRecordingButton.isEnabled, "Record button should be disabled when models failed to download")
 
         // Verify status text shows error
-        let statusPredicate = NSPredicate(format: "identifier == 'emptyStateStatus'")
+        let statusPredicate = NSPredicate(format: "identifier == 'downloadErrorStatus'")
         let statusText = app.descendants(matching: .staticText).matching(statusPredicate).firstMatch
         XCTAssertTrue(statusText.waitForExistence(timeout: 2), "Status text should exist in error state")
-        XCTAssertEqual(statusText.label, "Something went wrong", "Status text should show error message")
+        XCTAssertEqual(statusText.label, "Unable to download models", "Status text should show error message")
     }
 
     // MARK: - Transcription Failure Tests (Partial State)
