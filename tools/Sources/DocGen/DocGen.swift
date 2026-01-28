@@ -403,10 +403,22 @@ enum SchemaParser {
 
     private static func parseTrigger(from content: String, triggerPrefix: String) -> Trigger? {
         // Extract trigger name from prefix
-        let parts = triggerPrefix.components(separatedBy: " ")
+        // Handles both "CREATE TRIGGER name" and "CREATE TRIGGER IF NOT EXISTS name"
+        let parts = triggerPrefix.components(separatedBy: " ").filter { !$0.isEmpty }
         guard parts.count >= 3 else { return nil }
 
-        let name = parts[2] // CREATE TRIGGER <name>
+        // Find trigger name - it comes before AFTER/BEFORE
+        var name = ""
+        for (index, part) in parts.enumerated() {
+            if part == "AFTER" || part == "BEFORE" {
+                // Name is the previous part
+                if index > 0 {
+                    name = parts[index - 1]
+                }
+                break
+            }
+        }
+        guard !name.isEmpty else { return nil }
 
         // Determine event type
         var event = "UNKNOWN"

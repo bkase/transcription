@@ -28,6 +28,9 @@ public struct PeopleFeature {
         public var formColorToken: String = SpeakerColor.sky.rawValue
         public var isSaving: Bool = false
 
+        // User profile for avatar display
+        public var userProfile: UserProfile = .empty
+
         /// Whether we're editing an existing person (vs creating new)
         public var isEditing: Bool {
             editingPerson != nil
@@ -48,6 +51,19 @@ public struct PeopleFeature {
             conversationCounts[personId] ?? 0
         }
 
+        /// Compute initials from the profile name for avatar display
+        public var initials: String {
+            let components = userProfile.name.split(separator: " ")
+            if components.count >= 2 {
+                let first = components[0].prefix(1)
+                let last = components[components.count - 1].prefix(1)
+                return "\(first)\(last)".uppercased()
+            } else if let first = components.first?.prefix(1) {
+                return String(first).uppercased()
+            }
+            return ""
+        }
+
         public init(
             people: [PersonRecord] = [],
             conversationCounts: [String: Int] = [:],
@@ -58,7 +74,8 @@ public struct PeopleFeature {
             editingPerson: PersonRecord? = nil,
             formName: String = "",
             formColorToken: String = SpeakerColor.sky.rawValue,
-            isSaving: Bool = false
+            isSaving: Bool = false,
+            userProfile: UserProfile = .empty
         ) {
             self.people = people
             self.conversationCounts = conversationCounts
@@ -70,6 +87,7 @@ public struct PeopleFeature {
             self.formName = formName
             self.formColorToken = formColorToken
             self.isSaving = isSaving
+            self.userProfile = userProfile
         }
     }
 

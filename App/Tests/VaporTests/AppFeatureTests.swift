@@ -29,6 +29,9 @@ struct AppFeatureTests {
         await store.send(.onAppear)
         await store.receive(\.userProfileLoaded) {
             $0.userProfile = testProfile
+            // Profile is synced to child features
+            $0.timeline.userProfile = testProfile
+            $0.people.userProfile = testProfile
         }
 
         // State should still be on timeline
@@ -141,6 +144,9 @@ struct AppFeatureTests {
         // When profile is saved and delegate emits didSaveProfile
         await store.send(.path(.element(id: 0, action: .profile(.delegate(.didSaveProfile(updatedProfile)))))) {
             $0.userProfile = updatedProfile
+            // Profile is synced to child features
+            $0.timeline.userProfile = updatedProfile
+            $0.people.userProfile = updatedProfile
         }
 
         // Verify app-level profile was updated

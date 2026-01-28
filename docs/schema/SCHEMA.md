@@ -13,7 +13,7 @@ The database contains 5 tables:
 
 Full-text search tables:
 
-- [`transcript_fts`](#transcript_fts) (FTS5)
+- [`IF`](#IF) (FTS5)
 
 ---
 
@@ -96,7 +96,7 @@ Full-text search tables:
 
 ## Migration: `v3_fts5_search`
 
-### transcript_fts (FTS5 Virtual Table)
+### IF (FTS5 Virtual Table)
 
 Full-text search table for transcript search.
 

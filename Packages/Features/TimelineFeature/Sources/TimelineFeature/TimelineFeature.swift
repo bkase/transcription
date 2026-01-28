@@ -36,6 +36,9 @@ public struct TimelineFeature {
         // Model preparation state
         public var modelPreparationState: ModelPreparationState = .idle
 
+        // User profile for avatar display
+        public var userProfile: UserProfile = .empty
+
         /// Whether the user is actively searching (non-empty query)
         public var isSearching: Bool {
             !searchQuery.isEmpty
@@ -44,6 +47,19 @@ public struct TimelineFeature {
         /// Whether recording is enabled (models ready)
         public var isRecordEnabled: Bool {
             modelPreparationState == .ready
+        }
+
+        /// Compute initials from the profile name for avatar display
+        public var initials: String {
+            let components = userProfile.name.split(separator: " ")
+            if components.count >= 2 {
+                let first = components[0].prefix(1)
+                let last = components[components.count - 1].prefix(1)
+                return "\(first)\(last)".uppercased()
+            } else if let first = components.first?.prefix(1) {
+                return String(first).uppercased()
+            }
+            return ""
         }
 
         public init(
@@ -56,7 +72,8 @@ public struct TimelineFeature {
             sessionToDelete: SessionRecord? = nil,
             isShowingDeleteConfirmation: Bool = false,
             isDeleting: Bool = false,
-            modelPreparationState: ModelPreparationState = .idle
+            modelPreparationState: ModelPreparationState = .idle,
+            userProfile: UserProfile = .empty
         ) {
             self.searchQuery = searchQuery
             self.sessionGroups = sessionGroups
@@ -68,6 +85,7 @@ public struct TimelineFeature {
             self.isShowingDeleteConfirmation = isShowingDeleteConfirmation
             self.isDeleting = isDeleting
             self.modelPreparationState = modelPreparationState
+            self.userProfile = userProfile
         }
     }
 

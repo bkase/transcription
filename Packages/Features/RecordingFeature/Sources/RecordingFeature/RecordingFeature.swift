@@ -102,6 +102,21 @@ public struct RecordingFeature {
         public var isTranscriptionAvailable: Bool = true
         /// Message explaining why transcription is unavailable
         public var transcriptionUnavailableMessage: String?
+        /// User profile for avatar display
+        public var userProfile: UserProfile = .empty
+
+        /// Compute initials from the profile name for avatar display
+        public var initials: String {
+            let components = userProfile.name.split(separator: " ")
+            if components.count >= 2 {
+                let first = components[0].prefix(1)
+                let last = components[components.count - 1].prefix(1)
+                return "\(first)\(last)".uppercased()
+            } else if let first = components.first?.prefix(1) {
+                return String(first).uppercased()
+            }
+            return ""
+        }
 
         public init(
             isRecording: Bool = false,
@@ -119,7 +134,8 @@ public struct RecordingFeature {
             isShowingActionsMenu: Bool = false,
             audioRetentionMode: AudioRetentionMode = .both,
             isTranscriptionAvailable: Bool = true,
-            transcriptionUnavailableMessage: String? = nil
+            transcriptionUnavailableMessage: String? = nil,
+            userProfile: UserProfile = .empty
         ) {
             self.isRecording = isRecording
             self.isPaused = isPaused
@@ -137,6 +153,7 @@ public struct RecordingFeature {
             self.audioRetentionMode = audioRetentionMode
             self.isTranscriptionAvailable = isTranscriptionAvailable
             self.transcriptionUnavailableMessage = transcriptionUnavailableMessage
+            self.userProfile = userProfile
         }
     }
 

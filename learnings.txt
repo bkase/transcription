@@ -931,3 +931,11 @@
 - Merged segments use first segment's ID, earliest startMs, latest endMs, last segment's isFinal
 - Default max characters increased from 180 to 600 (approximately half screen height at typical font size)
 - Tests use skipInFlightEffects() to clean up timer effects from didStart event
+
+## User profile propagation to child features
+- App-level userProfile state needs to be synced to child features (Timeline, People, Recording, SessionDetail)
+- Add userProfile: UserProfile property to each child feature's State with computed `initials` property
+- Sync profile in two places: when profile is initially loaded, and when profile is saved via delegate action
+- Pass userProfile to child features when initializing them (e.g., RecordingFeature.State(userProfile: state.userProfile))
+- View layer extracts image from profile.avatar.imageData or displays initials as fallback
+- Use #if os(iOS) for UIImage(data:) since UIKit isn't available on macOS

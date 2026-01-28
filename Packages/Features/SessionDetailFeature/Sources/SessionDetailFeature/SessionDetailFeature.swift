@@ -102,6 +102,22 @@ public struct SessionDetailFeature {
         // Retry transcription state
         public var isRetrying: Bool = false
 
+        // User profile for avatar display
+        public var userProfile: UserProfile = .empty
+
+        /// Compute initials from the profile name for avatar display
+        public var initials: String {
+            let components = userProfile.name.split(separator: " ")
+            if components.count >= 2 {
+                let first = components[0].prefix(1)
+                let last = components[components.count - 1].prefix(1)
+                return "\(first)\(last)".uppercased()
+            } else if let first = components.first?.prefix(1) {
+                return String(first).uppercased()
+            }
+            return ""
+        }
+
         public init(
             sessionID: SessionID,
             session: SessionRecord? = nil,
@@ -119,7 +135,8 @@ public struct SessionDetailFeature {
             alertInfo: AlertInfo? = nil,
             isEditingTitle: Bool = false,
             editedTitle: String = "",
-            isRetrying: Bool = false
+            isRetrying: Bool = false,
+            userProfile: UserProfile = .empty
         ) {
             self.sessionID = sessionID
             self.session = session
@@ -138,6 +155,7 @@ public struct SessionDetailFeature {
             self.isEditingTitle = isEditingTitle
             self.editedTitle = editedTitle
             self.isRetrying = isRetrying
+            self.userProfile = userProfile
         }
     }
 

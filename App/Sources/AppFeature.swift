@@ -89,6 +89,9 @@ public struct AppFeature {
 
             case let .userProfileLoaded(profile):
                 state.userProfile = profile
+                // Sync profile to child features
+                state.timeline.userProfile = profile
+                state.people.userProfile = profile
                 return .none
 
             case let .tabSelected(tab):
@@ -110,6 +113,9 @@ public struct AppFeature {
             case let .path(.element(id: _, action: .profile(.delegate(.didSaveProfile(profile))))):
                 // Update app-level profile state when profile is saved
                 state.userProfile = profile
+                // Sync to child features
+                state.timeline.userProfile = profile
+                state.people.userProfile = profile
                 return .none
 
             case .path(.element(id: _, action: .sessionDetail(.deleteCompleted))):
@@ -125,12 +131,12 @@ public struct AppFeature {
 
             case let .timeline(.sessionTapped(sessionID)):
                 // Push session detail onto navigation stack
-                state.path.append(.sessionDetail(SessionDetailFeature.State(sessionID: sessionID)))
+                state.path.append(.sessionDetail(SessionDetailFeature.State(sessionID: sessionID, userProfile: state.userProfile)))
                 return .none
 
             case .timeline(.newRecordingTapped):
                 // Present recording screen and start recording
-                state.recording = RecordingFeature.State()
+                state.recording = RecordingFeature.State(userProfile: state.userProfile)
                 // Get audio directory from caches
                 let audioDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
                     .appendingPathComponent("recordings", isDirectory: true)
@@ -162,7 +168,7 @@ public struct AppFeature {
                 // Recording finished - navigate to session detail view
                 state.recording = nil
                 // Push session detail onto navigation stack
-                state.path.append(.sessionDetail(SessionDetailFeature.State(sessionID: sessionID)))
+                state.path.append(.sessionDetail(SessionDetailFeature.State(sessionID: sessionID, userProfile: state.userProfile)))
                 // Also reload timeline in background so it's up to date when user goes back
                 return .send(.timeline(.loadSessions))
 

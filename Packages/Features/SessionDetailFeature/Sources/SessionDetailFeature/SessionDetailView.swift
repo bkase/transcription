@@ -6,6 +6,10 @@ import Observability
 import SpeakerPickerFeature
 import SwiftUI
 
+#if os(iOS)
+import UIKit
+#endif
+
 // MARK: - Session Detail View
 
 /// Session detail screen displaying transcript in script format.
@@ -153,11 +157,31 @@ public struct SessionDetailView: View {
 
             Spacer()
 
-            Avatar(size: .large)
+            avatarView
         }
         .padding(.top, VaporSpacing.md)
         .padding(.horizontal, VaporSpacing.lg)
         .padding(.bottom, VaporSpacing.sm)
+    }
+
+    @ViewBuilder
+    private var avatarView: some View {
+        #if os(iOS)
+        if let imageData = store.userProfile.avatar.imageData,
+           let uiImage = UIImage(data: imageData) {
+            Avatar(image: Image(uiImage: uiImage), size: .large)
+        } else if !store.initials.isEmpty {
+            Avatar(initials: store.initials, size: .large)
+        } else {
+            Avatar(size: .large)
+        }
+        #else
+        if !store.initials.isEmpty {
+            Avatar(initials: store.initials, size: .large)
+        } else {
+            Avatar(size: .large)
+        }
+        #endif
     }
 
     // MARK: - Session Header

@@ -4,6 +4,10 @@ import DesignSystem
 import Observability
 import SwiftUI
 
+#if os(iOS)
+import UIKit
+#endif
+
 // MARK: - Recording View
 
 /// Recording screen with listening state, recording header, and controls.
@@ -132,11 +136,31 @@ public struct RecordingView: View {
         HStack {
             NavButton(label: "Back", action: onBack)
             Spacer()
-            Avatar(size: .large)
+            avatarView
         }
         .padding(.top, 56)
         .padding(.horizontal, VaporSpacing.lg)
         .padding(.bottom, VaporSpacing.md)
+    }
+
+    @ViewBuilder
+    private var avatarView: some View {
+        #if os(iOS)
+        if let imageData = store.userProfile.avatar.imageData,
+           let uiImage = UIImage(data: imageData) {
+            Avatar(image: Image(uiImage: uiImage), size: .large)
+        } else if !store.initials.isEmpty {
+            Avatar(initials: store.initials, size: .large)
+        } else {
+            Avatar(size: .large)
+        }
+        #else
+        if !store.initials.isEmpty {
+            Avatar(initials: store.initials, size: .large)
+        } else {
+            Avatar(size: .large)
+        }
+        #endif
     }
 
     // MARK: - Content Area

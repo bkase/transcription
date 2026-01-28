@@ -6,6 +6,10 @@ import Persistence
 import Processing
 import SwiftUI
 
+#if os(iOS)
+import UIKit
+#endif
+
 // MARK: - Timeline View
 
 /// Main timeline (archive) screen displaying sessions grouped by date.
@@ -106,7 +110,7 @@ public struct TimelineView: View {
             Button {
                 store.send(.avatarTapped)
             } label: {
-                Avatar(size: .medium)
+                avatarView
             }
             .buttonStyle(PlainButtonStyle())
             .accessibilityIdentifier("profileAvatarButton")
@@ -114,6 +118,26 @@ public struct TimelineView: View {
         .padding(.top, 56)
         .padding(.horizontal, VaporSpacing.lg)
         .padding(.bottom, VaporSpacing.md)
+    }
+
+    @ViewBuilder
+    private var avatarView: some View {
+        #if os(iOS)
+        if let imageData = store.userProfile.avatar.imageData,
+           let uiImage = UIImage(data: imageData) {
+            Avatar(image: Image(uiImage: uiImage), size: .medium)
+        } else if !store.initials.isEmpty {
+            Avatar(initials: store.initials, size: .medium)
+        } else {
+            Avatar(size: .medium)
+        }
+        #else
+        if !store.initials.isEmpty {
+            Avatar(initials: store.initials, size: .medium)
+        } else {
+            Avatar(size: .medium)
+        }
+        #endif
     }
 
     // MARK: - Search Section

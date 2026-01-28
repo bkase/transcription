@@ -4,6 +4,10 @@ import Models
 import Persistence
 import SwiftUI
 
+#if os(iOS)
+import UIKit
+#endif
+
 // MARK: - People View
 
 /// Main people directory screen displaying contacts.
@@ -61,7 +65,7 @@ public struct PeopleView: View {
             Button {
                 store.send(.avatarTapped)
             } label: {
-                Avatar(size: .medium)
+                avatarView
             }
             .buttonStyle(PlainButtonStyle())
             .accessibilityIdentifier("profileAvatarButton")
@@ -69,6 +73,26 @@ public struct PeopleView: View {
         .padding(.top, 56)
         .padding(.horizontal, VaporSpacing.lg)
         .padding(.bottom, VaporSpacing.md)
+    }
+
+    @ViewBuilder
+    private var avatarView: some View {
+        #if os(iOS)
+        if let imageData = store.userProfile.avatar.imageData,
+           let uiImage = UIImage(data: imageData) {
+            Avatar(image: Image(uiImage: uiImage), size: .medium)
+        } else if !store.initials.isEmpty {
+            Avatar(initials: store.initials, size: .medium)
+        } else {
+            Avatar(size: .medium)
+        }
+        #else
+        if !store.initials.isEmpty {
+            Avatar(initials: store.initials, size: .medium)
+        } else {
+            Avatar(size: .medium)
+        }
+        #endif
     }
 
     // MARK: - Search Section
