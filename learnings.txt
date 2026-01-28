@@ -1,3 +1,9 @@
+## Speaker Diarization
+- Speaker tracks are created with unique displayOrder values in Processing.swift's handleSegment method
+- seenSpeakers Set tracks which speaker IDs have been encountered; count after insert = displayOrder
+- TranscriptRendering.resolveSpeakerType maps machineSpeakerId -> SpeakerTrack -> displayOrder -> "Speaker N"
+- When testing diarization, validate displayOrder uniqueness AND the label mapping end-to-end
+
 ## XcodeGen with SPM packages
 - When using XcodeGen with SPM dependencies, specify `product:` alongside `package:`
 - Product names differ from package names (e.g., swift-composable-architecture -> ComposableArchitecture)

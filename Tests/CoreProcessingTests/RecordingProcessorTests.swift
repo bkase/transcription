@@ -171,6 +171,20 @@ import Persistence
     // Verify speaker tracks in database
     let speakerTracks = try await databaseClient.fetchSpeakerTracks(sessionId)
     #expect(speakerTracks.count == 2, "Should have 2 speaker tracks in database")
+
+    // Verify speaker tracks have unique display orders (bd-2w89 fix)
+    let displayOrders = Set(speakerTracks.map { $0.displayOrder })
+    #expect(displayOrders.count == 2, "Each speaker track should have a unique displayOrder")
+    #expect(displayOrders.contains(1), "First speaker should have displayOrder 1")
+    #expect(displayOrders.contains(2), "Second speaker should have displayOrder 2")
+
+    // Verify each speaker track maps to correct machine speaker ID
+    let spk0Track = speakerTracks.first { $0.machineSpeakerId == "spk_0" }
+    let spk1Track = speakerTracks.first { $0.machineSpeakerId == "spk_1" }
+    #expect(spk0Track != nil, "Speaker track for spk_0 should exist")
+    #expect(spk1Track != nil, "Speaker track for spk_1 should exist")
+    #expect(spk0Track!.displayOrder == 1, "First speaker (spk_0) should have displayOrder 1")
+    #expect(spk1Track!.displayOrder == 2, "Second speaker (spk_1) should have displayOrder 2")
 }
 
 @Test func testProcessorAlreadyRecordingThrows() async throws {

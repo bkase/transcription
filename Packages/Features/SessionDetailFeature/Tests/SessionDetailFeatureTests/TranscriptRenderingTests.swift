@@ -856,4 +856,101 @@ struct TranscriptRenderingTests {
             Issue.record("Expected .unassigned but got \(result[0].speakerType)")
         }
     }
+
+    // MARK: - bd-2w89: Speaker Diarization Display Order Tests
+
+    @Test
+    func testResolveSegmentSpeakerTypes_multipleSpeakers_showCorrectDisplayOrders() {
+        // This test specifically validates the bd-2w89 fix:
+        // Speaker diarization should show "Speaker 1", "Speaker 2", etc. - not "Speaker 1" for all
+        let tracks = [
+            DetailSpeakerTrack(
+                id: "track-1",
+                machineSpeakerId: "spk_0",
+                displayOrder: 1,  // First speaker detected
+                personId: nil,
+                personName: nil
+            ),
+            DetailSpeakerTrack(
+                id: "track-2",
+                machineSpeakerId: "spk_1",
+                displayOrder: 2,  // Second speaker detected
+                personId: nil,
+                personName: nil
+            ),
+            DetailSpeakerTrack(
+                id: "track-3",
+                machineSpeakerId: "spk_2",
+                displayOrder: 3,  // Third speaker detected
+                personId: nil,
+                personName: nil
+            )
+        ]
+
+        // Simulate a conversation with 3 speakers
+        let segments = [
+            DetailSegment(id: TranscriptSegmentID("seg-1"), machineSpeakerId: "spk_0", startMs: 0, endMs: 5000, text: "First speaker talking"),
+            DetailSegment(id: TranscriptSegmentID("seg-2"), machineSpeakerId: "spk_1", startMs: 5000, endMs: 10000, text: "Second speaker responds"),
+            DetailSegment(id: TranscriptSegmentID("seg-3"), machineSpeakerId: "spk_2", startMs: 10000, endMs: 15000, text: "Third speaker joins"),
+            DetailSegment(id: TranscriptSegmentID("seg-4"), machineSpeakerId: "spk_0", startMs: 15000, endMs: 20000, text: "First speaker again"),
+            DetailSegment(id: TranscriptSegmentID("seg-5"), machineSpeakerId: "spk_1", startMs: 20000, endMs: 25000, text: "Second speaker again"),
+        ]
+
+        let result = TranscriptRendering.resolveSegmentSpeakerTypes(segments, speakerTracks: tracks)
+
+        // Verify each segment has the correct speaker display order
+        #expect(result.count == 5)
+
+        // seg-1: spk_0 -> Speaker 1
+        if case let .unassigned(displayOrder, _) = result[0].speakerType {
+            #expect(displayOrder == 1, "spk_0 should be Speaker 1")
+        } else {
+            Issue.record("Expected .unassigned for seg-1")
+        }
+
+        // seg-2: spk_1 -> Speaker 2
+        if case let .unassigned(displayOrder, _) = result[1].speakerType {
+            #expect(displayOrder == 2, "spk_1 should be Speaker 2")
+        } else {
+            Issue.record("Expected .unassigned for seg-2")
+        }
+
+        // seg-3: spk_2 -> Speaker 3
+        if case let .unassigned(displayOrder, _) = result[2].speakerType {
+            #expect(displayOrder == 3, "spk_2 should be Speaker 3")
+        } else {
+            Issue.record("Expected .unassigned for seg-3")
+        }
+
+        // seg-4: spk_0 -> Speaker 1 (same speaker returns)
+        if case let .unassigned(displayOrder, _) = result[3].speakerType {
+            #expect(displayOrder == 1, "spk_0 returning should still be Speaker 1")
+        } else {
+            Issue.record("Expected .unassigned for seg-4")
+        }
+
+        // seg-5: spk_1 -> Speaker 2 (same speaker returns)
+        if case let .unassigned(displayOrder, _) = result[4].speakerType {
+            #expect(displayOrder == 2, "spk_1 returning should still be Speaker 2")
+        } else {
+            Issue.record("Expected .unassigned for seg-5")
+        }
+
+        // Verify all display labels are unique using the SpeakerType.label property
+        let labels = result.map { $0.speakerType.label }
+        let expectedLabels = ["Speaker 1", "Speaker 2", "Speaker 3", "Speaker 1", "Speaker 2"]
+        #expect(labels == expectedLabels, "Speaker labels should correctly reflect display orders: \(labels)")
+    }
+
+    @Test
+    func testSpeakerLabel_unassigned_showsCorrectDisplayOrder() {
+        // Verify that the SpeakerType.label property shows the correct speaker number
+        let speaker1 = SpeakerType.unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color)
+        let speaker2 = SpeakerType.unassigned(displayOrder: 2, color: SpeakerColor.forIndex(1).color)
+        let speaker3 = SpeakerType.unassigned(displayOrder: 3, color: SpeakerColor.forIndex(2).color)
+
+        #expect(speaker1.label == "Speaker 1")
+        #expect(speaker2.label == "Speaker 2")
+        #expect(speaker3.label == "Speaker 3")
+    }
 }
