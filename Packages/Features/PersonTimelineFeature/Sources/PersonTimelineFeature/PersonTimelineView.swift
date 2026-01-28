@@ -41,22 +41,22 @@ public struct PersonTimelineView: View {
     // MARK: - Header Section
 
     private var headerSection: some View {
+        VStack(alignment: .leading, spacing: VaporSpacing.md) {
+            // Top nav row: Back button on left, avatar on right
+            navHeader
+
+            // Page title row: "Conversations with [Person Name]"
+            pageHeader
+        }
+        .padding(.top, 56)
+        .padding(.horizontal, VaporSpacing.lg)
+        .padding(.bottom, VaporSpacing.md)
+    }
+
+    private var navHeader: some View {
         HStack {
             NavButton(label: "Back") {
                 store.send(.backTapped)
-            }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Conversations with")
-                    .font(.system(size: 12, weight: .light))
-                    .foregroundColor(VaporColor.textTertiary)
-                    .tracking(1.2)
-                    .textCase(.uppercase)
-
-                Text(store.personName)
-                    .font(.system(size: 24, weight: .light))
-                    .foregroundColor(VaporColor.textPrimary)
-                    .accessibilityIdentifier("personTimelineName")
             }
 
             Spacer()
@@ -69,9 +69,21 @@ public struct PersonTimelineView: View {
             .buttonStyle(PlainButtonStyle())
             .accessibilityIdentifier("profileAvatarButton")
         }
-        .padding(.top, 56)
-        .padding(.horizontal, VaporSpacing.lg)
-        .padding(.bottom, VaporSpacing.md)
+    }
+
+    private var pageHeader: some View {
+        VStack(alignment: .leading, spacing: VaporSpacing.xs) {
+            Text("CONVERSATIONS WITH")
+                .font(.system(size: 11, weight: .light))
+                .tracking(2)
+                .foregroundColor(VaporColor.textTertiary)
+
+            Text(store.personName)
+                .font(.system(size: 28, weight: .thin))
+                .tracking(-0.5)
+                .foregroundColor(VaporColor.textPrimary)
+                .accessibilityIdentifier("personTimelineName")
+        }
     }
 
     @ViewBuilder
@@ -226,24 +238,28 @@ public struct PersonTimelineViewPreview: View {
     public var body: some View {
         VStack(spacing: 0) {
             // Header
-            HStack {
-                NavButton(label: "Back") {}
+            VStack(alignment: .leading, spacing: VaporSpacing.md) {
+                // Top nav row: Back button on left, avatar on right
+                HStack {
+                    NavButton(label: "Back") {}
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Conversations with")
-                        .font(.system(size: 12, weight: .light))
-                        .foregroundColor(VaporColor.textTertiary)
-                        .tracking(1.2)
-                        .textCase(.uppercase)
+                    Spacer()
 
-                    Text(personName)
-                        .font(.system(size: 24, weight: .light))
-                        .foregroundColor(VaporColor.textPrimary)
+                    Avatar(size: .medium)
                 }
 
-                Spacer()
+                // Page title row: "Conversations with [Person Name]"
+                VStack(alignment: .leading, spacing: VaporSpacing.xs) {
+                    Text("CONVERSATIONS WITH")
+                        .font(.system(size: 11, weight: .light))
+                        .tracking(2)
+                        .foregroundColor(VaporColor.textTertiary)
 
-                Avatar(size: .medium)
+                    Text(personName)
+                        .font(.system(size: 28, weight: .thin))
+                        .tracking(-0.5)
+                        .foregroundColor(VaporColor.textPrimary)
+                }
             }
             .padding(.top, 56)
             .padding(.horizontal, VaporSpacing.lg)
