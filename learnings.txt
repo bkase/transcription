@@ -976,3 +976,11 @@
 - Pattern: `.path(.element(id: _, action: .childFeature(.someAction)))` triggers `.send(.sibling(.loadData))`
 - Used for: SessionDetailFeature.retryTranscriptionCompleted triggers TimelineFeature.loadSessions
 - Similar to existing patterns for deleteCompleted, profile delegate updates
+
+## SwiftUI ForEach with LazyVStack and computed properties
+- ForEach with stable IDs + LazyVStack can cache views even when related state changes
+- Problem: computed properties in view body (e.g., `speakerType(for: segment, tracks: store.tracks)`) may not trigger re-render for cached cells
+- Fix: embed computed values directly in the model stored in state (e.g., `segment.speakerType`) rather than computing in view
+- When related data changes (e.g., speaker tracks), re-resolve and store the computed values in the model
+- Pattern: `resolveSegmentSpeakerTypes(segments, speakerTracks:)` creates new segments with speakerType populated
+- This makes the data itself change when dependencies change, ensuring SwiftUI detects updates

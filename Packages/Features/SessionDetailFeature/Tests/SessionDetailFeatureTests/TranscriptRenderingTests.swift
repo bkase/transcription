@@ -752,4 +752,108 @@ struct TranscriptRenderingTests {
         }
         #expect(timestamp4 == "01:15")
     }
+
+    // MARK: - Resolve Segment Speaker Types Tests
+
+    @Test
+    func testResolveSegmentSpeakerTypes_emptySegments() {
+        let result = TranscriptRendering.resolveSegmentSpeakerTypes([], speakerTracks: [])
+        #expect(result.isEmpty)
+    }
+
+    @Test
+    func testResolveSegmentSpeakerTypes_appliesSpeakerTypesToAllSegments() {
+        // This is the key test for the bd-1z6l fix
+        // Ensures ALL segments get their speakerType populated based on tracks
+
+        let tracks = [
+            DetailSpeakerTrack(
+                id: "track-1",
+                machineSpeakerId: "spk_0",
+                displayOrder: 1,
+                personId: "person-alice",
+                personName: "Alice"
+            ),
+            DetailSpeakerTrack(
+                id: "track-2",
+                machineSpeakerId: "spk_1",
+                displayOrder: 2,
+                personId: nil,
+                personName: nil
+            )
+        ]
+
+        // 5 segments: spk_0, spk_1, spk_0, spk_1, spk_0
+        // All spk_0 segments should get Alice as speaker type
+        // All spk_1 segments should get unassigned displayOrder 2
+        let segments = [
+            DetailSegment(id: TranscriptSegmentID("seg-1"), machineSpeakerId: "spk_0", startMs: 0, endMs: 5000, text: "First"),
+            DetailSegment(id: TranscriptSegmentID("seg-2"), machineSpeakerId: "spk_1", startMs: 5000, endMs: 10000, text: "Second"),
+            DetailSegment(id: TranscriptSegmentID("seg-3"), machineSpeakerId: "spk_0", startMs: 10000, endMs: 15000, text: "Third (middle)"),
+            DetailSegment(id: TranscriptSegmentID("seg-4"), machineSpeakerId: "spk_1", startMs: 15000, endMs: 20000, text: "Fourth"),
+            DetailSegment(id: TranscriptSegmentID("seg-5"), machineSpeakerId: "spk_0", startMs: 20000, endMs: 25000, text: "Fifth (last)"),
+        ]
+
+        let result = TranscriptRendering.resolveSegmentSpeakerTypes(segments, speakerTracks: tracks)
+
+        // Verify count preserved
+        #expect(result.count == 5)
+
+        // Verify ALL spk_0 segments have Alice as speaker (including middle segment - the bug)
+        let aliceSpeakerType = SpeakerType.speaker(name: "Alice", color: SpeakerColor.forIndex(0).color)
+        #expect(result[0].speakerType == aliceSpeakerType, "First spk_0 segment should be Alice")
+        #expect(result[2].speakerType == aliceSpeakerType, "Middle spk_0 segment (seg-3) should be Alice")
+        #expect(result[4].speakerType == aliceSpeakerType, "Last spk_0 segment should be Alice")
+
+        // Verify spk_1 segments are unassigned displayOrder 2
+        let unassignedSpeaker2 = SpeakerType.unassigned(displayOrder: 2, color: SpeakerColor.forIndex(1).color)
+        #expect(result[1].speakerType == unassignedSpeaker2, "First spk_1 segment should be unassigned Speaker 2")
+        #expect(result[3].speakerType == unassignedSpeaker2, "Second spk_1 segment should be unassigned Speaker 2")
+    }
+
+    @Test
+    func testResolveSegmentSpeakerTypes_preservesOtherFields() {
+        let segments = [
+            DetailSegment(id: TranscriptSegmentID("seg-1"), machineSpeakerId: "spk_0", startMs: 100, endMs: 500, text: "Original text"),
+        ]
+        let tracks = [
+            DetailSpeakerTrack(id: "track-1", machineSpeakerId: "spk_0", displayOrder: 1, personId: "p1", personName: "Bob")
+        ]
+
+        let result = TranscriptRendering.resolveSegmentSpeakerTypes(segments, speakerTracks: tracks)
+
+        #expect(result.count == 1)
+        let resolvedSegment = result[0]
+
+        // Verify all original fields are preserved
+        #expect(resolvedSegment.id == TranscriptSegmentID("seg-1"))
+        #expect(resolvedSegment.machineSpeakerId == "spk_0")
+        #expect(resolvedSegment.startMs == 100)
+        #expect(resolvedSegment.endMs == 500)
+        #expect(resolvedSegment.text == "Original text")
+
+        // And speakerType is set correctly
+        if case let .speaker(name, _) = resolvedSegment.speakerType {
+            #expect(name == "Bob")
+        } else {
+            Issue.record("Expected .speaker but got \(resolvedSegment.speakerType)")
+        }
+    }
+
+    @Test
+    func testResolveSegmentSpeakerTypes_noMatchingTrack_defaultsToUnassigned() {
+        let segments = [
+            DetailSegment(id: TranscriptSegmentID("seg-1"), machineSpeakerId: "unknown_speaker", startMs: 0, endMs: 5000, text: "Text"),
+        ]
+        let tracks: [DetailSpeakerTrack] = []
+
+        let result = TranscriptRendering.resolveSegmentSpeakerTypes(segments, speakerTracks: tracks)
+
+        #expect(result.count == 1)
+        if case let .unassigned(displayOrder, _) = result[0].speakerType {
+            #expect(displayOrder == 1, "Should default to displayOrder 1 when no matching track")
+        } else {
+            Issue.record("Expected .unassigned but got \(result[0].speakerType)")
+        }
+    }
 }

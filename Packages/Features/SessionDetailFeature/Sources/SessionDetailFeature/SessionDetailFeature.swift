@@ -19,19 +19,23 @@ public struct DetailSegment: Equatable, Sendable, Identifiable {
     public let startMs: Int
     public let endMs: Int
     public let text: String
+    /// Pre-resolved speaker type for display. This ensures SwiftUI detects changes when speaker assignments update.
+    public let speakerType: SpeakerType
 
     public init(
         id: TranscriptSegmentID,
         machineSpeakerId: String?,
         startMs: Int,
         endMs: Int,
-        text: String
+        text: String,
+        speakerType: SpeakerType = .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color)
     ) {
         self.id = id
         self.machineSpeakerId = machineSpeakerId
         self.startMs = startMs
         self.endMs = endMs
         self.text = text
+        self.speakerType = speakerType
     }
 }
 
@@ -268,9 +272,15 @@ public struct SessionDetailFeature {
             case let .sessionLoaded(session, segments, tracks):
                 state.isLoading = false
                 state.session = session
-                // Merge consecutive same-speaker segments for cleaner display
-                state.segments = TranscriptRendering.mergeConsecutiveSegments(segments)
                 state.speakerTracks = tracks
+                // Merge consecutive same-speaker segments for cleaner display
+                let mergedSegments = TranscriptRendering.mergeConsecutiveSegments(segments)
+                // Resolve speaker types for each segment using the loaded tracks
+                // This ensures SwiftUI detects changes when speaker assignments update
+                state.segments = TranscriptRendering.resolveSegmentSpeakerTypes(
+                    mergedSegments,
+                    speakerTracks: tracks
+                )
 
                 // Initialize audio player if session has audio
                 if let audioPath = session?.audioPath {

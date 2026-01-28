@@ -396,7 +396,7 @@ public struct SessionDetailView: View {
         LazyVStack(alignment: .leading, spacing: VaporSpacing.xl) {
             ForEach(Array(store.segments.enumerated()), id: \.element.id) { index, segment in
                 TranscriptSegment(
-                    speaker: speakerType(for: segment),
+                    speaker: segment.speakerType,
                     timestamp: formatTimestamp(segment.startMs),
                     text: segment.text,
                     onSpeakerTap: {
@@ -431,10 +431,6 @@ public struct SessionDetailView: View {
     }
 
     // MARK: - Helpers
-
-    private func speakerType(for segment: DetailSegment) -> SpeakerType {
-        TranscriptRendering.speakerType(for: segment, speakerTracks: store.speakerTracks)
-    }
 
     private func formatTime(_ date: Date) -> String {
         let formatter = DateFormatter()

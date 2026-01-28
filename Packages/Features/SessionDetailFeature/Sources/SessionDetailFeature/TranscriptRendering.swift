@@ -97,6 +97,35 @@ public enum TranscriptRendering {
 
     // MARK: - Speaker Type Resolution
 
+    /// Resolve speaker types for all segments and return new segments with speakerType populated.
+    ///
+    /// This function should be called AFTER merging to ensure each segment has its speaker type
+    /// embedded, which allows SwiftUI to detect changes when speaker assignments are updated.
+    ///
+    /// - Parameters:
+    ///   - segments: The merged transcript segments
+    ///   - speakerTracks: Available speaker tracks for the session
+    /// - Returns: Segments with speakerType populated
+    public static func resolveSegmentSpeakerTypes(
+        _ segments: [DetailSegment],
+        speakerTracks: [DetailSpeakerTrack]
+    ) -> [DetailSegment] {
+        segments.map { segment in
+            let resolvedSpeakerType = resolveSpeakerType(
+                machineSpeakerId: segment.machineSpeakerId,
+                speakerTracks: speakerTracks
+            )
+            return DetailSegment(
+                id: segment.id,
+                machineSpeakerId: segment.machineSpeakerId,
+                startMs: segment.startMs,
+                endMs: segment.endMs,
+                text: segment.text,
+                speakerType: resolvedSpeakerType
+            )
+        }
+    }
+
     /// Determine the speaker type for a segment based on speaker tracks.
     ///
     /// Resolution logic:
@@ -113,7 +142,18 @@ public enum TranscriptRendering {
         for segment: DetailSegment,
         speakerTracks: [DetailSpeakerTrack]
     ) -> SpeakerType {
-        guard let machineSpeakerId = segment.machineSpeakerId else {
+        resolveSpeakerType(
+            machineSpeakerId: segment.machineSpeakerId,
+            speakerTracks: speakerTracks
+        )
+    }
+
+    /// Internal helper to resolve speaker type from machineSpeakerId
+    private static func resolveSpeakerType(
+        machineSpeakerId: String?,
+        speakerTracks: [DetailSpeakerTrack]
+    ) -> SpeakerType {
+        guard let machineSpeakerId = machineSpeakerId else {
             // Unknown speaker - default to Speaker 1
             return .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color)
         }
