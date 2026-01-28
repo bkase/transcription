@@ -1038,3 +1038,19 @@
 - TimelineEmptyStateView.downloading variant uses larger (2.0x scaled) spinner instead of static cloud icon
 - TimelineViewPreview.downloadStatusPreviewView mirrors main view's downloadStatusView for snapshot testing
 - ScaleEffect(0.8) for inline progress spinners, scaleEffect(2.0) for empty state spinner
+
+## Continue Recording feature patterns
+- ContinuationConfig struct holds sessionID and timestampOffsetMs for appending to existing sessions
+- RecordingProcessorClient.continueRecording takes audioDirectory and ContinuationConfig
+- RecordingProcessor.continueRecording reuses existing session ID, sets isContinuation=true and timestampOffsetMs
+- New segments use adjusted timestamps: `adjustedStartMs = Int(segment.startMs) + timestampOffsetMs`
+- Continuation audio saved to separate file with timestamp suffix to avoid overwriting original
+- Skip title generation for continuations (titleGenerationTriggered = true on start)
+- Load existing speaker tracks on continuation start to maintain display order consistency
+- Skip offline transcription for continuations - segments were already transcribed live
+- Duration computed from max segment endMs (includes offset) for continuation sessions
+- RecordingFeature.State has continuationSessionID and timestampOffsetMs; timer starts at offset/1000 seconds
+- continueRecording action stores continuation info in state, then triggers permission flow like startRecording
+- permissionGranted checks isContinuation to call appropriate processor method
+- AppFeature handles SessionDetailFeature.delegate.continueRecordingRequested to present recording in continuation mode
+- Clear continuation state (continuationSessionID, timestampOffsetMs) on didFinish and didDiscard

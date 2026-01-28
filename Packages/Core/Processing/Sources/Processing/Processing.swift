@@ -129,6 +129,19 @@ public enum AudioRouteChangeReason: Sendable, Equatable {
 
 // MARK: - RecordingProcessorClient
 
+/// Configuration for continuing an existing recording session
+public struct ContinuationConfig: Sendable, Equatable {
+    /// The session ID to continue
+    public let sessionID: SessionID
+    /// Timestamp offset in milliseconds (segments will have this added to their timestamps)
+    public let timestampOffsetMs: Int
+
+    public init(sessionID: SessionID, timestampOffsetMs: Int) {
+        self.sessionID = sessionID
+        self.timestampOffsetMs = timestampOffsetMs
+    }
+}
+
 /// Client for orchestrating recording sessions
 @DependencyClient
 public struct RecordingProcessorClient: Sendable {
@@ -136,6 +149,12 @@ public struct RecordingProcessorClient: Sendable {
     /// - Parameter audioDirectory: Directory where audio files should be saved
     /// - Returns: Stream of recording processor events
     public var startRecording: @Sendable (_ audioDirectory: URL) async throws -> AsyncStream<RecordingProcessorEvent>
+    /// Continue an existing recording session (append new content)
+    /// - Parameters:
+    ///   - audioDirectory: Directory where audio files should be saved
+    ///   - continuation: Configuration for the continuation (session ID and timestamp offset)
+    /// - Returns: Stream of recording processor events
+    public var continueRecording: @Sendable (_ audioDirectory: URL, _ continuation: ContinuationConfig) async throws -> AsyncStream<RecordingProcessorEvent> = { _, _ in AsyncStream { $0.finish() } }
     /// Stop the current recording session
     public var stopRecording: @Sendable () async -> Void
     /// Discard the current recording session (delete session and audio file)
@@ -164,6 +183,9 @@ extension RecordingProcessorClient: DependencyKey {
         return Self(
             startRecording: { audioDirectory in
                 try await processor.startRecording(audioDirectory: audioDirectory)
+            },
+            continueRecording: { audioDirectory, continuation in
+                try await processor.continueRecording(audioDirectory: audioDirectory, continuation: continuation)
             },
             stopRecording: {
                 await processor.stopRecording()
@@ -227,6 +249,10 @@ public actor RecordingProcessor {
     private var eventContinuation: AsyncStream<RecordingProcessorEvent>.Continuation?
     private var audioSessionTask: Task<Void, Never>?
 
+    // Continuation mode state
+    private var isContinuation: Bool = false
+    private var timestampOffsetMs: Int = 0
+
     // Title generation state
     private var accumulatedTranscriptText: String = ""
     private var titleGenerationTriggered: Bool = false
@@ -246,6 +272,8 @@ public actor RecordingProcessor {
         seenSpeakers = []
         accumulatedTranscriptText = ""
         titleGenerationTriggered = false
+        isContinuation = false
+        timestampOffsetMs = 0
 
         // Create event stream
         let (stream, continuation) = AsyncStream.makeStream(of: RecordingProcessorEvent.self)
@@ -323,6 +351,122 @@ public actor RecordingProcessor {
         }
 
         // Start observing audio session events (interruptions, route changes)
+        let audioSessionStream = await audioSessionClient.startObserving()
+        audioSessionTask = Task { [weak self] in
+            for await event in audioSessionStream {
+                guard let self = self else { break }
+                guard await self.getIsRecording() else { break }
+                await self.handleAudioSessionEvent(event)
+            }
+        }
+
+        return stream
+    }
+
+    /// Continue an existing recording session (append new audio and transcript)
+    /// - Parameters:
+    ///   - audioDirectory: Directory where audio files should be saved
+    ///   - continuation: Configuration for the continuation (session ID and timestamp offset)
+    /// - Returns: Stream of recording processor events
+    public func continueRecording(audioDirectory: URL, continuation config: ContinuationConfig) async throws -> AsyncStream<RecordingProcessorEvent> {
+        guard !isRecording else {
+            throw RecordingProcessorError.alreadyRecording
+        }
+
+        // Verify the session exists
+        guard let session = try await databaseClient.fetchSession(config.sessionID) else {
+            throw RecordingProcessorError.sessionNotFound
+        }
+
+        // Verify session is in a state that can be continued (processed or partial)
+        guard session.processingState == .processed || session.processingState == .partial else {
+            throw RecordingProcessorError.invalidStateForContinuation(session.processingState)
+        }
+
+        isRecording = true
+        isContinuation = true
+        timestampOffsetMs = config.timestampOffsetMs
+        accumulatedTranscriptText = ""
+        titleGenerationTriggered = true // Don't regenerate title for continuations
+
+        // Load existing speakers for this session
+        let existingTracks = try await databaseClient.fetchSpeakerTracks(config.sessionID)
+        seenSpeakers = Set(existingTracks.map(\.machineSpeakerId))
+
+        // Create event stream
+        let (stream, eventContinuation) = AsyncStream.makeStream(of: RecordingProcessorEvent.self)
+        self.eventContinuation = eventContinuation
+
+        // Use the existing session ID
+        let sessionId = config.sessionID
+        self.currentSessionID = sessionId
+
+        // Update session to recording state
+        var updatedSession = session
+        updatedSession.processingState = .recording
+        updatedSession.updatedAt = date.now
+        try await databaseClient.updateSession(updatedSession)
+
+        // Emit didStart event with the existing session ID
+        eventContinuation.yield(.didStart(sessionId))
+
+        // Configure audio session for recording
+        try await audioSessionClient.configureForRecording()
+
+        // Get the actual input format from the microphone
+        let inputFormat = audioCaptureClient.getInputFormat()
+
+        // Start audio file writing to a continuation file
+        // Use a unique suffix to avoid overwriting the original audio
+        let continuationSuffix = "_cont_\(Int(date.now.timeIntervalSince1970))"
+        let audioPath = audioDirectory.appendingPathComponent("\(sessionId.rawValue)\(continuationSuffix).caf")
+        self.currentAudioFileURL = audioPath
+        try await audioFileWriterClient.startWriting(audioPath, inputFormat)
+
+        // Start audio capture
+        let audioStream = try await audioCaptureClient.startCapture()
+
+        // Emit listening changed
+        eventContinuation.yield(.listeningChanged(true))
+
+        // Fork audio stream for file writing and ML
+        let (writerStream, mlStream) = forkAudioStream(audioStream)
+
+        // Process audio frames for file writing in background
+        Task { [weak self] in
+            for await frame in writerStream {
+                guard let self = self, await self.getIsRecording() else { break }
+                try? await self.audioFileWriterClient.appendFrame(frame)
+            }
+        }
+
+        // Start ML transcription in background
+        Task { [weak self, fluidAudioClient] in
+            guard let self = self else { return }
+            do {
+                NSLog("[RecordingProcessor] Starting continuation transcription with offset \(config.timestampOffsetMs)ms...")
+                let segmentStream = try await fluidAudioClient.startTranscription(mlStream)
+                NSLog("[RecordingProcessor] Continuation transcription started, emitting event")
+                await self.emitTranscriptionStarted()
+                var segmentCount = 0
+                for await segment in segmentStream {
+                    guard await self.getIsRecording() else {
+                        NSLog("[RecordingProcessor] Recording stopped, breaking segment loop")
+                        break
+                    }
+                    segmentCount += 1
+                    NSLog("[RecordingProcessor] Received continuation segment \(segmentCount): '\(segment.text)'")
+                    await self.handleSegment(segment, sessionId: sessionId)
+                }
+                NSLog("[RecordingProcessor] Continuation segment stream ended after \(segmentCount) segments")
+            } catch {
+                let errorMessage = "Live transcription unavailable: \(error.localizedDescription)"
+                NSLog("[RecordingProcessor] Continuation transcription error: \(errorMessage)")
+                await self.emitTranscriptionUnavailable(errorMessage)
+            }
+        }
+
+        // Start observing audio session events
         let audioSessionStream = await audioSessionClient.startObserving()
         audioSessionTask = Task { [weak self] in
             for await event in audioSessionStream {
@@ -571,12 +715,16 @@ public actor RecordingProcessor {
             try? await databaseClient.createSpeakerTrack(speakerTrack)
         }
 
+        // Apply timestamp offset for continuation mode
+        let adjustedStartMs = Int(segment.startMs) + timestampOffsetMs
+        let adjustedEndMs = Int(segment.endMs) + timestampOffsetMs
+
         // Create transcript segment record
         let segmentRecord = TranscriptSegmentRecord(
             id: segment.id.rawValue,
             sessionId: sessionId.rawValue,
-            startMs: Int(segment.startMs),
-            endMs: Int(segment.endMs),
+            startMs: adjustedStartMs,
+            endMs: adjustedEndMs,
             machineSpeakerId: segment.speakerId,
             text: segment.text,
             isFinal: segment.isFinal,
@@ -654,11 +802,20 @@ public actor RecordingProcessor {
             .map { $0.text }
             .joined(separator: " ")
 
-        // Compute duration from actual recording time (startedAt to now)
-        // Fall back to transcript segments if available, but prefer actual elapsed time
-        let elapsedMs = Int(now.timeIntervalSince(session.startedAt) * 1000)
-        let segmentDurationMs = segments.map { $0.endMs }.max() ?? 0
-        let durationMs = max(elapsedMs, segmentDurationMs)
+        // For continuation mode, compute duration from max segment timestamp
+        // (which already includes the offset). For new recordings, use elapsed time.
+        let durationMs: Int
+        if isContinuation {
+            // Use the max segment end time (includes offset from previous recording)
+            durationMs = segments.map { $0.endMs }.max() ?? (session.durationMs ?? 0)
+            NSLog("[Finalize] Continuation mode - computed duration from segments: %dms", durationMs)
+        } else {
+            // Compute duration from actual recording time (startedAt to now)
+            // Fall back to transcript segments if available, but prefer actual elapsed time
+            let elapsedMs = Int(now.timeIntervalSince(session.startedAt) * 1000)
+            let segmentDurationMs = segments.map { $0.endMs }.max() ?? 0
+            durationMs = max(elapsedMs, segmentDurationMs)
+        }
 
         // Update session - set to transcribing state first
         session.endedAt = now
@@ -667,6 +824,24 @@ public actor RecordingProcessor {
         session.speakerCount = seenSpeakers.count
         session.updatedAt = now
 
+        // For continuation mode: skip offline transcription, keep original audio path, mark as processed
+        if isContinuation {
+            // Don't change audioPath - keep the original audio file reference
+            // The continuation audio is stored separately but we don't need to track it
+            session.processingState = .processed
+            NSLog("[Finalize] Continuation mode - marking as processed without offline transcription")
+
+            do {
+                try await databaseClient.updateSession(session)
+                eventContinuation?.yield(.didFinish(sessionId))
+            } catch {
+                NSLog("[Finalize] ERROR: %@", String(describing: error))
+                eventContinuation?.yield(.didFail("Failed to finalize continuation session: \(error)"))
+            }
+            return
+        }
+
+        // Normal (non-continuation) flow below
         // Check privacy mode and handle audio retention
         let retentionMode = preferencesClient.getAudioRetentionMode()
         let shouldDeleteAudio = retentionMode == .transcriptOnly
@@ -1073,6 +1248,7 @@ public enum RecordingProcessorError: Error, Equatable, Sendable {
     case noAudioFile
     case audioFileNotFound
     case invalidStateForRetry(ProcessingState)
+    case invalidStateForContinuation(ProcessingState)
 }
 
 // MARK: - OfflineTranscriptionError

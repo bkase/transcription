@@ -132,6 +132,24 @@ public struct AppFeature {
                 // Reload timeline when retry transcription completes so the partial chip is removed
                 return .send(.timeline(.loadSessions))
 
+            case let .path(.element(id: _, action: .sessionDetail(.delegate(.continueRecordingRequested(sessionID, currentDurationMs))))):
+                // Present recording screen in continuation mode
+                var recordingState = RecordingFeature.State(userProfile: state.userProfile)
+                recordingState.continuationSessionID = sessionID
+                recordingState.timestampOffsetMs = currentDurationMs
+                state.recording = recordingState
+
+                // Get audio directory from caches
+                let audioDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+                    .appendingPathComponent("recordings", isDirectory: true)
+                // Create directory if needed
+                try? FileManager.default.createDirectory(at: audioDir, withIntermediateDirectories: true)
+                return .send(.recording(.presented(.continueRecording(
+                    audioDirectory: audioDir,
+                    sessionID: sessionID,
+                    timestampOffsetMs: currentDurationMs
+                ))))
+
             case .path(.element(id: _, action: .sessionDetail(.titleSaved))):
                 // Reload timeline when session title is saved so the updated title is visible
                 return .send(.timeline(.loadSessions))

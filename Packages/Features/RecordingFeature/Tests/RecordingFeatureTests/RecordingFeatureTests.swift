@@ -387,4 +387,194 @@ struct RecordingFeatureTests {
         // Stopping while not recording should be ignored
         await store.send(.stopRecording)
     }
+
+    // MARK: - testContinueRecordingTransitions
+
+    @Test
+    func testContinueRecordingTransitions() async {
+        let audioDirectory = FileManager.default.temporaryDirectory
+        let existingSessionID = SessionID("existing-session-123")
+        let existingDurationMs = 30_000 // 30 seconds
+
+        // Create a continuation we can control
+        var eventContinuation: AsyncStream<RecordingProcessorEvent>.Continuation?
+        let eventStream = AsyncStream<RecordingProcessorEvent> { continuation in
+            eventContinuation = continuation
+        }
+
+        let clock = TestClock()
+
+        let store = TestStore(initialState: RecordingFeature.State()) {
+            RecordingFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+            $0.microphonePermissionClient.getStatus = { .authorized }
+            $0.recordingProcessorClient.continueRecording = { _, config in
+                // Verify the continuation config is correct
+                #expect(config.sessionID == existingSessionID)
+                #expect(config.timestampOffsetMs == existingDurationMs)
+                return eventStream
+            }
+            $0.recordingProcessorClient.stopRecording = { }
+            $0.feedbackClient.playStartSound = { }
+            $0.feedbackClient.playStopSound = { }
+            $0.feedbackClient.triggerStartHaptic = { }
+            $0.feedbackClient.triggerStopHaptic = { }
+        }
+
+        // Initially not recording
+        #expect(store.state.isRecording == false)
+        #expect(store.state.continuationSessionID == nil)
+        #expect(store.state.timestampOffsetMs == 0)
+
+        // Continue recording - sets continuation state first
+        await store.send(.continueRecording(
+            audioDirectory: audioDirectory,
+            sessionID: existingSessionID,
+            timestampOffsetMs: existingDurationMs
+        )) {
+            $0.continuationSessionID = existingSessionID
+            $0.timestampOffsetMs = existingDurationMs
+        }
+
+        await store.receive(\.permissionGranted) {
+            $0.isRecording = true
+            $0.audioDirectory = audioDirectory
+            // Timer should start at offset (30 seconds)
+            $0.elapsedSeconds = 30
+        }
+
+        // Emit didStart event from processor - uses existing session ID
+        eventContinuation?.yield(.didStart(existingSessionID))
+        await store.receive(\.processorEvent) {
+            $0.sessionID = existingSessionID
+        }
+
+        // Emit listeningChanged event
+        eventContinuation?.yield(.listeningChanged(true))
+        await store.receive(\.processorEvent) {
+            $0.isListening = true
+        }
+
+        // Advance clock and verify timer ticks from offset
+        await clock.advance(by: .seconds(1))
+        await store.receive(\.timerTicked) {
+            $0.elapsedSeconds = 31
+        }
+
+        await clock.advance(by: .seconds(1))
+        await store.receive(\.timerTicked) {
+            $0.elapsedSeconds = 32
+        }
+
+        // Stop recording
+        await store.send(.stopRecording)
+
+        // Emit didFinish event - clears continuation state
+        eventContinuation?.yield(.didFinish(existingSessionID))
+        await store.receive(\.processorEvent) {
+            $0.isRecording = false
+            $0.isListening = false
+            $0.sessionID = nil
+            $0.continuationSessionID = nil
+            $0.timestampOffsetMs = 0
+        }
+
+        // Clean up
+        eventContinuation?.finish()
+    }
+
+    // MARK: - testContinueRecordingWhileRecordingIsIgnored
+
+    @Test
+    func testContinueRecordingWhileRecordingIsIgnored() async {
+        let audioDirectory = FileManager.default.temporaryDirectory
+        let sessionID = SessionID("some-session")
+
+        let store = TestStore(
+            initialState: RecordingFeature.State(isRecording: true)
+        ) {
+            RecordingFeature()
+        }
+
+        // Continue while already recording should be ignored
+        await store.send(.continueRecording(
+            audioDirectory: audioDirectory,
+            sessionID: sessionID,
+            timestampOffsetMs: 10_000
+        ))
+    }
+
+    // MARK: - testContinuationStateIsClearedOnDiscard
+
+    @Test
+    func testContinuationStateIsClearedOnDiscard() async {
+        let audioDirectory = FileManager.default.temporaryDirectory
+        let existingSessionID = SessionID("existing-session-456")
+        let existingDurationMs = 15_000
+
+        var eventContinuation: AsyncStream<RecordingProcessorEvent>.Continuation?
+        let eventStream = AsyncStream<RecordingProcessorEvent> { continuation in
+            eventContinuation = continuation
+        }
+
+        let clock = TestClock()
+
+        let store = TestStore(initialState: RecordingFeature.State()) {
+            RecordingFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+            $0.microphonePermissionClient.getStatus = { .authorized }
+            $0.recordingProcessorClient.continueRecording = { _, _ in eventStream }
+            $0.recordingProcessorClient.discardRecording = { }
+            $0.feedbackClient.playStartSound = { }
+            $0.feedbackClient.playStopSound = { }
+            $0.feedbackClient.triggerStartHaptic = { }
+            $0.feedbackClient.triggerStopHaptic = { }
+        }
+
+        // Start continuation
+        await store.send(.continueRecording(
+            audioDirectory: audioDirectory,
+            sessionID: existingSessionID,
+            timestampOffsetMs: existingDurationMs
+        )) {
+            $0.continuationSessionID = existingSessionID
+            $0.timestampOffsetMs = existingDurationMs
+        }
+
+        await store.receive(\.permissionGranted) {
+            $0.isRecording = true
+            $0.audioDirectory = audioDirectory
+            $0.elapsedSeconds = 15
+        }
+
+        eventContinuation?.yield(.didStart(existingSessionID))
+        await store.receive(\.processorEvent) {
+            $0.sessionID = existingSessionID
+        }
+
+        // Discard recording
+        await store.send(.discardTapped) {
+            $0.isShowingDiscardConfirmation = true
+        }
+
+        await store.send(.discardConfirmed) {
+            $0.isShowingDiscardConfirmation = false
+        }
+
+        // Emit didDiscard - should clear continuation state
+        eventContinuation?.yield(.didDiscard(existingSessionID))
+        await store.receive(\.processorEvent) {
+            $0.isRecording = false
+            $0.isListening = false
+            $0.sessionID = nil
+            $0.elapsedSeconds = 0
+            $0.continuationSessionID = nil
+            $0.timestampOffsetMs = 0
+        }
+
+        // Clean up
+        eventContinuation?.finish()
+    }
 }

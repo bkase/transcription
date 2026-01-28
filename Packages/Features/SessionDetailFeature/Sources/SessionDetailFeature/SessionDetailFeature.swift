@@ -163,6 +163,13 @@ public struct SessionDetailFeature {
         }
     }
 
+    /// Delegate actions for parent feature coordination
+    @CasePathable
+    public enum Delegate: Equatable, Sendable {
+        /// Request to continue recording for this session
+        case continueRecordingRequested(sessionID: SessionID, currentDurationMs: Int)
+    }
+
     public enum Action: Equatable, Sendable {
         case onAppear
         case onDisappear
@@ -175,6 +182,7 @@ public struct SessionDetailFeature {
         case audioPlayer(AudioPlayerFeature.Action)
         case speakerLabelTapped(segmentId: TranscriptSegmentID, machineSpeakerId: String?)
         case speakerPicker(PresentationAction<SpeakerPickerFeature.Action>)
+        case delegate(Delegate)
 
         // Title editing
         case titleTapped
@@ -194,6 +202,9 @@ public struct SessionDetailFeature {
         case exportCompleted(URL)
         case exportFailed(String)
         case shareSheetDismissed
+
+        // Continue recording action
+        case continueRecordingTapped
 
         // Delete actions
         case deleteTapped
@@ -466,6 +477,26 @@ public struct SessionDetailFeature {
 
             case .shareSheetDismissed:
                 state.shareURL = nil
+                return .none
+
+            // MARK: - Continue Recording
+
+            case .continueRecordingTapped:
+                state.isShowingActionsMenu = false
+                // Only allow continuation for processed or partial sessions with audio
+                guard let session = state.session,
+                      (session.processingState == .processed || session.processingState == .partial),
+                      session.audioPath != nil else {
+                    return .none
+                }
+                let currentDurationMs = session.durationMs ?? 0
+                return .send(.delegate(.continueRecordingRequested(
+                    sessionID: state.sessionID,
+                    currentDurationMs: currentDurationMs
+                )))
+
+            case .delegate:
+                // Delegate actions are handled by parent
                 return .none
 
             // MARK: - Delete Actions

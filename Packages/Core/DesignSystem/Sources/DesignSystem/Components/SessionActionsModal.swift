@@ -2,22 +2,25 @@ import SwiftUI
 
 // MARK: - Session Actions Modal
 
-/// Modal for session actions (Share, Export, Delete).
+/// Modal for session actions (Share, Export, Continue Recording, Delete).
 /// Uses the same design pattern as SpeakerPickerModal - positioned near trigger with fade overlay.
 public struct SessionActionsModal: View {
     private let onShare: () -> Void
     private let onExport: () -> Void
+    private let onContinueRecording: (() -> Void)?
     private let onDelete: () -> Void
     private let onDismiss: () -> Void
 
     public init(
         onShare: @escaping () -> Void,
         onExport: @escaping () -> Void,
+        onContinueRecording: (() -> Void)? = nil,
         onDelete: @escaping () -> Void,
         onDismiss: @escaping () -> Void
     ) {
         self.onShare = onShare
         self.onExport = onExport
+        self.onContinueRecording = onContinueRecording
         self.onDelete = onDelete
         self.onDismiss = onDismiss
     }
@@ -64,6 +67,20 @@ public struct SessionActionsModal: View {
                     action: onExport
                 )
                 .accessibilityIdentifier("exportAction")
+
+                if let onContinueRecording = onContinueRecording {
+                    Rectangle()
+                        .fill(VaporColor.fog)
+                        .frame(height: 1)
+                        .padding(.vertical, 4)
+
+                    SessionActionRow(
+                        icon: "mic.badge.plus",
+                        label: "Continue Recording",
+                        action: onContinueRecording
+                    )
+                    .accessibilityIdentifier("continueRecordingAction")
+                }
 
                 Rectangle()
                     .fill(VaporColor.fog)

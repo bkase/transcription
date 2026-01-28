@@ -114,6 +114,18 @@ public struct RecordingFeature {
         /// Speaker picker modal state
         @Presents public var speakerPicker: SpeakerPickerFeature.State?
 
+        // MARK: - Continuation Mode
+
+        /// If set, this recording is a continuation of an existing session
+        public var continuationSessionID: SessionID?
+        /// Timestamp offset in milliseconds for continuation mode
+        public var timestampOffsetMs: Int = 0
+
+        /// Whether this is a continuation of an existing session
+        public var isContinuation: Bool {
+            continuationSessionID != nil
+        }
+
         /// Compute initials from the profile name for avatar display
         public var initials: String {
             let components = userProfile.name.split(separator: " ")
@@ -145,7 +157,9 @@ public struct RecordingFeature {
             isTranscriptionAvailable: Bool = true,
             transcriptionUnavailableMessage: String? = nil,
             userProfile: UserProfile = .empty,
-            speakerPicker: SpeakerPickerFeature.State? = nil
+            speakerPicker: SpeakerPickerFeature.State? = nil,
+            continuationSessionID: SessionID? = nil,
+            timestampOffsetMs: Int = 0
         ) {
             self.isRecording = isRecording
             self.isPaused = isPaused
@@ -165,12 +179,16 @@ public struct RecordingFeature {
             self.transcriptionUnavailableMessage = transcriptionUnavailableMessage
             self.userProfile = userProfile
             self.speakerPicker = speakerPicker
+            self.continuationSessionID = continuationSessionID
+            self.timestampOffsetMs = timestampOffsetMs
         }
     }
 
     public enum Action: Equatable, Sendable {
         /// Start recording with the given audio directory
         case startRecording(audioDirectory: URL)
+        /// Continue an existing recording session
+        case continueRecording(audioDirectory: URL, sessionID: SessionID, timestampOffsetMs: Int)
         /// Stop the current recording
         case stopRecording
         /// Pause the current recording
@@ -262,10 +280,31 @@ public struct RecordingFeature {
                 state.error = nil
                 state.isPermissionDenied = false
 
+                // Check if we're in continuation mode
+                let isContinuation = state.continuationSessionID != nil
+                let continuationSessionID = state.continuationSessionID
+                let timestampOffsetMs = state.timestampOffsetMs
+
+                // For continuation, start timer at offset
+                if isContinuation {
+                    state.elapsedSeconds = timestampOffsetMs / 1000
+                }
+
                 return .merge(
                     .run { send in
                         do {
-                            let eventStream = try await recordingProcessorClient.startRecording(audioDirectory)
+                            let eventStream: AsyncStream<RecordingProcessorEvent>
+                            if isContinuation, let sessionID = continuationSessionID {
+                                // Continue existing session
+                                let config = ContinuationConfig(
+                                    sessionID: sessionID,
+                                    timestampOffsetMs: timestampOffsetMs
+                                )
+                                eventStream = try await recordingProcessorClient.continueRecording(audioDirectory, config)
+                            } else {
+                                // Start new session
+                                eventStream = try await recordingProcessorClient.startRecording(audioDirectory)
+                            }
 
                             // Listen for events
                             for await event in eventStream {
@@ -281,6 +320,37 @@ public struct RecordingFeature {
                         await feedbackClient.playStartSound()
                     }
                 )
+
+            case let .continueRecording(audioDirectory, sessionID, timestampOffsetMs):
+                guard !state.isRecording else { return .none }
+
+                // Store continuation info in state
+                state.continuationSessionID = sessionID
+                state.timestampOffsetMs = timestampOffsetMs
+
+                // Check permission status synchronously first
+                let status = microphonePermissionClient.getStatus()
+
+                switch status {
+                case .authorized:
+                    // Already authorized, proceed directly
+                    return .send(.permissionGranted(audioDirectory: audioDirectory))
+
+                case .undetermined:
+                    // Need to request permission
+                    return .run { [microphonePermissionClient] send in
+                        let granted = await microphonePermissionClient.requestPermission()
+                        if granted {
+                            await send(.permissionGranted(audioDirectory: audioDirectory))
+                        } else {
+                            await send(.permissionDenied)
+                        }
+                    }
+
+                case .denied, .restricted:
+                    // Permission denied - show UI with settings button
+                    return .send(.permissionDenied)
+                }
 
             case .permissionDenied:
                 state.isPermissionDenied = true
@@ -416,6 +486,8 @@ public struct RecordingFeature {
                     state.sessionID = nil
                     state.liveSegments = []
                     state.speakerTracks = []
+                    state.continuationSessionID = nil
+                    state.timestampOffsetMs = 0
                     // Keep elapsedSeconds for display until view navigates away
                     return .merge(
                         .cancel(id: CancelID.timer),
@@ -434,6 +506,8 @@ public struct RecordingFeature {
                     state.liveSegments = []
                     state.speakerTracks = []
                     state.elapsedSeconds = 0
+                    state.continuationSessionID = nil
+                    state.timestampOffsetMs = 0
                     return .merge(
                         .cancel(id: CancelID.timer),
                         .cancel(id: CancelID.processorEvents),

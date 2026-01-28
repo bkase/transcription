@@ -21,6 +21,14 @@ public struct SessionDetailView: View {
         self.store = store
     }
 
+    /// Whether the session can be continued (has audio and is in a completed state)
+    private var canContinueRecording: Bool {
+        guard let session = store.session else { return false }
+        let isCompletedState = session.processingState == .processed || session.processingState == .partial
+        let hasAudio = session.audioPath != nil
+        return isCompletedState && hasAudio
+    }
+
     public var body: some View {
         ZStack(alignment: .bottom) {
             // Main content
@@ -109,6 +117,7 @@ public struct SessionDetailView: View {
                 SessionActionsModal(
                     onShare: { store.send(.shareTapped) },
                     onExport: { store.send(.exportTapped) },
+                    onContinueRecording: canContinueRecording ? { store.send(.continueRecordingTapped) } : nil,
                     onDelete: { store.send(.deleteTapped) },
                     onDismiss: { store.send(.actionsMenuDismissed) }
                 )
