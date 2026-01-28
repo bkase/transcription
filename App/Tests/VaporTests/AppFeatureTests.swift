@@ -208,6 +208,46 @@ struct AppFeatureTests {
     // MARK: - Session Detail Coordination Tests
 
     @Test
+    func testTitleSavedRefreshesTimeline() async {
+        // This test verifies that when titleSaved is received from session detail,
+        // the AppFeature forwards a timeline reload so the updated title is visible on the timeline.
+        let sessionID = SessionID(rawValue: "test-session-123")
+        let fixedDate = Date(timeIntervalSince1970: 1000000)
+
+        let store = TestStore(
+            initialState: AppFeature.State(
+                path: StackState([.sessionDetail(SessionDetailFeature.State(sessionID: sessionID))])
+            )
+        ) {
+            AppFeature()
+        } withDependencies: {
+            // Mock date for timeline reload
+            $0.date = .constant(fixedDate)
+            // Mock database client for timeline reload
+            $0.databaseClient.fetchSessionsGroupedByDate = { _ in [] }
+            $0.databaseClient.fetchSpeakerInfoForSessions = { _ in [:] }
+        }
+
+        // When title is saved in session detail, the parent forwards timeline.loadSessions
+        await store.send(.path(.element(id: 0, action: .sessionDetail(.titleSaved))))
+
+        // Receive the timeline.loadSessions action that was sent by AppFeature
+        await store.receive(\.timeline.loadSessions) {
+            $0.timeline.isLoading = true
+        }
+
+        // Receive the sessionsLoaded response
+        await store.receive(\.timeline.sessionsLoaded) {
+            $0.timeline.isLoading = false
+            $0.timeline.sessionGroups = []
+            $0.timeline.speakerInfoBySession = [:]
+        }
+
+        // Session detail should remain on the path
+        #expect(store.state.path.count == 1)
+    }
+
+    @Test
     func testRetryTranscriptionCompletedRefreshesTimeline() async {
         // This test verifies that when retryTranscriptionCompleted is received from session detail,
         // the AppFeature forwards a timeline reload so the partial chip is removed from the timeline.

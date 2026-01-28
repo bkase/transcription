@@ -1024,3 +1024,9 @@
 - Use zIndex to control circle stacking order (first speaker on top)
 - Add speakerInfoBySession: [String: [SessionSpeakerInfo]] to parent state for lookup
 - When action parameters change (e.g., sessionsLoaded takes new arg), update ALL tests using that action
+
+## TCA cross-feature state synchronization via AppFeature
+- When SessionDetailFeature saves changes (title, speaker assignment), AppFeature intercepts the action
+- Pattern: `.path(.element(id: _, action: .sessionDetail(.titleSaved)))` triggers `.send(.timeline(.loadSessions))`
+- Same pattern used for: deleteCompleted, retryTranscriptionCompleted, titleSaved
+- This ensures sibling features (Timeline) reflect changes made in child features (SessionDetail)

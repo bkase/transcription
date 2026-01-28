@@ -132,6 +132,10 @@ public struct AppFeature {
                 // Reload timeline when retry transcription completes so the partial chip is removed
                 return .send(.timeline(.loadSessions))
 
+            case .path(.element(id: _, action: .sessionDetail(.titleSaved))):
+                // Reload timeline when session title is saved so the updated title is visible
+                return .send(.timeline(.loadSessions))
+
             case .path(.element(id: _, action: .personTimeline(.backTapped))):
                 // Pop the navigation stack when back is tapped in person timeline
                 _ = state.path.popLast()
