@@ -46,13 +46,8 @@ public struct SessionCard: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: showMetadata ? 12 : 8) {
-            // Header: speaker avatars + title + time + optional status
+            // Header: title + status + speaker avatars + time
             HStack(spacing: VaporSpacing.sm) {
-                // Speaker avatars (left side)
-                if !speakerAvatars.isEmpty {
-                    SpeakerAvatarStack(speakers: speakerAvatars)
-                }
-
                 Text(title)
                     .font(.system(size: 18, weight: .light))
                     .tracking(-0.2)
@@ -63,6 +58,11 @@ public struct SessionCard: View {
                 // Status pill (when processing state is notable)
                 if let pillType = statusPillType {
                     StatusPill(type: pillType)
+                }
+
+                // Speaker avatars (right side, near time)
+                if !speakerAvatars.isEmpty {
+                    SpeakerAvatarStack(speakers: speakerAvatars)
                 }
 
                 Text(time)

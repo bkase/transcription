@@ -138,4 +138,67 @@ struct SessionCardSnapshotTests {
 
         SnapshotHarness.assertSnapshot(of: view, named: "session_card_in_timeline")
     }
+
+    @Test func testSessionCardWithSpeakerAvatars() {
+        // Test speaker avatars on the right side near time
+        let view = VStack(alignment: .leading, spacing: 24) {
+            // Single avatar
+            VStack(alignment: .leading, spacing: 8) {
+                CaptionText("1 Avatar (right side)")
+                SessionCard(
+                    title: "Solo Recording",
+                    time: "2:30 PM",
+                    previewText: "Just me talking to myself about ideas...",
+                    speakerAvatars: [
+                        SpeakerAvatarInfo(id: "1", initials: "SC", color: .sky)
+                    ]
+                )
+            }
+
+            // Two overlapping avatars
+            VStack(alignment: .leading, spacing: 8) {
+                CaptionText("2 Avatars (overlapping)")
+                SessionCard(
+                    title: "Architecture Review",
+                    time: "9:41 AM",
+                    previewText: "So we're looking at the Vapor direction...",
+                    speakerAvatars: [
+                        SpeakerAvatarInfo(id: "1", initials: "SC", color: .sky),
+                        SpeakerAvatarInfo(id: "2", initials: "MK", color: .lavender)
+                    ]
+                )
+            }
+
+            // With status pill + avatars
+            VStack(alignment: .leading, spacing: 8) {
+                CaptionText("Status Pill + Avatars")
+                SessionCard(
+                    title: "Team Standup",
+                    time: "9:00 AM",
+                    previewText: "Let's go around and share updates...",
+                    statusPillType: .transcribing,
+                    speakerAvatars: [
+                        SpeakerAvatarInfo(id: "1", initials: "AL", color: .deep),
+                        SpeakerAvatarInfo(id: "2", initials: "JS", color: .dusk)
+                    ]
+                )
+            }
+
+            // Without avatars (fallback)
+            VStack(alignment: .leading, spacing: 8) {
+                CaptionText("No Avatars")
+                SessionCard(
+                    title: "Morning Reflection",
+                    time: "7:30 AM",
+                    previewText: "The light in the studio was particularly interesting this morning...",
+                    speakerAvatars: []
+                )
+            }
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(VaporColor.mist)
+
+        SnapshotHarness.assertSnapshot(of: view, named: "session_card_speaker_avatars")
+    }
 }

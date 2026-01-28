@@ -241,4 +241,51 @@ struct TimelineViewSnapshotTests {
 
         SnapshotHarness.assertSnapshot(of: view, named: "timeline_sessions_status_pills")
     }
+
+    @Test func testTimelineSessionsWithSpeakerAvatars() {
+        // Sessions with speaker avatars on the right side near time
+        let view = TimelineViewPreview(
+            sections: [
+                .init(
+                    header: "TODAY",
+                    sessions: [
+                        .init(
+                            title: "Architecture Review",
+                            time: "9:41 AM",
+                            previewText: "So we're looking at the Vapor direction...",
+                            speakerAvatars: [
+                                SpeakerAvatarInfo(id: "1", initials: "SC", color: .sky),
+                                SpeakerAvatarInfo(id: "2", initials: "MK", color: .lavender)
+                            ]
+                        ),
+                        .init(
+                            title: "Morning Reflection",
+                            time: "7:30 AM",
+                            previewText: "The light in the studio was particularly interesting this morning...",
+                            speakerAvatars: [
+                                SpeakerAvatarInfo(id: "3", initials: "JS", color: .deep)
+                            ]
+                        )
+                    ]
+                ),
+                .init(
+                    header: "YESTERDAY",
+                    sessions: [
+                        .init(
+                            title: "Product Strategy",
+                            time: "4:20 PM",
+                            previewText: "If we pivot to a local-first model, the database sync...",
+                            statusPillType: .partial,
+                            speakerAvatars: [
+                                SpeakerAvatarInfo(id: "4", initials: "AL", color: .dusk),
+                                SpeakerAvatarInfo(id: "5", initials: "BK", color: .sky)
+                            ]
+                        )
+                    ]
+                )
+            ]
+        )
+
+        SnapshotHarness.assertSnapshot(of: view, named: "timeline_sessions_speaker_avatars")
+    }
 }
