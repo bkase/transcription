@@ -580,6 +580,215 @@ public struct PeopleViewPreview: View {
     }
 }
 
+// MARK: - Person Form Sheet Preview (for snapshots)
+
+/// Non-interactive preview variant of PersonFormSheet for snapshot testing.
+/// Uses static data instead of Store for deterministic snapshots.
+public struct PersonFormSheetPreview: View {
+    /// Display mode for the form preview
+    public enum DisplayMode {
+        /// Adding a new person (no photo)
+        case addPerson
+        /// Adding a new person with a photo
+        case addPersonWithPhoto
+        /// Editing an existing person (no photo)
+        case editPerson
+        /// Editing an existing person with a photo
+        case editPersonWithPhoto
+    }
+
+    private let displayMode: DisplayMode
+    private let name: String
+    private let color: SpeakerColor
+    private let imageData: Data?
+
+    public init(
+        displayMode: DisplayMode = .addPerson,
+        name: String = "",
+        color: SpeakerColor = .sky,
+        imageData: Data? = nil
+    ) {
+        self.displayMode = displayMode
+        self.name = name
+        self.color = color
+        self.imageData = imageData
+    }
+
+    private var isEditing: Bool {
+        switch displayMode {
+        case .addPerson, .addPersonWithPhoto:
+            return false
+        case .editPerson, .editPersonWithPhoto:
+            return true
+        }
+    }
+
+    private var hasPhoto: Bool {
+        switch displayMode {
+        case .addPerson, .editPerson:
+            return false
+        case .addPersonWithPhoto, .editPersonWithPhoto:
+            return true
+        }
+    }
+
+    public var body: some View {
+        NavigationStack {
+            VStack(spacing: VaporSpacing.lg) {
+                // Avatar/Photo section
+                avatarSection
+
+                // Name field
+                VStack(alignment: .leading, spacing: VaporSpacing.xs) {
+                    Text("Name")
+                        .vaporTextStyle(.caption)
+                        .foregroundColor(VaporColor.textSecondary)
+
+                    TextField("Enter name", text: .constant(name))
+                        .textFieldStyle(.roundedBorder)
+                }
+
+                // Color picker
+                VStack(alignment: .leading, spacing: VaporSpacing.xs) {
+                    Text("Color")
+                        .vaporTextStyle(.caption)
+                        .foregroundColor(VaporColor.textSecondary)
+
+                    HStack(spacing: VaporSpacing.sm) {
+                        ForEach(SpeakerColor.allCases, id: \.rawValue) { speakerColor in
+                            colorButton(for: speakerColor)
+                        }
+                    }
+                }
+
+                Spacer()
+            }
+            .padding(VaporSpacing.lg)
+            .background(VaporColor.mist)
+            .navigationTitle(isEditing ? "Edit Person" : "Add Person")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {}
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {}
+                        .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+    }
+
+    // MARK: - Avatar Section
+
+    private var avatarSection: some View {
+        VStack(spacing: VaporSpacing.sm) {
+            // Avatar with camera badge
+            avatarWithBadge
+
+            // Helper text and remove button
+            if hasPhoto {
+                Text("Remove photo")
+                    .font(.system(size: 12, weight: .light))
+                    .foregroundColor(VaporColor.recording)
+            } else {
+                Text("Tap to add photo")
+                    .font(.system(size: 12, weight: .light))
+                    .foregroundColor(VaporColor.textTertiary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.bottom, VaporSpacing.sm)
+    }
+
+    private var avatarWithBadge: some View {
+        ZStack(alignment: .bottomTrailing) {
+            avatarImage(size: 80, fontSize: 28)
+
+            // Camera badge
+            ZStack {
+                Circle()
+                    .fill(VaporColor.cloud)
+                    .frame(width: 28, height: 28)
+                    .overlay(
+                        Circle()
+                            .strokeBorder(VaporColor.fog, lineWidth: 1)
+                    )
+
+                Image(systemName: "camera")
+                    .font(.system(size: 14))
+                    .foregroundColor(VaporColor.textSecondary)
+            }
+            .offset(x: 4, y: 4)
+        }
+    }
+
+    @ViewBuilder
+    private func avatarImage(size: CGFloat, fontSize: CGFloat) -> some View {
+        ZStack {
+            Circle()
+                .fill(color.color)
+                .frame(width: size, height: size)
+                .overlay(
+                    Circle()
+                        .strokeBorder(VaporColor.fog, lineWidth: size > 50 ? 2 : 1)
+                )
+
+            #if os(iOS)
+            if hasPhoto, let imageData = imageData, let uiImage = UIImage(data: imageData) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
+            } else {
+                initialsView(fontSize: fontSize)
+            }
+            #else
+            initialsView(fontSize: fontSize)
+            #endif
+        }
+    }
+
+    @ViewBuilder
+    private func initialsView(fontSize: CGFloat) -> some View {
+        let initials = generateInitials(from: name)
+        if !initials.isEmpty {
+            Text(initials)
+                .font(.system(size: fontSize, weight: .medium))
+                .foregroundColor(VaporColor.cloud)
+        } else {
+            Image(systemName: "person.fill")
+                .font(.system(size: fontSize))
+                .foregroundColor(VaporColor.cloud.opacity(0.8))
+        }
+    }
+
+    private func generateInitials(from name: String) -> String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+        let components = trimmed.split(separator: " ")
+        let first = components.first?.prefix(1) ?? ""
+        let last = components.count > 1 ? components.last?.prefix(1) ?? "" : ""
+        return String(first + last).uppercased()
+    }
+
+    private func colorButton(for speakerColor: SpeakerColor) -> some View {
+        let isSelected = self.color.rawValue == speakerColor.rawValue
+        return Circle()
+            .fill(speakerColor.color)
+            .frame(width: 40, height: 40)
+            .overlay {
+                if isSelected {
+                    Circle()
+                        .stroke(VaporColor.textPrimary, lineWidth: 3)
+                }
+            }
+    }
+}
+
 // MARK: - Previews
 
 #if DEBUG
@@ -593,6 +802,38 @@ struct PeopleView_Previews: PreviewProvider {
                 .init(name: "Jordan Lee", conversationCount: 1, color: .dusk)
             ]
         )
+    }
+}
+
+struct PersonFormSheet_Previews: PreviewProvider {
+    static var previews: some View {
+        Group {
+            PersonFormSheetPreview(displayMode: .addPerson)
+                .previewDisplayName("Add Person")
+
+            PersonFormSheetPreview(
+                displayMode: .addPersonWithPhoto,
+                name: "Alice Smith",
+                color: .lavender,
+                imageData: Data([0x89, 0x50, 0x4E, 0x47])
+            )
+            .previewDisplayName("Add Person With Photo")
+
+            PersonFormSheetPreview(
+                displayMode: .editPerson,
+                name: "Bob Johnson",
+                color: .deep
+            )
+            .previewDisplayName("Edit Person")
+
+            PersonFormSheetPreview(
+                displayMode: .editPersonWithPhoto,
+                name: "Carol Williams",
+                color: .dusk,
+                imageData: Data([0x89, 0x50, 0x4E, 0x47])
+            )
+            .previewDisplayName("Edit Person With Photo")
+        }
     }
 }
 #endif

@@ -38,3 +38,53 @@ struct PeopleViewSnapshotTests {
         SnapshotHarness.assertSnapshot(of: view, named: "people_directory_search_no_results")
     }
 }
+
+// MARK: - Person Form Sheet Snapshot Tests
+
+@Suite("Person Form Sheet Snapshots")
+@MainActor
+struct PersonFormSheetSnapshotTests {
+
+    @Test func testPersonFormAddPerson() {
+        // Add person form - empty state with no name or photo
+        let view = PersonFormSheetPreview(displayMode: .addPerson)
+
+        SnapshotHarness.assertSnapshot(of: view, named: "person_form_add_person")
+    }
+
+    @Test func testPersonFormAddPersonWithPhoto() {
+        // Add person form with photo selected
+        // Note: Using mock image data for snapshot consistency
+        let view = PersonFormSheetPreview(
+            displayMode: .addPersonWithPhoto,
+            name: "Alice Smith",
+            color: .lavender,
+            imageData: MockPhotoData.imageData(forIndex: 0)
+        )
+
+        SnapshotHarness.assertSnapshot(of: view, named: "person_form_add_person_with_photo")
+    }
+
+    @Test func testPersonFormEditPerson() {
+        // Edit person form - shows initials, no photo
+        let view = PersonFormSheetPreview(
+            displayMode: .editPerson,
+            name: "Bob Johnson",
+            color: .deep
+        )
+
+        SnapshotHarness.assertSnapshot(of: view, named: "person_form_edit_person")
+    }
+
+    @Test func testPersonFormEditPersonWithPhoto() {
+        // Edit person form with existing photo
+        let view = PersonFormSheetPreview(
+            displayMode: .editPersonWithPhoto,
+            name: "Carol Williams",
+            color: .dusk,
+            imageData: MockPhotoData.imageData(forIndex: 1)
+        )
+
+        SnapshotHarness.assertSnapshot(of: view, named: "person_form_edit_person_with_photo")
+    }
+}

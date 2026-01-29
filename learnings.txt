@@ -1278,3 +1278,9 @@
 - syncUserProfileToPath in AppFeature needs to sync profile to all features that use it
 - E2E tests: Avoid complex text editing (Select All menu unreliable); keep tests focused on navigation flow
 
+## Photo Picker in Forms (People, Profile)
+- For UI testing, check `ProcessInfo.processInfo.arguments.contains("-uiTesting")` to switch to mock picker
+- Mock photo picker uses numbered accessibility IDs like `personMockPhotoOption-0` for deterministic testing
+- Use `profileImageClient.normalize()` to resize and compress photos before storing
+- Preview variants (e.g., PersonFormSheetPreview) need separate display modes for with/without photo states
+- E2E tests should verify "Remove photo" button appears only when photo is set
