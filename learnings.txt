@@ -1266,3 +1266,8 @@
 - Remove `XCTAssertTrue(tab.isSelected, ...)` assertions when tabs are removed
 - Navigation to former tab content becomes navigation via buttons (push to path)
 
+## Bug verification with E2E tests
+- When investigating a reported bug, first write an E2E test that exercises the exact flow
+- If the test passes, the bug may be: already fixed, a false report, or environment-specific
+- E2E tests for context menu actions: use `element.press(forDuration: 1.0)` to trigger long-press
+- Context menu buttons can be found by label: `app.buttons["Edit"]`, `app.buttons["Delete"]`
