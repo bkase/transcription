@@ -120,23 +120,25 @@ public struct PeopleView: View {
     private var peopleListContent: some View {
         LazyVStack(spacing: VaporSpacing.sm) {
             ForEach(store.filteredPeople, id: \.id) { person in
-                personCard(for: person)
-                    .contextMenu {
-                        Button {
-                            store.send(.editPersonTapped(person))
-                        } label: {
-                            Label("Edit", systemImage: "pencil")
-                        }
+                Button {
+                    store.send(.personTapped(PersonID(rawValue: person.id)))
+                } label: {
+                    personCard(for: person)
+                }
+                .buttonStyle(PlainButtonStyle())
+                .contextMenu {
+                    Button {
+                        store.send(.editPersonTapped(person))
+                    } label: {
+                        Label("Edit", systemImage: "pencil")
+                    }
 
-                        Button(role: .destructive) {
-                            store.send(.deletePersonTapped(PersonID(rawValue: person.id)))
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
+                    Button(role: .destructive) {
+                        store.send(.deletePersonTapped(PersonID(rawValue: person.id)))
+                    } label: {
+                        Label("Delete", systemImage: "trash")
                     }
-                    .onTapGesture {
-                        store.send(.personTapped(PersonID(rawValue: person.id)))
-                    }
+                }
             }
         }
     }
