@@ -318,6 +318,17 @@ struct TimelineFeatureTests {
         await store.send(.newRecordingTapped)
     }
 
+    @Test
+    func testSettingsButtonTappedIsNavigationIntent() async {
+        // Settings button (avatarTapped action) navigates to profile/settings
+        let store = TestStore(initialState: TimelineFeature.State()) {
+            TimelineFeature()
+        }
+
+        // avatarTapped (now settings gear icon) is a navigation intent - no state change expected
+        await store.send(.avatarTapped)
+    }
+
     // MARK: - testOnAppearReloadsSessionsForFreshData (bd-16zo fix)
 
     /// Verifies that onAppear always reloads sessions to ensure fresh data is displayed.
