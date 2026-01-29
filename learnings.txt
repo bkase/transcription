@@ -1200,6 +1200,13 @@
 - Keep action name (e.g., avatarTapped) for consistency across features even when trigger changes
 - Update all tests that initialize the feature State to remove the removed parameters
 
+## SwiftUI conditional view transitions (bd-1rs5)
+- Conditional views (`if condition { View }`) use SwiftUI's default insertion animation (slides from leading edge)
+- To animate from a specific direction, use `.transition(.vaporSlideTrailing)` for right-side elements
+- The vaporSlideTrailing transition: insertion slides from right with fade, removal just fades
+- Transitions only animate when parent view has `.animation(curve, value: stateVariable)` modifier
+- Previous workaround using opacity 0/1 prevents all animation - use custom transition instead
+
 ## Removing avatar from multiple features (bd-11a6)
 - When removing avatar from SessionDetailView, PeopleView, etc., also remove:
   - userProfile property from feature State

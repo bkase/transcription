@@ -308,10 +308,40 @@ public extension AnyTransition {
             )
         )
     }
+
+    /// A transition that slides in from the trailing edge (right) with fade.
+    /// Useful for menu buttons and controls that appear on the right side of headers.
+    /// - Insertion: slides in from right, fades in
+    /// - Removal: fades out
+    /// Uses vapor-appear curve for insertion and vapor-exit curve for removal.
+    static var vaporSlideTrailing: AnyTransition {
+        .asymmetric(
+            insertion: .modifier(
+                active: VaporSlideTrailingModifier(offset: 20, opacity: 0),
+                identity: VaporSlideTrailingModifier(offset: 0, opacity: 1)
+            ),
+            removal: .modifier(
+                active: VaporSlideTrailingModifier(offset: 0, opacity: 0),
+                identity: VaporSlideTrailingModifier(offset: 0, opacity: 1)
+            )
+        )
+    }
 }
 
 /// Internal modifier used by the vaporPage transition.
 private struct VaporPageTransitionModifier: ViewModifier {
+    let offset: CGFloat
+    let opacity: Double
+
+    func body(content: Content) -> some View {
+        content
+            .offset(x: offset)
+            .opacity(opacity)
+    }
+}
+
+/// Internal modifier used by the vaporSlideTrailing transition.
+private struct VaporSlideTrailingModifier: ViewModifier {
     let offset: CGFloat
     let opacity: Double
 

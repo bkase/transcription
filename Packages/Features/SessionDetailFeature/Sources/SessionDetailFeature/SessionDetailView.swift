@@ -256,28 +256,34 @@ public struct SessionDetailView: View {
                     Spacer()
 
                     // More actions button (ellipsis) - hidden during title edit
-                    // Use opacity instead of conditional to prevent slide-in animation
-                    GeometryReader { geometry in
-                        IconButton(
-                            systemName: "ellipsis",
-                            style: .transparent,
-                            iconColor: VaporColor.textTertiary
-                        ) {
-                            // Calculate the button's position in global coordinates
-                            let frame = geometry.frame(in: .global)
-                            let anchorPoint = CGPoint(
-                                x: frame.maxX,  // Right edge of button
-                                y: frame.maxY   // Bottom edge of button
-                            )
-                            store.send(.moreButtonTapped(anchorPoint: anchorPoint))
+                    // Uses vaporSlideTrailing transition to animate in from the right
+                    if !store.isEditingTitle {
+                        GeometryReader { geometry in
+                            IconButton(
+                                systemName: "ellipsis",
+                                style: .transparent,
+                                iconColor: VaporColor.textTertiary
+                            ) {
+                                // Calculate the button's position in global coordinates
+                                let frame = geometry.frame(in: .global)
+                                let anchorPoint = CGPoint(
+                                    x: frame.maxX,  // Right edge of button
+                                    y: frame.maxY   // Bottom edge of button
+                                )
+                                store.send(.moreButtonTapped(anchorPoint: anchorPoint))
+                            }
+                            .accessibilityIdentifier("moreButton")
                         }
-                        .accessibilityIdentifier("moreButton")
+                        .frame(width: 44, height: 44)  // Fixed size for the button container
+                        .opacity(store.isExporting || store.isDeleting ? 0.5 : 1.0)
+                        .disabled(store.isExporting || store.isDeleting)
+                        .transition(.vaporSlideTrailing)
                     }
-                    .frame(width: 44, height: 44)  // Fixed size for the button container
-                    .opacity(store.isEditingTitle ? 0 : (store.isExporting || store.isDeleting ? 0.5 : 1.0))
-                    .disabled(store.isEditingTitle || store.isExporting || store.isDeleting)
-                    .animation(nil, value: store.isEditingTitle)
                 }
+                .animation(
+                    VaporAnimation.appearCurve.animation(duration: VaporAnimation.normalDuration),
+                    value: store.isEditingTitle
+                )
 
                 // Metadata row
                 HStack(spacing: VaporSpacing.sm) {

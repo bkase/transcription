@@ -203,3 +203,20 @@ import SwiftUI
     let _ = Text("Test").transition(.vaporPageBack)
     #expect(true)
 }
+
+// MARK: - Vapor Slide Trailing Transition Tests
+
+/// Tests for the vaporSlideTrailing transition that animates from the right edge.
+/// Used for menu buttons that appear/disappear based on editing state.
+
+@Test func testVaporSlideTrailingTransitionExists() {
+    // The vaporSlideTrailing transition should be available
+    let transition: AnyTransition = .vaporSlideTrailing
+    #expect(true)
+}
+
+@Test func testVaporSlideTrailingTransitionCanBeApplied() {
+    // Transition should be applicable to any view
+    let _ = Text("Test").transition(.vaporSlideTrailing)
+    #expect(true)
+}
