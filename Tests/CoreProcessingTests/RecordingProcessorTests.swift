@@ -1130,6 +1130,175 @@ import Persistence
     await processor.stopRecording()
 }
 
+@Test func testOfflineTranscriptionSuccessReplacesLiveSegments() async throws {
+    // This test verifies that when offline transcription succeeds,
+    // live segments are replaced with offline results and session is marked as .processed
+
+    let dbQueue = try makeDatabase(configuration: .inMemory)
+
+    // Set up temp directory and create a dummy audio file
+    // The incrementing UUID starts with 00000000-0000-0000-0000-000000000000
+    let tempDir = FileManager.default.temporaryDirectory
+    let expectedSessionId = "00000000-0000-0000-0000-000000000000"
+    let expectedAudioPath = tempDir.appendingPathComponent("\(expectedSessionId).caf")
+
+    // Create dummy audio file so offline transcription is triggered
+    FileManager.default.createFile(atPath: expectedAudioPath.path, contents: Data(repeating: 0, count: 1024), attributes: nil)
+
+    // Mock audio capture that emits frames then finishes
+    let mockAudioCapture = AudioCaptureClient(
+        startCapture: {
+            AsyncStream { continuation in
+                continuation.yield(AudioFrame(data: Data(repeating: 0, count: 1024), timestamp: 0))
+                continuation.finish()
+            }
+        },
+        stopCapture: { },
+        isCapturing: { false },
+        getInputFormat: { .recording }
+    )
+
+    let mockFileWriter = AudioFileWriterClient(
+        startWriting: { _, _ in },
+        appendFrame: { _ in },
+        finishWriting: { 1024 },
+        cancelWriting: { },
+        isWriting: { false }
+    )
+
+    let mockAudioSession = AudioSessionClient(
+        startObserving: { AsyncStream { $0.finish() } },
+        stopObserving: { },
+        configureForRecording: { }
+    )
+
+    // Live script: will produce 3 segments during recording
+    let liveScript = MockFluidAudioScript.twoSpeakerConversation
+
+    // Offline transcription script: produces different, higher-quality segments
+    let offlineScript = MockFluidAudioScript(
+        segments: [
+            ScriptedSegment(
+                id: TranscriptSegmentID(rawValue: "offline-seg-001"),
+                text: "Hello, how are you doing today?", // Better quality than live
+                startMs: 0,
+                endMs: 3000,
+                speakerId: "spk_0",
+                isFinal: true
+            ),
+            ScriptedSegment(
+                id: TranscriptSegmentID(rawValue: "offline-seg-002"),
+                text: "I'm doing very well, thank you for asking me.",
+                startMs: 3500,
+                endMs: 7000,
+                speakerId: "spk_1",
+                isFinal: true
+            )
+        ]
+    )
+
+    // Mock FluidAudio: live segments during recording, different offline results
+    // Use a mock actor that can switch behavior
+    let mockFluidAudioActor = MockFluidAudioClientActor(
+        script: liveScript,
+        modelState: .ready,
+        offlineBehavior: .success
+    )
+    // Set the offline script (when transcribeFile is called, it returns these)
+    await mockFluidAudioActor.setScript(offlineScript)
+
+    let mockFluidAudio = FluidAudioClient(
+        prepareModels: { await mockFluidAudioActor.prepareModels() },
+        modelStatus: { await mockFluidAudioActor.getModelStatus() },
+        startTranscription: { audioStream in
+            // For live transcription, use the original live script
+            return AsyncStream { continuation in
+                Task {
+                    for segment in liveScript.segments {
+                        continuation.yield(segment.toTranscriptSegment())
+                    }
+                    continuation.finish()
+                }
+            }
+        },
+        stopTranscription: { await mockFluidAudioActor.stopTranscription() },
+        isTranscribing: { await mockFluidAudioActor.getIsTranscribing() },
+        transcribeFile: { _ in
+            // Return offline script segments
+            offlineScript.segments.map { $0.toTranscriptSegment() }
+        }
+    )
+
+    let databaseClient = DatabaseClient.live(dbQueue: dbQueue)
+
+    let mockPreferences = PreferencesClient(
+        getAudioRetentionMode: { .both },
+        setAudioRetentionMode: { _ in }
+    )
+
+    let processor = withDependencies {
+        $0.audioCaptureClient = mockAudioCapture
+        $0.audioFileWriterClient = mockFileWriter
+        $0.audioSessionClient = mockAudioSession
+        $0.fluidAudioClient = mockFluidAudio
+        $0.databaseClient = databaseClient
+        $0.preferencesClient = mockPreferences
+        $0.titleGeneratorClient = TitleGeneratorClient(generateTitle: { _ in nil }, isAvailable: { false })
+        $0.uuid = .incrementing
+        $0.date = .constant(Date(timeIntervalSince1970: 1000))
+    } operation: {
+        RecordingProcessor()
+    }
+
+    // Start recording and collect events
+    let eventStream = try await processor.startRecording(audioDirectory: tempDir)
+    var receivedEvents: [RecordingProcessorEvent] = []
+
+    let collectTask = Task {
+        for await event in eventStream {
+            receivedEvents.append(event)
+        }
+    }
+
+    // Wait for live segments to be processed
+    try await Task.sleep(for: .milliseconds(100))
+
+    // Stop recording (triggers offline transcription which will succeed)
+    await processor.stopRecording()
+
+    // Wait for offline transcription to complete
+    try await Task.sleep(for: .milliseconds(200))
+    collectTask.cancel()
+
+    // Verify session is marked as processed (offline succeeded)
+    let sessions = try await databaseClient.fetchSessions()
+    #expect(sessions.count == 1)
+
+    let session = sessions[0]
+    #expect(session.processingState == .processed, "Session should be .processed when offline transcription succeeds")
+    #expect(session.processingError == nil, "Session should have no error message on success")
+
+    // Verify live segments were REPLACED with offline segments
+    let sessionId = SessionID(rawValue: session.id)
+    let segments = try await databaseClient.fetchTranscriptSegments(sessionId)
+    #expect(segments.count == 2, "Should have 2 segments from offline transcription (not 3 live)")
+
+    // Verify the segments are the offline ones (contain different text)
+    let segmentTexts = segments.map { $0.text }
+    #expect(segmentTexts.contains { $0.contains("how are you doing today") }, "Should have offline segment text")
+    #expect(segmentTexts.contains { $0.contains("very well") }, "Should have offline segment text")
+
+    // Verify speaker tracks were recreated based on offline results
+    let speakerTracks = try await databaseClient.fetchSpeakerTracks(sessionId)
+    #expect(speakerTracks.count == 2, "Should have 2 speaker tracks from offline transcription")
+
+    // Verify preview text is from offline segments
+    #expect(session.previewText?.contains("how are you doing today") == true, "Preview should be from offline segments")
+
+    // Clean up
+    try? FileManager.default.removeItem(at: expectedAudioPath)
+}
+
 // MARK: - Timeout Error Tests
 
 @Test func testOfflineTranscriptionTimeoutErrorDescription() {

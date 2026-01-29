@@ -1137,3 +1137,14 @@
 - Use separate action (speakerTrackCreated) to update state after async DB operations complete
 - Generate both new machineSpeakerId and trackId using @Dependency(\.uuid)
 - Update segment's machineSpeakerId in DB to link segment with new speaker track
+
+## Offline transcription debugging
+- Offline transcription happens after live recording stops, using saved audio file
+- runOfflineTranscription calls fluidAudioClient.transcribeFile with 5-minute timeout
+- If offline succeeds: live segments are DELETED, replaced with offline results, session marked .processed
+- If offline fails: live segments are PRESERVED, session marked .partial with error message
+- If offline returns empty: live segments preserved, session marked .processed (no error)
+- Detailed logging added to identify failure points: manager state, file reading, ASR processing, diarization
+- Task.detached was removed from offline ASR chunk processing - run ASR directly in actor context
+- Key error types: LiveFluidAudioClientError.notInitialized, OfflineTranscriptionError.timeout
+- Test coverage: offline success replaces live, offline failure keeps live (.partial), retry success/failure

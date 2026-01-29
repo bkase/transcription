@@ -176,10 +176,17 @@ public actor LiveFluidAudioClientActor {
     /// - Returns: Array of transcript segments
     public func transcribeFile(audioFileURL: URL) async throws -> [TranscriptSegment] {
         NSLog("[FluidAudio] transcribeFile called for: \(audioFileURL.lastPathComponent)")
-        NSLog("[FluidAudio] transcribeFile: checking managers...")
+        NSLog("[FluidAudio] transcribeFile: full path: \(audioFileURL.path)")
+        NSLog("[FluidAudio] transcribeFile: checking managers... asrManager=\(asrManager != nil), diarizerManager=\(diarizerManager != nil), diarizerAvailable=\(diarizerManager?.isAvailable ?? false)")
+        NSLog("[FluidAudio] transcribeFile: modelState=\(modelState)")
 
         guard let asrManager = asrManager, let diarizerManager = diarizerManager else {
-            NSLog("[FluidAudio] ERROR: Managers not initialized for offline transcription")
+            NSLog("[FluidAudio] ERROR: Managers not initialized for offline transcription - asrManager=\(asrManager != nil), diarizerManager=\(diarizerManager != nil)")
+            throw LiveFluidAudioClientError.notInitialized
+        }
+
+        guard diarizerManager.isAvailable else {
+            NSLog("[FluidAudio] ERROR: Diarizer manager not available (models not loaded)")
             throw LiveFluidAudioClientError.notInitialized
         }
         NSLog("[FluidAudio] transcribeFile: managers OK, opening file...")
@@ -262,22 +269,24 @@ public actor LiveFluidAudioClientActor {
             NSLog("[FluidAudio] Processing offline chunk: \(chunkStartMs)-\(chunkEndMs)ms, \(chunkSamples.count) samples")
 
             do {
-                // Run ASR in a detached task to avoid cancellation from parent context
-                let asrResult = try await Task.detached {
-                    try await asrManager.transcribe(chunkSamples, source: .microphone)
-                }.value
+                // Run ASR directly (not in detached task to maintain proper context)
+                NSLog("[FluidAudio] Offline chunk: running ASR...")
+                let asrResult = try await asrManager.transcribe(chunkSamples, source: .microphone)
+                NSLog("[FluidAudio] Offline chunk: ASR completed")
                 let transcriptText = asrResult.text.trimmingCharacters(in: .whitespacesAndNewlines)
 
                 if !transcriptText.isEmpty {
                     NSLog("[FluidAudio] Offline ASR result: '\(transcriptText)'")
 
                     // Run diarization
+                    NSLog("[FluidAudio] Offline chunk: running diarization...")
                     let startTimeSeconds = TimeInterval(chunkStartMs) / 1000.0
                     let diarizationResult = try diarizerManager.performCompleteDiarization(
                         chunkSamples,
                         sampleRate: sampleRate,
                         atTime: startTimeSeconds
                     )
+                    NSLog("[FluidAudio] Offline chunk: diarization completed")
 
                     let speakerId = findDominantSpeaker(in: diarizationResult)
 
@@ -290,9 +299,13 @@ public actor LiveFluidAudioClientActor {
                         isFinal: true
                     )
                     segments.append(segment)
+                    NSLog("[FluidAudio] Offline chunk: segment added (total: \(segments.count))")
+                } else {
+                    NSLog("[FluidAudio] Offline chunk: empty transcription, skipping")
                 }
             } catch {
-                NSLog("[FluidAudio] Offline chunk error: \(error)")
+                NSLog("[FluidAudio] Offline chunk error: \(type(of: error)) - \(error)")
+                NSLog("[FluidAudio] Offline chunk error localizedDescription: \(error.localizedDescription)")
                 // Continue processing other chunks
             }
 

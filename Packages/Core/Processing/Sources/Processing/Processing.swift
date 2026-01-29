@@ -1048,8 +1048,15 @@ public actor RecordingProcessor {
                 NSLog("[OfflineTranscription] Session marked as processed")
             }
         } catch {
-            NSLog("[OfflineTranscription] ERROR: \(String(describing: error))")
+            NSLog("[OfflineTranscription] ERROR type: \(type(of: error))")
+            NSLog("[OfflineTranscription] ERROR description: \(String(describing: error))")
             NSLog("[OfflineTranscription] ERROR localizedDescription: \(error.localizedDescription)")
+            if let liveError = error as? LiveFluidAudioClientError {
+                NSLog("[OfflineTranscription] ERROR is LiveFluidAudioClientError: \(liveError)")
+            }
+            if let offlineError = error as? OfflineTranscriptionError {
+                NSLog("[OfflineTranscription] ERROR is OfflineTranscriptionError: \(offlineError)")
+            }
             // Mark session as failed with error message, but keep live transcription segments
             // Live segments are still available since we only delete after successful offline transcription
             do {
