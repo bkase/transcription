@@ -29,6 +29,9 @@ packages:
   swift-composable-architecture:
     url: https://github.com/pointfreeco/swift-composable-architecture
     from: "1.23.0"
+  swift-collections:
+    url: https://github.com/apple/swift-collections
+    from: "1.0.0"
   swift-tagged:
     url: https://github.com/pointfreeco/swift-tagged
     from: "0.10.0"
@@ -97,6 +100,8 @@ targets:
         product: URLRouting
       - package: swift-case-paths
         product: CasePaths
+      - package: swift-collections
+        product: OrderedCollections
       - target: Models
       - target: Persistence
       - target: Audio

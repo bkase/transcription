@@ -1151,3 +1151,12 @@
 - Task.detached was removed from offline ASR chunk processing - run ASR directly in actor context
 - Key error types: LiveFluidAudioClientError.notInitialized, OfflineTranscriptionError.timeout
 - Test coverage: offline success replaces live, offline failure keeps live (.partial), retry success/failure
+
+## UserProfile propagation to navigation path (bd-2j6f)
+- When userProfile loads or saves, must sync to all features in navigation path
+- Child features in StackState need their userProfile updated when app-level profile changes
+- Use zip(path.ids, path) pattern to iterate while preserving element IDs
+- Requires import OrderedCollections (from swift-collections) to use path.ids
+- Add OrderedCollections dependency to project.yml for app target
+- Pattern: syncUserProfileToPath() iterates path, updates sessionDetail/profile/personTimeline states
+- Call sync in both userProfileLoaded and didSaveProfile action handlers

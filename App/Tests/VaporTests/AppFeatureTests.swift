@@ -150,6 +150,11 @@ struct AppFeatureTests {
             // Profile is synced to child features
             $0.timeline.userProfile = updatedProfile
             $0.people.userProfile = updatedProfile
+            // Profile in path is also synced (bd-2j6f)
+            if case var .profile(profileState) = $0.path[id: 0] {
+                profileState.profile = updatedProfile
+                $0.path[id: 0] = .profile(profileState)
+            }
         }
 
         // Verify app-level profile was updated
@@ -522,5 +527,159 @@ struct AppFeatureTests {
 
         // Path should still be empty (no navigation happened)
         #expect(store.state.path.isEmpty)
+    }
+
+    // MARK: - Profile Sync to Navigation Path Tests (bd-2j6f)
+
+    @Test
+    func testUserProfileLoadedSyncsToSessionDetailInPath() async {
+        // Start with session detail already in path with empty profile
+        let sessionID = SessionID(rawValue: "test-session-123")
+        let loadedProfile = UserProfile(
+            name: "Jane Doe",
+            email: "jane@example.com",
+            avatar: .init(imageData: Data([0x89, 0x50, 0x4E, 0x47])) // PNG header bytes
+        )
+
+        let store = TestStore(
+            initialState: AppFeature.State(
+                path: StackState([.sessionDetail(SessionDetailFeature.State(sessionID: sessionID))]),
+                userProfile: .empty
+            )
+        ) {
+            AppFeature()
+        } withDependencies: {
+            $0.recoveryRoutineClient.run = { .empty }
+            $0.userProfileClient.load = { loadedProfile }
+        }
+
+        // Verify session detail starts with empty profile
+        if case let .sessionDetail(detail) = store.state.path.first {
+            #expect(detail.userProfile == .empty)
+        }
+
+        // When profile is loaded on app start
+        await store.send(.onAppear)
+        await store.receive(\.userProfileLoaded) {
+            $0.userProfile = loadedProfile
+            $0.timeline.userProfile = loadedProfile
+            $0.people.userProfile = loadedProfile
+            // Session detail in path should also be updated
+            if case var .sessionDetail(detail) = $0.path[id: 0] {
+                detail.userProfile = loadedProfile
+                $0.path[id: 0] = .sessionDetail(detail)
+            }
+        }
+
+        // Verify session detail now has the loaded profile
+        if case let .sessionDetail(detail) = store.state.path.first {
+            #expect(detail.userProfile == loadedProfile)
+            #expect(detail.userProfile.avatar.imageData != nil)
+        } else {
+            Issue.record("Expected sessionDetail in path")
+        }
+    }
+
+    @Test
+    func testProfileSaveSyncsToSessionDetailInPath() async {
+        // Start with session detail in path while profile is also in path
+        let sessionID = SessionID(rawValue: "test-session-123")
+        let initialProfile = UserProfile(name: "Initial")
+        let updatedProfile = UserProfile(
+            name: "Updated",
+            avatar: .init(imageData: Data([0x89, 0x50, 0x4E, 0x47]))
+        )
+
+        let store = TestStore(
+            initialState: AppFeature.State(
+                path: StackState([
+                    .sessionDetail(SessionDetailFeature.State(
+                        sessionID: sessionID,
+                        userProfile: initialProfile
+                    )),
+                    .profile(ProfileFeature.State(profile: initialProfile))
+                ]),
+                userProfile: initialProfile
+            )
+        ) {
+            AppFeature()
+        }
+
+        // When profile is saved via delegate
+        await store.send(.path(.element(id: 1, action: .profile(.delegate(.didSaveProfile(updatedProfile)))))) {
+            $0.userProfile = updatedProfile
+            $0.timeline.userProfile = updatedProfile
+            $0.people.userProfile = updatedProfile
+            // Session detail in path should also be updated
+            if case var .sessionDetail(detail) = $0.path[id: 0] {
+                detail.userProfile = updatedProfile
+                $0.path[id: 0] = .sessionDetail(detail)
+            }
+            // Profile state in path should also be updated
+            if case var .profile(profileState) = $0.path[id: 1] {
+                profileState.profile = updatedProfile
+                $0.path[id: 1] = .profile(profileState)
+            }
+        }
+
+        // Verify session detail has updated profile
+        if case let .sessionDetail(detail) = store.state.path.first {
+            #expect(detail.userProfile == updatedProfile)
+            #expect(detail.userProfile.name == "Updated")
+        } else {
+            Issue.record("Expected sessionDetail in path")
+        }
+    }
+
+    @Test
+    func testProfileSaveSyncsToPersonTimelineInPath() async {
+        // Start with person timeline in path
+        let personId = PersonID("person-123")
+        let initialProfile = UserProfile(name: "Initial")
+        let updatedProfile = UserProfile(
+            name: "Updated",
+            avatar: .init(imageData: Data([0x89, 0x50, 0x4E, 0x47]))
+        )
+
+        let store = TestStore(
+            initialState: AppFeature.State(
+                path: StackState([
+                    .personTimeline(PersonTimelineFeature.State(
+                        personId: personId,
+                        personName: "Sarah",
+                        userProfile: initialProfile
+                    )),
+                    .profile(ProfileFeature.State(profile: initialProfile))
+                ]),
+                userProfile: initialProfile
+            )
+        ) {
+            AppFeature()
+        }
+
+        // When profile is saved via delegate
+        await store.send(.path(.element(id: 1, action: .profile(.delegate(.didSaveProfile(updatedProfile)))))) {
+            $0.userProfile = updatedProfile
+            $0.timeline.userProfile = updatedProfile
+            $0.people.userProfile = updatedProfile
+            // Person timeline in path should also be updated
+            if case var .personTimeline(personTimeline) = $0.path[id: 0] {
+                personTimeline.userProfile = updatedProfile
+                $0.path[id: 0] = .personTimeline(personTimeline)
+            }
+            // Profile state in path should also be updated
+            if case var .profile(profileState) = $0.path[id: 1] {
+                profileState.profile = updatedProfile
+                $0.path[id: 1] = .profile(profileState)
+            }
+        }
+
+        // Verify person timeline has updated profile
+        if case let .personTimeline(personTimeline) = store.state.path.first {
+            #expect(personTimeline.userProfile == updatedProfile)
+            #expect(personTimeline.userProfile.name == "Updated")
+        } else {
+            Issue.record("Expected personTimeline in path")
+        }
     }
 }

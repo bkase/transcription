@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import Foundation
+import OrderedCollections
 import TimelineFeature
 import RecordingFeature
 import SessionDetailFeature
@@ -97,6 +98,8 @@ public struct AppFeature {
                 // Sync profile to child features
                 state.timeline.userProfile = profile
                 state.people.userProfile = profile
+                // Sync to any features in the navigation path that need userProfile
+                state.syncUserProfileToPath(profile)
                 return .none
 
             case let .tabSelected(tab):
@@ -121,6 +124,8 @@ public struct AppFeature {
                 // Sync to child features
                 state.timeline.userProfile = profile
                 state.people.userProfile = profile
+                // Sync to any features in the navigation path that need userProfile
+                state.syncUserProfileToPath(profile)
                 return .none
 
             case .path(.element(id: _, action: .sessionDetail(.deleteCompleted))):
@@ -281,6 +286,29 @@ public struct AppFeature {
         .forEach(\.path, action: \.path)
         .ifLet(\.$recording, action: \.recording) {
             RecordingFeature()
+        }
+    }
+}
+
+// MARK: - Helper Functions
+
+extension AppFeature.State {
+    /// Syncs the user profile to all features in the navigation path that need it.
+    /// This ensures avatar displays are updated when the profile changes while in a child screen.
+    mutating func syncUserProfileToPath(_ profile: UserProfile) {
+        // Iterate using zip with ids to preserve element IDs during mutation
+        for (id, element) in zip(path.ids, path) {
+            switch element {
+            case .sessionDetail(var detail):
+                detail.userProfile = profile
+                path[id: id] = .sessionDetail(detail)
+            case .profile(var profileState):
+                profileState.profile = profile
+                path[id: id] = .profile(profileState)
+            case .personTimeline(var personTimeline):
+                personTimeline.userProfile = profile
+                path[id: id] = .personTimeline(personTimeline)
+            }
         }
     }
 }
