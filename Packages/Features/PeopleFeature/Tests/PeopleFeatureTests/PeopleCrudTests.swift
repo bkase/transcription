@@ -256,6 +256,101 @@ struct PeopleCrudTests {
         }
     }
 
+    // MARK: - testAddPersonTappedWorksAfterDismissSheet
+
+    @Test
+    func testAddPersonTappedWorksAfterDismissSheet() async {
+        // This test verifies that the Add Person button works after opening and closing the sheet once.
+        // Regression test for: "Add Person button stops working after opening and closing modal once"
+        let store = TestStore(initialState: PeopleFeature.State()) {
+            PeopleFeature()
+        }
+
+        // First: Open the sheet
+        await store.send(.addPersonTapped) {
+            $0.isShowingAddPersonSheet = true
+            $0.editingPerson = nil
+            $0.formName = ""
+            $0.formColorToken = SpeakerColor.sky.rawValue
+            $0.formImageData = nil
+            $0.error = nil
+        }
+
+        // Close the sheet
+        await store.send(.dismissSheet) {
+            $0.isShowingAddPersonSheet = false
+            $0.editingPerson = nil
+            $0.formName = ""
+            $0.formColorToken = SpeakerColor.sky.rawValue
+            $0.formImageData = nil
+            $0.isSaving = false
+            $0.error = nil
+        }
+
+        // Second: Open the sheet again - THIS MUST WORK
+        await store.send(.addPersonTapped) {
+            $0.isShowingAddPersonSheet = true
+            $0.editingPerson = nil
+            $0.formName = ""
+            $0.formColorToken = SpeakerColor.sky.rawValue
+            $0.formImageData = nil
+            $0.error = nil
+        }
+
+        // Verify the sheet can be opened
+        #expect(store.state.isShowingAddPersonSheet == true)
+    }
+
+    // MARK: - testAddPersonTappedWorksAfterDismissSheetWithError
+
+    @Test
+    func testAddPersonTappedWorksAfterDismissSheetWithError() async {
+        // This test verifies that the Add Person button works after an error occurred and the sheet was dismissed.
+        let store = TestStore(initialState: PeopleFeature.State()) {
+            PeopleFeature()
+        }
+
+        // Open the sheet
+        await store.send(.addPersonTapped) {
+            $0.isShowingAddPersonSheet = true
+            $0.editingPerson = nil
+            $0.formName = ""
+            $0.formColorToken = SpeakerColor.sky.rawValue
+            $0.formImageData = nil
+            $0.error = nil
+        }
+
+        // Try to save with empty name - this causes an error
+        await store.send(.savePerson) {
+            $0.error = "Name cannot be empty"
+        }
+
+        // Dismiss the sheet (simulating user tapping Cancel after seeing the error)
+        await store.send(.dismissSheet) {
+            $0.isShowingAddPersonSheet = false
+            $0.editingPerson = nil
+            $0.formName = ""
+            $0.formColorToken = SpeakerColor.sky.rawValue
+            $0.formImageData = nil
+            $0.isSaving = false
+            $0.error = nil
+        }
+
+        // Open the sheet again - THIS MUST WORK and error must be cleared
+        await store.send(.addPersonTapped) {
+            $0.isShowingAddPersonSheet = true
+            $0.editingPerson = nil
+            $0.formName = ""
+            $0.formColorToken = SpeakerColor.sky.rawValue
+            $0.formImageData = nil
+            $0.error = nil
+        }
+
+        // Verify the sheet can be opened and error is cleared
+        #expect(store.state.isShowingAddPersonSheet == true)
+        #expect(store.state.error == nil)
+    }
+
     // MARK: - testPeopleListSortedByName
 
     @Test

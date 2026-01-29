@@ -241,6 +241,7 @@ public struct PeopleFeature {
                 state.formColorToken = SpeakerColor.sky.rawValue
                 state.formImageData = nil
                 state.isSaving = false
+                state.error = nil
                 return .none
 
             case let .formNameChanged(name):

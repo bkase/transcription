@@ -1112,6 +1112,12 @@
 - Test setup for @Presents actions: initialize the presented state in the child to avoid "destination state absent" errors
 - Use `skipReceivedActions()` when multiple child effects fire (e.g., child reload + parent trigger)
 
+## TCA dismissSheet must reset ALL form state including error
+- When implementing sheet dismissal in TCA, reset ALL related state including error messages
+- If `error` is not reset in `dismissSheet`, it persists across sheet open/close cycles
+- While `addPersonTapped` may clear error when opening, complete state cleanup in `dismissSheet` is essential
+- Pattern: `dismissSheet` should reset: isShowingSheet, editingItem, formFields, isSaving, AND error
+
 ## TabView with NavigationStack per tab
 - Each tab that needs navigation must wrap its content in its own NavigationStack
 - Multiple tabs can share the same StackState path if they need coordinated navigation
