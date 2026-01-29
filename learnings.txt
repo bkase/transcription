@@ -1039,6 +1039,9 @@
 - Pattern: `.path(.element(id: _, action: .sessionDetail(.titleSaved)))` triggers `.send(.timeline(.loadSessions))`
 - Same pattern used for: deleteCompleted, retryTranscriptionCompleted, titleSaved
 - This ensures sibling features (Timeline) reflect changes made in child features (SessionDetail)
+- For guaranteed freshness: TimelineFeature.onAppear always reloads sessions (even if not empty)
+- This "refresh on appear" pattern ensures data is fresh when navigating back from child screens (bd-16zo)
+- Combine both patterns: delegate actions for immediate updates + refresh on appear for reliability
 
 ## Model download progress indicators
 - FluidAudio SDK does not expose download progress callbacks (uses URLSession.download internally without delegate)

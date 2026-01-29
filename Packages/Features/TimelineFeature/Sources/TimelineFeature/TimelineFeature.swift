@@ -145,8 +145,10 @@ public struct TimelineFeature {
                 // Start model preparation if not already ready or downloading
                 let shouldPrepareModels = state.modelPreparationState == .idle
 
-                // Load sessions if needed
-                let shouldLoadSessions = state.sessionGroups.isEmpty && !state.isLoading
+                // Always load sessions on appear to ensure fresh data after navigation.
+                // This ensures changes made in child features (title edits, speaker assignments)
+                // are visible immediately when returning to the timeline. (bd-16zo fix)
+                let shouldLoadSessions = !state.isLoading
 
                 // Start polling if there are transcribing sessions
                 let shouldStartPolling = state.hasTranscribingSessions

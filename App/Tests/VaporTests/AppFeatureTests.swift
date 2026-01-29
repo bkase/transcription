@@ -7,6 +7,7 @@ import SessionDetailFeature
 import SpeakerPickerFeature
 import ProfileFeature
 import PersonTimelineFeature
+import TimelineFeature
 import Persistence
 import Processing
 @testable import Vapor
@@ -681,5 +682,89 @@ struct AppFeatureTests {
         } else {
             Issue.record("Expected personTimeline in path")
         }
+    }
+
+    // MARK: - Timeline Refresh on Return from Detail (bd-16zo fix)
+
+    @Test
+    func testTimelineRefreshesOnReturnFromSessionDetail() async {
+        // This test verifies that when the user navigates back from session detail,
+        // the timeline reloads to show any changes made (title edits, speaker assignments).
+        // This is the fix for bd-16zo.
+        let sessionID = SessionID(rawValue: "test-session-123")
+        let fixedDate = Date(timeIntervalSince1970: 1000000)
+
+        // Original sessions
+        let originalSession = SessionRecord(
+            id: sessionID.rawValue,
+            startedAt: fixedDate,
+            title: "Original Title",
+            processingState: .processed,
+            speakerCount: 1,
+            updatedAt: fixedDate
+        )
+        let originalGroups = [SessionGroup(bucket: .today, sessions: [originalSession])]
+
+        // Updated sessions (after edit in detail view)
+        let updatedSession = SessionRecord(
+            id: sessionID.rawValue,
+            startedAt: fixedDate,
+            title: "Updated Title",
+            processingState: .processed,
+            speakerCount: 1,
+            updatedAt: fixedDate
+        )
+        let updatedGroups = [SessionGroup(bucket: .today, sessions: [updatedSession])]
+
+        var loadCallCount = 0
+
+        let store = TestStore(
+            initialState: AppFeature.State(
+                path: StackState([.sessionDetail(SessionDetailFeature.State(sessionID: sessionID))]),
+                timeline: TimelineFeature.State(
+                    sessionGroups: originalGroups,
+                    modelPreparationState: .ready
+                )
+            )
+        ) {
+            AppFeature()
+        } withDependencies: {
+            $0.date = .constant(fixedDate)
+            $0.databaseClient.fetchSessionsGroupedByDate = { _ in
+                loadCallCount += 1
+                // Return updated data after edit
+                return updatedGroups
+            }
+            $0.databaseClient.fetchSpeakerInfoForSessions = { _ in [:] }
+        }
+
+        // Verify initial state has original title
+        #expect(store.state.timeline.sessionGroups[0].sessions[0].title == "Original Title")
+
+        // User navigates back from session detail
+        await store.send(.path(.element(id: 0, action: .sessionDetail(.backTapped)))) {
+            _ = $0.path.popLast()
+        }
+
+        // When the timeline view reappears, its onAppear will trigger a reload.
+        // Simulate the timeline's onAppear being called after navigation.
+        await store.send(.timeline(.onAppear))
+
+        // Receive the loadSessions action
+        await store.receive(\.timeline.loadSessions) {
+            $0.timeline.isLoading = true
+        }
+
+        // Receive the sessionsLoaded with updated data
+        await store.receive(\.timeline.sessionsLoaded) {
+            $0.timeline.isLoading = false
+            $0.timeline.sessionGroups = updatedGroups
+            $0.timeline.speakerInfoBySession = [:]
+        }
+
+        // Verify the title is now updated
+        #expect(store.state.timeline.sessionGroups[0].sessions[0].title == "Updated Title")
+        // Verify load was called
+        #expect(loadCallCount >= 1)
     }
 }

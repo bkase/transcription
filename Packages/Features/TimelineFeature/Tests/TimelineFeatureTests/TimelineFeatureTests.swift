@@ -318,10 +318,13 @@ struct TimelineFeatureTests {
         await store.send(.newRecordingTapped)
     }
 
-    // MARK: - testOnAppearDoesNotReloadIfAlreadyLoaded
+    // MARK: - testOnAppearReloadsSessionsForFreshData (bd-16zo fix)
 
+    /// Verifies that onAppear always reloads sessions to ensure fresh data is displayed.
+    /// This ensures changes made in child features (title edits, speaker assignments)
+    /// are visible immediately when returning to the timeline.
     @Test
-    func testOnAppearDoesNotReloadIfAlreadyLoaded() async {
+    func testOnAppearReloadsSessionsForFreshData() async {
         let mockDate = Date(timeIntervalSince1970: 1000000)
         let existingGroups = [
             SessionGroup(bucket: .today, sessions: [
@@ -340,7 +343,25 @@ struct TimelineFeatureTests {
             ])
         ]
 
-        // Start with sessions AND models ready to ensure onAppear is a no-op
+        // Updated sessions with new title (simulating changes made in detail view)
+        let updatedGroups = [
+            SessionGroup(bucket: .today, sessions: [
+                SessionRecord(
+                    id: "session-1",
+                    startedAt: mockDate,
+                    endedAt: nil,
+                    title: "New Title",
+                    previewText: nil,
+                    durationMs: nil,
+                    audioPath: nil,
+                    processingState: .recording,
+                    speakerCount: 0,
+                    updatedAt: mockDate
+                )
+            ])
+        ]
+
+        // Start with sessions AND models ready
         let store = TestStore(
             initialState: TimelineFeature.State(
                 sessionGroups: existingGroups,
@@ -350,15 +371,28 @@ struct TimelineFeatureTests {
             TimelineFeature()
         } withDependencies: {
             $0.date = .constant(mockDate)
-            // Should never be called since sessions already loaded
-            $0.databaseClient.fetchSessionsGroupedByDate = { _ in
-                Issue.record("Should not reload when sessions already exist")
-                return []
-            }
+            // Return updated sessions to simulate changes made in detail view
+            $0.databaseClient.fetchSessionsGroupedByDate = { _ in updatedGroups }
+            $0.databaseClient.fetchSpeakerInfoForSessions = { _ in [:] }
         }
 
-        // onAppear should not trigger reload when sessions already exist
+        // onAppear should trigger loadSessions even with existing sessions (bd-16zo fix)
         await store.send(.onAppear)
+
+        // loadSessions is sent
+        await store.receive(\.loadSessions) {
+            $0.isLoading = true
+        }
+
+        // Sessions are reloaded with fresh data
+        await store.receive(\.sessionsLoaded) {
+            $0.isLoading = false
+            $0.sessionGroups = updatedGroups
+            $0.speakerInfoBySession = [:]
+        }
+
+        // Verify the new title is now visible
+        #expect(store.state.sessionGroups[0].sessions[0].title == "New Title")
     }
 
     // MARK: - Delete Tests
