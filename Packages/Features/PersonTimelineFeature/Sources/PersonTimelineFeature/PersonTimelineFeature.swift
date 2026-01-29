@@ -18,36 +18,18 @@ public struct PersonTimelineFeature {
         public var isLoading: Bool = false
         public var error: String?
 
-        // User profile for avatar display
-        public var userProfile: UserProfile = .empty
-
-        /// Compute initials from the profile name for avatar display
-        public var initials: String {
-            let components = userProfile.name.split(separator: " ")
-            if components.count >= 2 {
-                let first = components[0].prefix(1)
-                let last = components[components.count - 1].prefix(1)
-                return "\(first)\(last)".uppercased()
-            } else if let first = components.first?.prefix(1) {
-                return String(first).uppercased()
-            }
-            return ""
-        }
-
         public init(
             personId: PersonID,
             personName: String,
             sessions: [SessionRecord] = [],
             isLoading: Bool = false,
-            error: String? = nil,
-            userProfile: UserProfile = .empty
+            error: String? = nil
         ) {
             self.personId = personId
             self.personName = personName
             self.sessions = sessions
             self.isLoading = isLoading
             self.error = error
-            self.userProfile = userProfile
         }
     }
 
@@ -58,7 +40,7 @@ public struct PersonTimelineFeature {
         case loadFailed(String)
         case sessionTapped(SessionID)
         case backTapped
-        /// User tapped the header avatar to navigate to profile
+        /// User tapped the settings icon to navigate to profile
         case avatarTapped
     }
 

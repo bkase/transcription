@@ -5,10 +5,6 @@ import Persistence
 import SwiftUI
 import TimelineFeature
 
-#if os(iOS)
-import UIKit
-#endif
-
 // MARK: - Person Timeline View
 
 /// Shows a filtered timeline of sessions for a specific person.
@@ -61,13 +57,14 @@ public struct PersonTimelineView: View {
 
             Spacer()
 
-            Button {
+            IconButton(
+                systemName: "gearshape",
+                style: .transparent,
+                iconColor: VaporColor.textTertiary
+            ) {
                 store.send(.avatarTapped)
-            } label: {
-                avatarView
             }
-            .buttonStyle(PlainButtonStyle())
-            .accessibilityIdentifier("profileAvatarButton")
+            .accessibilityIdentifier("settingsButton")
         }
     }
 
@@ -84,26 +81,6 @@ public struct PersonTimelineView: View {
                 .foregroundColor(VaporColor.textPrimary)
                 .accessibilityIdentifier("personTimelineName")
         }
-    }
-
-    @ViewBuilder
-    private var avatarView: some View {
-        #if os(iOS)
-        if let imageData = store.userProfile.avatar.imageData,
-           let uiImage = UIImage(data: imageData) {
-            Avatar(image: Image(uiImage: uiImage), size: .medium)
-        } else if !store.initials.isEmpty {
-            Avatar(initials: store.initials, size: .medium)
-        } else {
-            Avatar(size: .medium)
-        }
-        #else
-        if !store.initials.isEmpty {
-            Avatar(initials: store.initials, size: .medium)
-        } else {
-            Avatar(size: .medium)
-        }
-        #endif
     }
 
     // MARK: - Sessions Content
@@ -239,13 +216,17 @@ public struct PersonTimelineViewPreview: View {
         VStack(spacing: 0) {
             // Header
             VStack(alignment: .leading, spacing: VaporSpacing.md) {
-                // Top nav row: Back button on left, avatar on right
+                // Top nav row: Back button on left, settings icon on right
                 HStack {
                     NavButton(label: "Back") {}
 
                     Spacer()
 
-                    Avatar(size: .medium)
+                    IconButton(
+                        systemName: "gearshape",
+                        style: .transparent,
+                        iconColor: VaporColor.textTertiary
+                    ) {}
                 }
 
                 // Page title row: "Conversations with [Person Name]"

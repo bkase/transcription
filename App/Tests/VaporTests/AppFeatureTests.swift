@@ -424,7 +424,6 @@ struct AppFeatureTests {
         if case let .personTimeline(personTimelineState) = store.state.path.first {
             #expect(personTimelineState.personId == personId)
             #expect(personTimelineState.personName == "Sarah Chen")
-            #expect(personTimelineState.userProfile == testProfile)
         } else {
             Issue.record("Expected personTimeline state in path")
         }
@@ -450,8 +449,7 @@ struct AppFeatureTests {
                 currentTab: .people,
                 path: StackState([.personTimeline(PersonTimelineFeature.State(
                     personId: personId,
-                    personName: "Sarah Chen",
-                    userProfile: testProfile
+                    personName: "Sarah Chen"
                 ))]),
                 userProfile: testProfile
             )
@@ -484,8 +482,7 @@ struct AppFeatureTests {
                 currentTab: .people,
                 path: StackState([.personTimeline(PersonTimelineFeature.State(
                     personId: personId,
-                    personName: "Sarah Chen",
-                    userProfile: testProfile
+                    personName: "Sarah Chen"
                 ))]),
                 userProfile: testProfile
             )
@@ -647,8 +644,7 @@ struct AppFeatureTests {
                 path: StackState([
                     .personTimeline(PersonTimelineFeature.State(
                         personId: personId,
-                        personName: "Sarah",
-                        userProfile: initialProfile
+                        personName: "Sarah"
                     )),
                     .profile(ProfileFeature.State(profile: initialProfile))
                 ]),
@@ -663,22 +659,17 @@ struct AppFeatureTests {
             $0.userProfile = updatedProfile
             $0.timeline.userProfile = updatedProfile
             $0.people.userProfile = updatedProfile
-            // Person timeline in path should also be updated
-            if case var .personTimeline(personTimeline) = $0.path[id: 0] {
-                personTimeline.userProfile = updatedProfile
-                $0.path[id: 0] = .personTimeline(personTimeline)
-            }
-            // Profile state in path should also be updated
+            // PersonTimeline uses settings icon, not avatar - no profile sync needed
+            // Profile state in path should be updated
             if case var .profile(profileState) = $0.path[id: 1] {
                 profileState.profile = updatedProfile
                 $0.path[id: 1] = .profile(profileState)
             }
         }
 
-        // Verify person timeline has updated profile
-        if case let .personTimeline(personTimeline) = store.state.path.first {
-            #expect(personTimeline.userProfile == updatedProfile)
-            #expect(personTimeline.userProfile.name == "Updated")
+        // Verify person timeline is still in path (no changes to it since it uses settings icon)
+        if case .personTimeline = store.state.path.first {
+            // PersonTimeline uses settings icon instead of avatar, so no profile sync is needed
         } else {
             Issue.record("Expected personTimeline in path")
         }

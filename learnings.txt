@@ -1171,3 +1171,10 @@
   - Before: `card.contextMenu { ... }.onTapGesture { action() }`
   - After: `Button { action() } label: { card }.buttonStyle(PlainButtonStyle()).contextMenu { ... }`
 - PlainButtonStyle() is important to preserve the visual appearance of the wrapped content
+
+## Child feature state simplification when removing avatar (bd-3ee0)
+- When replacing avatar with settings icon in child feature headers, userProfile state becomes unnecessary
+- Remove userProfile property from child feature State if only used for avatar display
+- Update AppFeature.syncUserProfileToPath to skip features that no longer need profile sync
+- Keep action name (e.g., avatarTapped) for consistency across features even when trigger changes
+- Update all tests that initialize the feature State to remove the removed parameters

@@ -230,8 +230,7 @@ public struct AppFeature {
                 // Push person timeline onto navigation stack
                 state.path.append(.personTimeline(PersonTimelineFeature.State(
                     personId: PersonID(person.id),
-                    personName: person.name,
-                    userProfile: state.userProfile
+                    personName: person.name
                 )))
                 return .none
 
@@ -305,9 +304,9 @@ extension AppFeature.State {
             case .profile(var profileState):
                 profileState.profile = profile
                 path[id: id] = .profile(profileState)
-            case .personTimeline(var personTimeline):
-                personTimeline.userProfile = profile
-                path[id: id] = .personTimeline(personTimeline)
+            case .personTimeline:
+                // PersonTimeline uses settings icon, not avatar - no profile sync needed
+                break
             }
         }
     }

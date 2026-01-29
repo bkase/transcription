@@ -163,10 +163,12 @@ struct PersonTimelineFeatureTests {
         await store.send(.backTapped)
     }
 
-    // MARK: - testAvatarTappedIsNavigationIntent
+    // MARK: - testSettingsButtonTappedIsNavigationIntent
 
     @Test
-    func testAvatarTappedIsNavigationIntent() async {
+    func testSettingsButtonTappedIsNavigationIntent() async {
+        // The settings icon in the header triggers avatarTapped action
+        // (action named for historical reasons, now triggered by settings icon)
         let store = TestStore(
             initialState: PersonTimelineFeature.State(
                 personId: PersonID("person-1"),
@@ -177,6 +179,7 @@ struct PersonTimelineFeatureTests {
         }
 
         // avatarTapped is a navigation intent - no state change expected
+        // This action is triggered by the settings icon in the header
         await store.send(.avatarTapped)
     }
 }
