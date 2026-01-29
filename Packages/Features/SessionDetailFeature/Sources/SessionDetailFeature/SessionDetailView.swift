@@ -107,26 +107,15 @@ public struct SessionDetailView: View {
                 set: { if !$0 { store.send(.actionsMenuDismissed) } }
             )
         ) {
-            ZStack(alignment: .topTrailing) {
-                Color.black.opacity(0.3)
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        store.send(.actionsMenuDismissed)
-                    }
-
-                SessionActionsModal(
-                    onShare: { store.send(.shareTapped) },
-                    onExport: { store.send(.exportTapped) },
-                    onContinueRecording: canContinueRecording ? { store.send(.continueRecordingTapped) } : nil,
-                    onDelete: { store.send(.deleteTapped) },
-                    onDismiss: { store.send(.actionsMenuDismissed) }
-                )
-                .frame(width: 260)
-                .padding(.top, 100)
-                .padding(.trailing, VaporSpacing.lg)
-                .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .topTrailing)))
-            }
-            .presentationBackground(.clear)
+            ActionsMenuOverlay(
+                anchorPoint: store.menuAnchorPoint,
+                canContinueRecording: canContinueRecording,
+                onShare: { store.send(.shareTapped) },
+                onExport: { store.send(.exportTapped) },
+                onContinueRecording: { store.send(.continueRecordingTapped) },
+                onDelete: { store.send(.deleteTapped) },
+                onDismiss: { store.send(.actionsMenuDismissed) }
+            )
         }
         .confirmationDialog(
             "Delete Recording",
@@ -295,14 +284,23 @@ public struct SessionDetailView: View {
 
                     // More actions button (ellipsis) - hidden during title edit
                     // Use opacity instead of conditional to prevent slide-in animation
-                    IconButton(
-                        systemName: "ellipsis",
-                        style: .transparent,
-                        iconColor: VaporColor.textTertiary
-                    ) {
-                        store.send(.moreButtonTapped)
+                    GeometryReader { geometry in
+                        IconButton(
+                            systemName: "ellipsis",
+                            style: .transparent,
+                            iconColor: VaporColor.textTertiary
+                        ) {
+                            // Calculate the button's position in global coordinates
+                            let frame = geometry.frame(in: .global)
+                            let anchorPoint = CGPoint(
+                                x: frame.maxX,  // Right edge of button
+                                y: frame.maxY   // Bottom edge of button
+                            )
+                            store.send(.moreButtonTapped(anchorPoint: anchorPoint))
+                        }
+                        .accessibilityIdentifier("moreButton")
                     }
-                    .accessibilityIdentifier("moreButton")
+                    .frame(width: 44, height: 44)  // Fixed size for the button container
                     .opacity(store.isEditingTitle ? 0 : (store.isExporting || store.isDeleting ? 0.5 : 1.0))
                     .disabled(store.isEditingTitle || store.isExporting || store.isDeleting)
                     .animation(nil, value: store.isEditingTitle)
@@ -800,6 +798,96 @@ struct ShareSheet: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+#endif
+
+// MARK: - Actions Menu Overlay
+
+/// Overlay for the actions menu that positions the modal near the tap point with a fade animation.
+#if os(iOS)
+private struct ActionsMenuOverlay: View {
+    let anchorPoint: CGPoint
+    let canContinueRecording: Bool
+    let onShare: () -> Void
+    let onExport: () -> Void
+    let onContinueRecording: () -> Void
+    let onDelete: () -> Void
+    let onDismiss: () -> Void
+
+    @State private var isVisible = false
+
+    // Modal dimensions
+    private let modalWidth: CGFloat = 260
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .topLeading) {
+                // Semi-transparent backdrop
+                Color.black.opacity(isVisible ? 0.3 : 0)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        dismissWithAnimation()
+                    }
+
+                // Modal positioned near the anchor point
+                SessionActionsModal(
+                    onShare: onShare,
+                    onExport: onExport,
+                    onContinueRecording: canContinueRecording ? onContinueRecording : nil,
+                    onDelete: onDelete,
+                    onDismiss: { dismissWithAnimation() }
+                )
+                .frame(width: modalWidth)
+                .opacity(isVisible ? 1 : 0)
+                .scaleEffect(isVisible ? 1 : 0.95, anchor: .topTrailing)
+                .position(computeModalPosition(in: geometry))
+            }
+        }
+        .presentationBackground(.clear)
+        .onAppear {
+            withAnimation(VaporAnimation.appearCurve.animation(duration: VaporAnimation.normalDuration)) {
+                isVisible = true
+            }
+        }
+    }
+
+    /// Compute the modal position relative to the anchor point
+    private func computeModalPosition(in geometry: GeometryProxy) -> CGPoint {
+        let safeArea = geometry.safeAreaInsets
+        let screenSize = geometry.size
+
+        // Position modal so its top-right corner is near the anchor point
+        // Add some padding from the anchor
+        let padding: CGFloat = VaporSpacing.sm
+
+        // Start with anchor point, offset so modal appears below and to the left
+        var x = anchorPoint.x - modalWidth / 2 - padding
+        var y = anchorPoint.y + padding
+
+        // Ensure modal stays within screen bounds (with safe area)
+        let minX = modalWidth / 2 + VaporSpacing.lg
+        let maxX = screenSize.width - modalWidth / 2 - VaporSpacing.lg
+
+        // Estimate modal height (approximately 250pt for typical content)
+        let estimatedModalHeight: CGFloat = 280
+        let minY = safeArea.top + estimatedModalHeight / 2 + VaporSpacing.lg
+        let maxY = screenSize.height - safeArea.bottom - estimatedModalHeight / 2 - VaporSpacing.lg
+
+        x = max(minX, min(maxX, x))
+        y = max(minY, min(maxY, y))
+
+        return CGPoint(x: x, y: y)
+    }
+
+    private func dismissWithAnimation() {
+        withAnimation(VaporAnimation.exitCurve.animation(duration: VaporAnimation.normalDuration)) {
+            isVisible = false
+        }
+        // Delay the actual dismiss to allow animation to complete
+        DispatchQueue.main.asyncAfter(deadline: .now() + VaporAnimation.normalDuration) {
+            onDismiss()
+        }
+    }
 }
 #endif
 

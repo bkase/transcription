@@ -1170,6 +1170,15 @@
 - Pattern: syncUserProfileToPath() iterates path, updates sessionDetail/profile/personTimeline states
 - Call sync in both userProfileLoaded and didSaveProfile action handlers
 
+## Custom modal positioning with anchor points (bd-220z)
+- Pass CGPoint from GeometryReader at tap time to capture button position
+- Use fullScreenCover with ZStack + GeometryReader for custom modal positioning
+- Add CGPoint property to TCA state to store anchor point across render cycles
+- Wrap button in GeometryReader to capture frame, call `.frame(in: .global)` for screen coordinates
+- Modal position computed from anchor point with boundary checks to stay within screen
+- Fade animation: animate `isVisible` state with VaporAnimation curves on onAppear
+- Exit animation: call `withAnimation` before dismiss, delay actual dismiss for animation duration
+
 ## SwiftUI contextMenu and onTapGesture conflict (bd-1cfj)
 - `contextMenu` modifier adds an implicit gesture recognizer that can interfere with `onTapGesture`
 - When both are applied to the same view, taps may not register correctly

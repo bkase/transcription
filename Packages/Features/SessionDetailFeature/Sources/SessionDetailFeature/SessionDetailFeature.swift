@@ -1,5 +1,6 @@
 import CasePaths
 import ComposableArchitecture
+import CoreGraphics
 import Dependencies
 import Foundation
 import Models
@@ -93,6 +94,8 @@ public struct SessionDetailFeature {
 
         // Actions menu state
         public var isShowingActionsMenu: Bool = false
+        /// The anchor point for positioning the actions menu near the tap location
+        public var menuAnchorPoint: CGPoint = .zero
 
         // Delete flow state
         public var isShowingDeleteConfirmation: Bool = false
@@ -134,6 +137,7 @@ public struct SessionDetailFeature {
             isExporting: Bool = false,
             shareURL: URL? = nil,
             isShowingActionsMenu: Bool = false,
+            menuAnchorPoint: CGPoint = .zero,
             isShowingDeleteConfirmation: Bool = false,
             isDeleting: Bool = false,
             alertInfo: AlertInfo? = nil,
@@ -153,6 +157,7 @@ public struct SessionDetailFeature {
             self.isExporting = isExporting
             self.shareURL = shareURL
             self.isShowingActionsMenu = isShowingActionsMenu
+            self.menuAnchorPoint = menuAnchorPoint
             self.isShowingDeleteConfirmation = isShowingDeleteConfirmation
             self.isDeleting = isDeleting
             self.alertInfo = alertInfo
@@ -193,7 +198,7 @@ public struct SessionDetailFeature {
         case titleSaveFailed(String)
 
         // Actions menu
-        case moreButtonTapped
+        case moreButtonTapped(anchorPoint: CGPoint)
         case actionsMenuDismissed
 
         // Share actions
@@ -473,7 +478,8 @@ public struct SessionDetailFeature {
 
             // MARK: - Actions Menu
 
-            case .moreButtonTapped:
+            case let .moreButtonTapped(anchorPoint):
+                state.menuAnchorPoint = anchorPoint
                 state.isShowingActionsMenu = true
                 return .none
 
