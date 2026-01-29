@@ -203,7 +203,8 @@ public struct NavButton: View {
                     .font(.system(size: 14, weight: .light))
                     .foregroundColor(VaporColor.textSecondary)
             }
-            .padding(VaporSpacing.sm)
+            .padding(.vertical, VaporSpacing.sm)
+            .padding(.trailing, VaporSpacing.sm)
             .background(
                 RoundedRectangle(cornerRadius: 20)
                     .fill(Color.clear)

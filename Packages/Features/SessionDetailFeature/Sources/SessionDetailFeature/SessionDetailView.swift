@@ -152,40 +152,12 @@ public struct SessionDetailView: View {
 
     // MARK: - Session Header
 
-    /// Convert speaker tracks to avatar info for display
-    private var speakerAvatars: [SpeakerAvatarInfo] {
-        store.speakerTracks.map { track -> SpeakerAvatarInfo in
-            if let personId = track.personId, let personName = track.personName {
-                // Assigned speaker - use person data
-                return SpeakerAvatarInfo.from(
-                    id: personId,
-                    name: personName,
-                    imageData: nil, // TODO: Add imageData to DetailSpeakerTrack if needed
-                    colorIndex: track.displayOrder - 1
-                )
-            } else {
-                // Unassigned speaker - use display order
-                return SpeakerAvatarInfo(
-                    id: track.machineSpeakerId,
-                    imageData: nil,
-                    initials: "S\(track.displayOrder)",
-                    color: SpeakerColor.forIndex(track.displayOrder - 1)
-                )
-            }
-        }
-    }
-
     @ViewBuilder
     private var sessionHeader: some View {
         if let session = store.session {
             VStack(alignment: .leading, spacing: VaporSpacing.xs) {
-                // Title row with speaker avatars and action buttons
+                // Title row with action buttons
                 HStack(alignment: .center, spacing: VaporSpacing.sm) {
-                    // Speaker avatars
-                    if !speakerAvatars.isEmpty {
-                        SpeakerAvatarStack(speakers: speakerAvatars)
-                    }
-
                     if store.isEditingTitle {
                         // Editing mode - show text field
                         HStack(spacing: VaporSpacing.sm) {
@@ -566,7 +538,8 @@ public struct SessionDetailViewPreview: View {
                             .font(.system(size: 14, weight: .light))
                             .foregroundColor(VaporColor.textSecondary)
                     }
-                    .padding(VaporSpacing.sm)
+                    .padding(.vertical, VaporSpacing.sm)
+                    .padding(.trailing, VaporSpacing.sm)
 
                     Spacer()
                 }

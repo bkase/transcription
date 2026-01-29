@@ -1232,3 +1232,10 @@
 - Fade in/out pattern: `@State isVisible = false`, animate on onAppear, delay dismiss for animation duration
 - Custom delete confirmation: use VStack with Dividers between buttons, match iOS alert styling (width: 270, cornerRadius: 14)
 - Add accessibility identifiers (e.g., "deleteConfirmButton", "deleteCancelButton") for UI testing
+
+## Left alignment flush to screen edge (bd-3pa8)
+- NavButton had internal `.padding(VaporSpacing.sm)` which offset content from container edge
+- Fix: Change to `.padding(.vertical, VaporSpacing.sm)` and `.padding(.trailing, VaporSpacing.sm)` - no leading padding
+- XCUIElement.frame.minX can verify left alignment in E2E tests with 2pt tolerance
+- Session header should NOT include SpeakerAvatarStack - title should be flush left per design spec
+- When implementing from design file, check component hierarchy for what elements actually exist
