@@ -1239,3 +1239,8 @@
 - XCUIElement.frame.minX can verify left alignment in E2E tests with 2pt tolerance
 - Session header should NOT include SpeakerAvatarStack - title should be flush left per design spec
 - When implementing from design file, check component hierarchy for what elements actually exist
+
+## Transcript layout changes (bd-1216)
+- TranscriptSegment HStack order change: timestamp first, Spacer(), then speaker label on right
+- Snapshot tests capture visual layout - update reference snapshots after layout changes
+- Mock transcription may not include speaker diarization - E2E tests should handle gracefully with XCTSkip

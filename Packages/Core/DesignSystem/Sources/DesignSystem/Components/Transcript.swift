@@ -80,14 +80,16 @@ public struct TranscriptSegment: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            // Header: speaker label + timestamp
+            // Header: timestamp on left, speaker label on right
             HStack(spacing: 12) {
-                speakerLabel
-
                 Text(timestamp)
                     .font(.system(size: 10, weight: .light))
                     .tracking(0.5)
                     .foregroundColor(VaporColor.overcast)
+
+                Spacer()
+
+                speakerLabel
             }
 
             // Transcript text - animated or static based on flag
