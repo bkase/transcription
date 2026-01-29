@@ -3,6 +3,9 @@
 - seenSpeakers Set tracks which speaker IDs have been encountered; count after insert = displayOrder
 - TranscriptRendering.resolveSpeakerType maps machineSpeakerId -> SpeakerTrack -> displayOrder -> "Speaker N"
 - When testing diarization, validate displayOrder uniqueness AND the label mapping end-to-end
+- FluidAudio SDK's DiarizerManager uses SpeakerManager for consistent speaker tracking across chunks
+- Speaker IDs like "spk_0", "spk_1" are assigned by SpeakerManager.assignSpeaker() based on embedding similarity
+- DiarizationMapping.findDominantSpeaker aggregates segment durations to find the speaker who spoke most
 
 ## XcodeGen with SPM packages
 - When using XcodeGen with SPM dependencies, specify `product:` alongside `package:`
