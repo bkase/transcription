@@ -492,7 +492,7 @@ public struct DatabaseClient: Sendable {
     public var fetchSpeakerInfoForSessions: @Sendable (_ sessionIds: [SessionID]) async throws -> [String: [SessionSpeakerInfo]] = { _ in [:] }
 
     /// Delete all user data (sessions, transcripts, speakers, people) while preserving ML models.
-    public var deleteAllData: @Sendable () async throws -> Void
+    public var deleteAllData: @Sendable () async throws -> Void = { }
 }
 
 extension DatabaseClient: DependencyKey {
