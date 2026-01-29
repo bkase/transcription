@@ -109,22 +109,6 @@ public struct SessionDetailFeature {
         // Retry transcription state
         public var isRetrying: Bool = false
 
-        // User profile for avatar display
-        public var userProfile: UserProfile = .empty
-
-        /// Compute initials from the profile name for avatar display
-        public var initials: String {
-            let components = userProfile.name.split(separator: " ")
-            if components.count >= 2 {
-                let first = components[0].prefix(1)
-                let last = components[components.count - 1].prefix(1)
-                return "\(first)\(last)".uppercased()
-            } else if let first = components.first?.prefix(1) {
-                return String(first).uppercased()
-            }
-            return ""
-        }
-
         public init(
             sessionID: SessionID,
             session: SessionRecord? = nil,
@@ -143,8 +127,7 @@ public struct SessionDetailFeature {
             alertInfo: AlertInfo? = nil,
             isEditingTitle: Bool = false,
             editedTitle: String = "",
-            isRetrying: Bool = false,
-            userProfile: UserProfile = .empty
+            isRetrying: Bool = false
         ) {
             self.sessionID = sessionID
             self.session = session
@@ -164,7 +147,6 @@ public struct SessionDetailFeature {
             self.isEditingTitle = isEditingTitle
             self.editedTitle = editedTitle
             self.isRetrying = isRetrying
-            self.userProfile = userProfile
         }
     }
 
@@ -413,8 +395,7 @@ public struct SessionDetailFeature {
                         speakerTrackId: track.id,
                         sessionId: state.sessionID,
                         displayOrder: track.displayOrder,
-                        currentPersonId: track.personId.map { PersonID($0) },
-                        userProfile: state.userProfile
+                        currentPersonId: track.personId.map { PersonID($0) }
                     )
                     return .none
                 }
@@ -454,8 +435,7 @@ public struct SessionDetailFeature {
                     speakerTrackId: trackId,
                     sessionId: state.sessionID,
                     displayOrder: displayOrder,
-                    currentPersonId: nil,
-                    userProfile: state.userProfile
+                    currentPersonId: nil
                 )
                 return .none
 

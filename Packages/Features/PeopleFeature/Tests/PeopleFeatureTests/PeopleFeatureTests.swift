@@ -124,18 +124,6 @@ struct PeopleFeatureTests {
         await store.send(.personTapped(PersonID("person-1")))
     }
 
-    // MARK: - testAvatarTappedIsNavigationIntent
-
-    @Test
-    func testAvatarTappedIsNavigationIntent() async {
-        let store = TestStore(initialState: PeopleFeature.State()) {
-            PeopleFeature()
-        }
-
-        // avatarTapped is a navigation intent - no state change expected
-        await store.send(.avatarTapped)
-    }
-
     // MARK: - testRemovePhotoTapped
 
     @Test

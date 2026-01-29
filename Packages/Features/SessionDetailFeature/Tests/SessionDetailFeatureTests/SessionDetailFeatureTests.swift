@@ -839,8 +839,7 @@ struct SessionDetailFeatureTests {
                 speakerTrackId: "track-1",
                 sessionId: sessionID,
                 displayOrder: 1,
-                currentPersonId: nil,
-                userProfile: .empty
+                currentPersonId: nil
             )
         }
     }

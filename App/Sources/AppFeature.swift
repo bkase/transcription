@@ -95,9 +95,8 @@ public struct AppFeature {
 
             case let .userProfileLoaded(profile):
                 state.userProfile = profile
-                // Sync profile to child features
+                // Sync profile to timeline feature (has settings icon but may need profile for recording)
                 state.timeline.userProfile = profile
-                state.people.userProfile = profile
                 // Sync to any features in the navigation path that need userProfile
                 state.syncUserProfileToPath(profile)
                 return .none
@@ -121,9 +120,8 @@ public struct AppFeature {
             case let .path(.element(id: _, action: .profile(.delegate(.didSaveProfile(profile))))):
                 // Update app-level profile state when profile is saved
                 state.userProfile = profile
-                // Sync to child features
+                // Sync to timeline feature
                 state.timeline.userProfile = profile
-                state.people.userProfile = profile
                 // Sync to any features in the navigation path that need userProfile
                 state.syncUserProfileToPath(profile)
                 return .none
@@ -170,7 +168,7 @@ public struct AppFeature {
 
             case let .path(.element(id: _, action: .personTimeline(.sessionTapped(sessionID)))):
                 // Push session detail onto navigation stack from person timeline
-                state.path.append(.sessionDetail(SessionDetailFeature.State(sessionID: sessionID, userProfile: state.userProfile)))
+                state.path.append(.sessionDetail(SessionDetailFeature.State(sessionID: sessionID)))
                 return .none
 
             case .path(.element(id: _, action: .personTimeline(.avatarTapped))):
@@ -186,7 +184,7 @@ public struct AppFeature {
 
             case let .timeline(.sessionTapped(sessionID)):
                 // Push session detail onto navigation stack
-                state.path.append(.sessionDetail(SessionDetailFeature.State(sessionID: sessionID, userProfile: state.userProfile)))
+                state.path.append(.sessionDetail(SessionDetailFeature.State(sessionID: sessionID)))
                 return .none
 
             case .timeline(.newRecordingTapped):
@@ -208,11 +206,6 @@ public struct AppFeature {
                 return .none
 
             // MARK: - People Actions
-
-            case .people(.avatarTapped):
-                // Push profile onto navigation stack with current user profile
-                state.path.append(.profile(ProfileFeature.State(profile: state.userProfile)))
-                return .none
 
             case let .people(.personTapped(personId)):
                 // Fetch person record and navigate to person timeline
@@ -247,7 +240,7 @@ public struct AppFeature {
                 // Recording finished - navigate to session detail view
                 state.recording = nil
                 // Push session detail onto navigation stack
-                state.path.append(.sessionDetail(SessionDetailFeature.State(sessionID: sessionID, userProfile: state.userProfile)))
+                state.path.append(.sessionDetail(SessionDetailFeature.State(sessionID: sessionID)))
                 // Also reload timeline in background so it's up to date when user goes back
                 return .send(.timeline(.loadSessions))
 
@@ -298,9 +291,9 @@ extension AppFeature.State {
         // Iterate using zip with ids to preserve element IDs during mutation
         for (id, element) in zip(path.ids, path) {
             switch element {
-            case .sessionDetail(var detail):
-                detail.userProfile = profile
-                path[id: id] = .sessionDetail(detail)
+            case .sessionDetail:
+                // SessionDetail no longer has avatar - no profile sync needed
+                break
             case .profile(var profileState):
                 profileState.profile = profile
                 path[id: id] = .profile(profileState)

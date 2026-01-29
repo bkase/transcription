@@ -1199,3 +1199,14 @@
 - Update AppFeature.syncUserProfileToPath to skip features that no longer need profile sync
 - Keep action name (e.g., avatarTapped) for consistency across features even when trigger changes
 - Update all tests that initialize the feature State to remove the removed parameters
+
+## Removing avatar from multiple features (bd-11a6)
+- When removing avatar from SessionDetailView, PeopleView, etc., also remove:
+  - userProfile property from feature State
+  - initials computed property from feature State
+  - avatarTapped action from reducer (if feature no longer navigates to profile)
+  - Profile sync in AppFeature.syncUserProfileToPath for affected features
+- Update AppFeature tests that expect userProfile sync (e.g., peopleLoaded tests)
+- SpeakerPickerFeature can still receive userProfile for "You" option, but parent can pass .empty
+- Delete snapshot tests that include removed avatar components, then re-record
+- Remove UIKit import only if no other UIKit types are used (check for UIImage, UIActivityViewController, etc.)

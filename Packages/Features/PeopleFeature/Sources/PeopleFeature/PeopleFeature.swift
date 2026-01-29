@@ -59,9 +59,6 @@ public struct PeopleFeature {
         // Mock photo picker state (for UI testing)
         public var isShowingMockPhotoPicker: Bool = false
 
-        // User profile for avatar display
-        public var userProfile: UserProfile = .empty
-
         /// Whether we're editing an existing person (vs creating new)
         public var isEditing: Bool {
             editingPerson != nil
@@ -82,19 +79,6 @@ public struct PeopleFeature {
             conversationCounts[personId] ?? 0
         }
 
-        /// Compute initials from the profile name for avatar display
-        public var initials: String {
-            let components = userProfile.name.split(separator: " ")
-            if components.count >= 2 {
-                let first = components[0].prefix(1)
-                let last = components[components.count - 1].prefix(1)
-                return "\(first)\(last)".uppercased()
-            } else if let first = components.first?.prefix(1) {
-                return String(first).uppercased()
-            }
-            return ""
-        }
-
         public init(
             people: [PersonRecord] = [],
             conversationCounts: [String: Int] = [:],
@@ -107,8 +91,7 @@ public struct PeopleFeature {
             formColorToken: String = SpeakerColor.sky.rawValue,
             formImageData: Data? = nil,
             isSaving: Bool = false,
-            isShowingMockPhotoPicker: Bool = false,
-            userProfile: UserProfile = .empty
+            isShowingMockPhotoPicker: Bool = false
         ) {
             self.people = people
             self.conversationCounts = conversationCounts
@@ -122,7 +105,6 @@ public struct PeopleFeature {
             self.formImageData = formImageData
             self.isSaving = isSaving
             self.isShowingMockPhotoPicker = isShowingMockPhotoPicker
-            self.userProfile = userProfile
         }
     }
 
@@ -133,8 +115,6 @@ public struct PeopleFeature {
         case peopleFailed(String)
         case searchQueryChanged(String)
         case personTapped(PersonID)
-        /// User tapped the header avatar to navigate to profile
-        case avatarTapped
 
         // CRUD actions
         case addPersonTapped
@@ -199,10 +179,6 @@ public struct PeopleFeature {
                 return .none
 
             case .personTapped:
-                // Navigation intent - will be handled by parent
-                return .none
-
-            case .avatarTapped:
                 // Navigation intent - will be handled by parent
                 return .none
 

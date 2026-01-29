@@ -62,38 +62,10 @@ public struct PeopleView: View {
                     .foregroundColor(VaporColor.deep)
             }
             .accessibilityIdentifier("addPersonButton")
-
-            Button {
-                store.send(.avatarTapped)
-            } label: {
-                avatarView
-            }
-            .buttonStyle(PlainButtonStyle())
-            .accessibilityIdentifier("profileAvatarButton")
         }
         .padding(.top, 56)
         .padding(.horizontal, VaporSpacing.lg)
         .padding(.bottom, VaporSpacing.md)
-    }
-
-    @ViewBuilder
-    private var avatarView: some View {
-        #if os(iOS)
-        if let imageData = store.userProfile.avatar.imageData,
-           let uiImage = UIImage(data: imageData) {
-            Avatar(image: Image(uiImage: uiImage), size: .medium)
-        } else if !store.initials.isEmpty {
-            Avatar(initials: store.initials, size: .medium)
-        } else {
-            Avatar(size: .medium)
-        }
-        #else
-        if !store.initials.isEmpty {
-            Avatar(initials: store.initials, size: .medium)
-        } else {
-            Avatar(size: .medium)
-        }
-        #endif
     }
 
     // MARK: - Search Section
@@ -523,7 +495,6 @@ public struct PeopleViewPreview: View {
                 Image(systemName: "plus.circle.fill")
                     .font(.system(size: 28))
                     .foregroundColor(VaporColor.deep)
-                Avatar(size: .medium)
             }
             .padding(.top, 56)
             .padding(.horizontal, VaporSpacing.lg)
