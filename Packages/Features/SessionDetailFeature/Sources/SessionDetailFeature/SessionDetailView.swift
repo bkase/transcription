@@ -76,21 +76,6 @@ public struct SessionDetailView: View {
             store.send(.onDisappear)
         }
         #if os(iOS)
-        .fullScreenCover(
-            item: $store.scope(state: \.speakerPicker, action: \.speakerPicker)
-        ) { speakerPickerStore in
-            ZStack {
-                Color.black.opacity(0.3)
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        store.send(.speakerPicker(.presented(.closeModal)))
-                    }
-
-                SpeakerPickerView(store: speakerPickerStore)
-                    .padding(VaporSpacing.lg)
-            }
-            .presentationBackground(.clear)
-        }
         .sheet(
             isPresented: Binding(
                 get: { store.shareURL != nil },
@@ -101,38 +86,38 @@ public struct SessionDetailView: View {
                 ShareSheet(items: [shareURL])
             }
         }
-        .fullScreenCover(
-            isPresented: Binding(
-                get: { store.isShowingActionsMenu },
-                set: { if !$0 { store.send(.actionsMenuDismissed) } }
-            )
-        ) {
-            ActionsMenuOverlay(
-                anchorPoint: store.menuAnchorPoint,
-                canContinueRecording: canContinueRecording,
-                onShare: { store.send(.shareTapped) },
-                onExport: { store.send(.exportTapped) },
-                onContinueRecording: { store.send(.continueRecordingTapped) },
-                onDelete: { store.send(.deleteTapped) },
-                onDismiss: { store.send(.actionsMenuDismissed) }
-            )
+        .overlay {
+            // Actions menu overlay
+            if store.isShowingActionsMenu {
+                ActionsMenuOverlay(
+                    anchorPoint: store.menuAnchorPoint,
+                    canContinueRecording: canContinueRecording,
+                    onShare: { store.send(.shareTapped) },
+                    onExport: { store.send(.exportTapped) },
+                    onContinueRecording: { store.send(.continueRecordingTapped) },
+                    onDelete: { store.send(.deleteTapped) },
+                    onDismiss: { store.send(.actionsMenuDismissed) }
+                )
+            }
         }
-        .confirmationDialog(
-            "Delete Recording",
-            isPresented: Binding(
-                get: { store.isShowingDeleteConfirmation },
-                set: { if !$0 { store.send(.deleteCancelled) } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("Delete", role: .destructive) {
-                store.send(.deleteConfirmed)
+        .overlay {
+            // Delete confirmation overlay
+            if store.isShowingDeleteConfirmation {
+                DeleteConfirmationOverlay(
+                    onDelete: { store.send(.deleteConfirmed) },
+                    onCancel: { store.send(.deleteCancelled) }
+                )
             }
-            Button("Cancel", role: .cancel) {
-                store.send(.deleteCancelled)
+        }
+        .overlay {
+            // Speaker picker overlay
+            if store.speakerPicker != nil,
+               let speakerPickerStore = $store.scope(state: \.speakerPicker, action: \.speakerPicker).wrappedValue {
+                SpeakerPickerOverlay(
+                    store: speakerPickerStore,
+                    onDismiss: { store.send(.speakerPicker(.presented(.closeModal))) }
+                )
             }
-        } message: {
-            Text("This will permanently delete this recording and its transcript. This action cannot be undone.")
         }
         .alert(
             item: Binding(
@@ -820,7 +805,6 @@ private struct ActionsMenuOverlay: View {
                 .position(computeModalPosition(in: geometry))
             }
         }
-        .presentationBackground(.clear)
         .onAppear {
             withAnimation(VaporAnimation.appearCurve.animation(duration: VaporAnimation.normalDuration)) {
                 isVisible = true
@@ -861,6 +845,137 @@ private struct ActionsMenuOverlay: View {
             isVisible = false
         }
         // Delay the actual dismiss to allow animation to complete
+        DispatchQueue.main.asyncAfter(deadline: .now() + VaporAnimation.normalDuration) {
+            onDismiss()
+        }
+    }
+}
+
+// MARK: - Delete Confirmation Overlay
+
+/// Overlay for the delete confirmation that fades in/out instead of sliding.
+private struct DeleteConfirmationOverlay: View {
+    let onDelete: () -> Void
+    let onCancel: () -> Void
+
+    @State private var isVisible = false
+
+    var body: some View {
+        ZStack {
+            // Semi-transparent backdrop
+            Color.black.opacity(isVisible ? 0.3 : 0)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    dismissWithAnimation(action: onCancel)
+                }
+
+            // Modal content
+            VStack(spacing: 0) {
+                // Title
+                Text("Delete Recording")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(VaporColor.textPrimary)
+                    .padding(.top, 20)
+                    .padding(.bottom, 8)
+
+                // Message
+                Text("This will permanently delete this recording and its transcript. This action cannot be undone.")
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundColor(VaporColor.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 20)
+
+                Divider()
+                    .background(VaporColor.fog)
+
+                // Delete button
+                Button {
+                    dismissWithAnimation(action: onDelete)
+                } label: {
+                    Text("Delete")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(VaporColor.recording)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                }
+                .accessibilityIdentifier("deleteConfirmButton")
+
+                Divider()
+                    .background(VaporColor.fog)
+
+                // Cancel button
+                Button {
+                    dismissWithAnimation(action: onCancel)
+                } label: {
+                    Text("Cancel")
+                        .font(.system(size: 17, weight: .regular))
+                        .foregroundColor(VaporColor.sky)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                }
+                .accessibilityIdentifier("deleteCancelButton")
+            }
+            .frame(width: 270)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(VaporColor.cloud)
+            )
+            .opacity(isVisible ? 1 : 0)
+            .scaleEffect(isVisible ? 1 : 0.95)
+        }
+        .onAppear {
+            withAnimation(VaporAnimation.appearCurve.animation(duration: VaporAnimation.normalDuration)) {
+                isVisible = true
+            }
+        }
+    }
+
+    private func dismissWithAnimation(action: @escaping () -> Void) {
+        withAnimation(VaporAnimation.exitCurve.animation(duration: VaporAnimation.normalDuration)) {
+            isVisible = false
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + VaporAnimation.normalDuration) {
+            action()
+        }
+    }
+}
+
+// MARK: - Speaker Picker Overlay
+
+/// Overlay for the speaker picker that fades in/out instead of sliding.
+private struct SpeakerPickerOverlay: View {
+    let store: StoreOf<SpeakerPickerFeature>
+    let onDismiss: () -> Void
+
+    @State private var isVisible = false
+
+    var body: some View {
+        ZStack {
+            // Semi-transparent backdrop
+            Color.black.opacity(isVisible ? 0.3 : 0)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    dismissWithAnimation()
+                }
+
+            // Modal content
+            SpeakerPickerView(store: store)
+                .padding(VaporSpacing.lg)
+                .opacity(isVisible ? 1 : 0)
+                .scaleEffect(isVisible ? 1 : 0.95)
+        }
+        .onAppear {
+            withAnimation(VaporAnimation.appearCurve.animation(duration: VaporAnimation.normalDuration)) {
+                isVisible = true
+            }
+        }
+    }
+
+    private func dismissWithAnimation() {
+        withAnimation(VaporAnimation.exitCurve.animation(duration: VaporAnimation.normalDuration)) {
+            isVisible = false
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + VaporAnimation.normalDuration) {
             onDismiss()
         }

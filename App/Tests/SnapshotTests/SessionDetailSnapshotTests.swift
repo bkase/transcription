@@ -330,4 +330,63 @@ struct SessionDetailSnapshotTests {
 
         SnapshotHarness.assertSnapshot(of: view, named: "session_actions_modal")
     }
+
+    @Test func testDeleteConfirmationOverlay() {
+        // Delete confirmation overlay (custom overlay instead of confirmationDialog)
+        let view = ZStack {
+            // Background content
+            Color(VaporColor.mist)
+                .ignoresSafeArea()
+
+            // Semi-transparent backdrop
+            Color.black.opacity(0.3)
+                .ignoresSafeArea()
+
+            // Modal content (simulating the DeleteConfirmationOverlay)
+            VStack(spacing: 0) {
+                // Title
+                Text("Delete Recording")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(VaporColor.textPrimary)
+                    .padding(.top, 20)
+                    .padding(.bottom, 8)
+
+                // Message
+                Text("This will permanently delete this recording and its transcript. This action cannot be undone.")
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundColor(VaporColor.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 20)
+
+                Divider()
+                    .background(VaporColor.fog)
+
+                // Delete button
+                Text("Delete")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(VaporColor.recording)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+
+                Divider()
+                    .background(VaporColor.fog)
+
+                // Cancel button
+                Text("Cancel")
+                    .font(.system(size: 17, weight: .regular))
+                    .foregroundColor(VaporColor.sky)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+            }
+            .frame(width: 270)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(VaporColor.cloud)
+            )
+        }
+        .frame(width: 390, height: 844)
+
+        SnapshotHarness.assertSnapshot(of: view, named: "delete_confirmation_overlay")
+    }
 }

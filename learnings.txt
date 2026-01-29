@@ -1224,3 +1224,11 @@
 - Add `.animation(nil, value: isSelected)` to the container to disable all implicit animations
 - Use fixed `.frame(width: N)` on the conditionally-visible element to prevent layout shift
 - Example: checkmark in SpeakerOption row should use fixed 20pt frame with opacity toggle
+
+## Replacing system modals with custom overlays (bd-2emq)
+- `.confirmationDialog` and `.fullScreenCover` slide from bottom - use `.overlay {}` for fade animations
+- Remove `.presentationBackground(.clear)` when converting from fullScreenCover to overlay
+- For TCA `@Presents` child state with overlay: `if store.childState != nil, let childStore = $store.scope(...).wrappedValue`
+- Fade in/out pattern: `@State isVisible = false`, animate on onAppear, delay dismiss for animation duration
+- Custom delete confirmation: use VStack with Dividers between buttons, match iOS alert styling (width: 270, cornerRadius: 14)
+- Add accessibility identifiers (e.g., "deleteConfirmButton", "deleteCancelButton") for UI testing
