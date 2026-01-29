@@ -59,6 +59,9 @@ public struct PeopleFeature {
         // Mock photo picker state (for UI testing)
         public var isShowingMockPhotoPicker: Bool = false
 
+        /// Current user profile (to detect when tapped person is self)
+        public var userProfile: UserProfile = .empty
+
         /// Whether we're editing an existing person (vs creating new)
         public var isEditing: Bool {
             editingPerson != nil
@@ -79,6 +82,14 @@ public struct PeopleFeature {
             conversationCounts[personId] ?? 0
         }
 
+        /// Check if a person record represents the current user.
+        /// Matches by case-insensitive name comparison (same logic as SpeakerPickerFeature).
+        public func isCurrentUser(_ person: PersonRecord) -> Bool {
+            let userName = userProfile.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !userName.isEmpty else { return false }
+            return person.name.lowercased() == userName.lowercased()
+        }
+
         public init(
             people: [PersonRecord] = [],
             conversationCounts: [String: Int] = [:],
@@ -91,7 +102,8 @@ public struct PeopleFeature {
             formColorToken: String = SpeakerColor.sky.rawValue,
             formImageData: Data? = nil,
             isSaving: Bool = false,
-            isShowingMockPhotoPicker: Bool = false
+            isShowingMockPhotoPicker: Bool = false,
+            userProfile: UserProfile = .empty
         ) {
             self.people = people
             self.conversationCounts = conversationCounts
@@ -105,6 +117,7 @@ public struct PeopleFeature {
             self.formImageData = formImageData
             self.isSaving = isSaving
             self.isShowingMockPhotoPicker = isShowingMockPhotoPicker
+            self.userProfile = userProfile
         }
     }
 
@@ -116,6 +129,7 @@ public struct PeopleFeature {
         case peopleFailed(String)
         case searchQueryChanged(String)
         case personTapped(PersonID)
+        case selfTapped  // Emitted when tapping on a person that represents the current user
 
         // CRUD actions
         case addPersonTapped
@@ -185,6 +199,10 @@ public struct PeopleFeature {
 
             case .personTapped:
                 // Navigation intent - will be handled by parent
+                return .none
+
+            case .selfTapped:
+                // Navigation intent to open profile - will be handled by parent
                 return .none
 
             // MARK: - CRUD Actions

@@ -166,6 +166,11 @@ public struct AppFeature {
                 _ = state.path.popLast()
                 return .none
 
+            case .path(.element(id: _, action: .people(.selfTapped))):
+                // Navigate to profile when user taps on themselves in people directory
+                state.path.append(.profile(ProfileFeature.State(profile: state.userProfile)))
+                return .none
+
             case let .path(.element(id: _, action: .people(.personTapped(personId)))):
                 // Fetch person record and navigate to person timeline
                 return .run { [databaseClient] send in
@@ -200,8 +205,8 @@ public struct AppFeature {
                 return .send(.recording(.presented(.startRecording(audioDirectory: audioDir))))
 
             case .timeline(.peopleTapped):
-                // Push people directory onto navigation stack
-                state.path.append(.people(PeopleFeature.State()))
+                // Push people directory onto navigation stack with current user profile
+                state.path.append(.people(PeopleFeature.State(userProfile: state.userProfile)))
                 return .none
 
             case .timeline(.avatarTapped):
@@ -292,9 +297,10 @@ extension AppFeature.State {
             case .personTimeline:
                 // PersonTimeline uses settings icon, not avatar - no profile sync needed
                 break
-            case .people:
-                // PeopleFeature doesn't need profile sync
-                break
+            case .people(var peopleState):
+                // Sync profile to PeopleFeature so it can detect current user
+                peopleState.userProfile = profile
+                path[id: id] = .people(peopleState)
             }
         }
     }

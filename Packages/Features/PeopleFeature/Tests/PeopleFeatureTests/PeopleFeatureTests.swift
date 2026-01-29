@@ -154,4 +154,89 @@ struct PeopleFeatureTests {
         // Removing when no photo exists should do nothing (formImageData already nil)
         await store.send(.removePhotoTapped)
     }
+
+    // MARK: - testSelfTappedIsNavigationIntent
+
+    @Test
+    func testSelfTappedIsNavigationIntent() async {
+        let store = TestStore(initialState: PeopleFeature.State()) {
+            PeopleFeature()
+        }
+
+        // selfTapped is a navigation intent - no state change expected
+        await store.send(.selfTapped)
+    }
+
+    // MARK: - testIsCurrentUserDetection
+
+    @Test
+    func testIsCurrentUserDetection() async {
+        let mockDate = Date(timeIntervalSince1970: 1000000)
+        let userProfile = UserProfile(name: "Alice Smith")
+        let person = PersonRecord(
+            id: "person-1",
+            name: "Alice Smith",
+            colorToken: "sky",
+            createdAt: mockDate,
+            updatedAt: mockDate
+        )
+        let otherPerson = PersonRecord(
+            id: "person-2",
+            name: "Bob Jones",
+            colorToken: "lavender",
+            createdAt: mockDate,
+            updatedAt: mockDate
+        )
+
+        let state = PeopleFeature.State(
+            people: [person, otherPerson],
+            userProfile: userProfile
+        )
+
+        // Person with matching name should be detected as current user
+        #expect(state.isCurrentUser(person) == true)
+        // Person with different name should not be current user
+        #expect(state.isCurrentUser(otherPerson) == false)
+    }
+
+    @Test
+    func testIsCurrentUserDetectionCaseInsensitive() async {
+        let mockDate = Date(timeIntervalSince1970: 1000000)
+        let userProfile = UserProfile(name: "ALICE SMITH")
+        let person = PersonRecord(
+            id: "person-1",
+            name: "alice smith",
+            colorToken: "sky",
+            createdAt: mockDate,
+            updatedAt: mockDate
+        )
+
+        let state = PeopleFeature.State(
+            people: [person],
+            userProfile: userProfile
+        )
+
+        // Case-insensitive matching should work
+        #expect(state.isCurrentUser(person) == true)
+    }
+
+    @Test
+    func testIsCurrentUserReturnsFalseWhenProfileEmpty() async {
+        let mockDate = Date(timeIntervalSince1970: 1000000)
+        let person = PersonRecord(
+            id: "person-1",
+            name: "Alice Smith",
+            colorToken: "sky",
+            createdAt: mockDate,
+            updatedAt: mockDate
+        )
+
+        let state = PeopleFeature.State(
+            people: [person],
+            userProfile: .empty
+        )
+
+        // With empty profile, no one should be detected as current user
+        #expect(state.isCurrentUser(person) == false)
+    }
 }

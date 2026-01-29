@@ -1271,3 +1271,10 @@
 - If the test passes, the bug may be: already fixed, a false report, or environment-specific
 - E2E tests for context menu actions: use `element.press(forDuration: 1.0)` to trigger long-press
 - Context menu buttons can be found by label: `app.buttons["Edit"]`, `app.buttons["Delete"]`
+
+## People -> Profile Navigation
+- To detect if a person is the current user, compare names case-insensitively (same as SpeakerPickerFeature)
+- Pass userProfile to child features that need to identify the current user
+- syncUserProfileToPath in AppFeature needs to sync profile to all features that use it
+- E2E tests: Avoid complex text editing (Select All menu unreliable); keep tests focused on navigation flow
+

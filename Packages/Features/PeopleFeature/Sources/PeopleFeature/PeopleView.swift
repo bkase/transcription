@@ -100,23 +100,35 @@ public struct PeopleView: View {
     private var peopleListContent: some View {
         LazyVStack(spacing: VaporSpacing.sm) {
             ForEach(store.filteredPeople, id: \.id) { person in
+                let isCurrentUser = store.state.isCurrentUser(person)
                 Button {
-                    store.send(.personTapped(PersonID(rawValue: person.id)))
+                    if isCurrentUser {
+                        store.send(.selfTapped)
+                    } else {
+                        store.send(.personTapped(PersonID(rawValue: person.id)))
+                    }
                 } label: {
-                    personCard(for: person)
+                    personCard(for: person, isCurrentUser: isCurrentUser)
                 }
                 .buttonStyle(PlainButtonStyle())
+                .accessibilityIdentifier(isCurrentUser ? "currentUserPersonCard" : "personCard_\(person.id)")
                 .contextMenu {
                     Button {
-                        store.send(.editPersonTapped(person))
+                        if isCurrentUser {
+                            store.send(.selfTapped)
+                        } else {
+                            store.send(.editPersonTapped(person))
+                        }
                     } label: {
                         Label("Edit", systemImage: "pencil")
                     }
 
-                    Button(role: .destructive) {
-                        store.send(.deletePersonTapped(PersonID(rawValue: person.id)))
-                    } label: {
-                        Label("Delete", systemImage: "trash")
+                    if !isCurrentUser {
+                        Button(role: .destructive) {
+                            store.send(.deletePersonTapped(PersonID(rawValue: person.id)))
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
                     }
                 }
             }
@@ -147,10 +159,10 @@ public struct PeopleView: View {
         .padding(.top, VaporSpacing.xl)
     }
 
-    private func personCard(for person: PersonRecord) -> some View {
+    private func personCard(for person: PersonRecord, isCurrentUser: Bool = false) -> some View {
         let speakerColor = SpeakerColor(rawValue: person.colorToken) ?? .sky
         return PersonCard(
-            name: person.name,
+            name: isCurrentUser ? "\(person.name) (You)" : person.name,
             imageData: person.imageData,
             conversationCount: store.state.conversationCount(for: person.id),
             color: speakerColor

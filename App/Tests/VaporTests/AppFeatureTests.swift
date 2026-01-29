@@ -40,7 +40,9 @@ struct AppFeatureTests {
 
     @Test
     func testPeopleTappedNavigatesToPeopleDirectory() async {
-        let store = TestStore(initialState: AppFeature.State()) {
+        let testProfile = UserProfile(name: "Test User")
+
+        let store = TestStore(initialState: AppFeature.State(userProfile: testProfile)) {
             AppFeature()
         }
 
@@ -49,13 +51,14 @@ struct AppFeatureTests {
 
         // Tap people icon in timeline header
         await store.send(.timeline(.peopleTapped)) {
-            $0.path.append(.people(PeopleFeature.State()))
+            $0.path.append(.people(PeopleFeature.State(userProfile: testProfile)))
         }
 
         // Verify people is on path
         #expect(store.state.path.count == 1)
-        if case .people = store.state.path.first {
-            // Success
+        if case let .people(peopleState) = store.state.path.first {
+            // Verify userProfile was passed
+            #expect(peopleState.userProfile == testProfile)
         } else {
             Issue.record("Expected people state in path")
         }
@@ -81,6 +84,36 @@ struct AppFeatureTests {
 
         // Path should be empty (back to timeline)
         #expect(store.state.path.isEmpty)
+    }
+
+    @Test
+    func testSelfTappedInPeopleNavigatesToProfile() async {
+        let testProfile = UserProfile(name: "Test User", email: "test@example.com")
+
+        let store = TestStore(
+            initialState: AppFeature.State(
+                path: StackState([.people(PeopleFeature.State(userProfile: testProfile))]),
+                userProfile: testProfile
+            )
+        ) {
+            AppFeature()
+        }
+
+        // Path should have people view
+        #expect(store.state.path.count == 1)
+
+        // Tap on self in people view
+        await store.send(.path(.element(id: 0, action: .people(.selfTapped)))) {
+            $0.path.append(.profile(ProfileFeature.State(profile: testProfile)))
+        }
+
+        // Path should have people and profile
+        #expect(store.state.path.count == 2)
+        if case let .profile(profileState) = store.state.path.last {
+            #expect(profileState.profile == testProfile)
+        } else {
+            Issue.record("Expected profile state in path")
+        }
     }
 
     // MARK: - Navigation Stack Tests
@@ -514,6 +547,48 @@ struct AppFeatureTests {
     }
 
     // MARK: - Profile Sync to Navigation Path Tests (bd-2j6f)
+
+    @Test
+    func testProfileSaveSyncsToPeopleFeatureInPath() async {
+        // Verify that when profile is saved, it syncs to PeopleFeature in the path
+        let initialProfile = UserProfile(name: "Initial")
+        let updatedProfile = UserProfile(name: "Updated Name")
+
+        let store = TestStore(
+            initialState: AppFeature.State(
+                path: StackState([
+                    .people(PeopleFeature.State(userProfile: initialProfile)),
+                    .profile(ProfileFeature.State(profile: initialProfile))
+                ]),
+                userProfile: initialProfile
+            )
+        ) {
+            AppFeature()
+        }
+
+        // When profile is saved via delegate
+        await store.send(.path(.element(id: 1, action: .profile(.delegate(.didSaveProfile(updatedProfile)))))) {
+            $0.userProfile = updatedProfile
+            $0.timeline.userProfile = updatedProfile
+            // PeopleFeature state in path should have updated userProfile
+            if case var .people(peopleState) = $0.path[id: 0] {
+                peopleState.userProfile = updatedProfile
+                $0.path[id: 0] = .people(peopleState)
+            }
+            // Profile state in path should be updated
+            if case var .profile(profileState) = $0.path[id: 1] {
+                profileState.profile = updatedProfile
+                $0.path[id: 1] = .profile(profileState)
+            }
+        }
+
+        // Verify PeopleFeature has updated profile
+        if case let .people(peopleState) = store.state.path.first {
+            #expect(peopleState.userProfile == updatedProfile)
+        } else {
+            Issue.record("Expected people state in path")
+        }
+    }
 
     @Test
     func testProfileSaveSyncsToPersonTimelineInPath() async {
