@@ -233,7 +233,7 @@ public struct SessionDetailView: View {
         if let session = store.session {
             VStack(alignment: .leading, spacing: VaporSpacing.xs) {
                 // Title row with speaker avatars and action buttons
-                HStack(alignment: .top, spacing: VaporSpacing.sm) {
+                HStack(alignment: .center, spacing: VaporSpacing.sm) {
                     // Speaker avatars
                     if !speakerAvatars.isEmpty {
                         SpeakerAvatarStack(speakers: speakerAvatars)
@@ -619,7 +619,7 @@ public struct SessionDetailViewPreview: View {
                     VStack(alignment: .leading, spacing: 0) {
                         // Session header
                         VStack(alignment: .leading, spacing: VaporSpacing.xs) {
-                            HStack(alignment: .top) {
+                            HStack(alignment: .center) {
                                 Text(title)
                                     .font(.system(size: 28, weight: .thin))
                                     .tracking(-0.5)

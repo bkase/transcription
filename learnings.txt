@@ -949,6 +949,12 @@
 - View layer extracts image from profile.avatar.imageData or displays initials as fallback
 - Use #if os(iOS) for UIImage(data:) since UIKit isn't available on macOS
 
+## SwiftUI HStack vertical alignment with multi-line content
+- When HStack contains items of varying height (e.g., multi-line text with fixed-size buttons), use `HStack(alignment: .center)` to vertically center all items
+- Default HStack alignment is `.center` but can be overridden; explicit `.center` ensures consistent centering
+- Common bug: `HStack(alignment: .top)` causes buttons/icons to stay at top when adjacent text wraps to multiple lines
+- Fix pattern: Change `.top` to `.center` for header rows with title + icons that need vertical centering
+
 ## Transcription timeout and recovery patterns
 - Offline transcription timeout: use `withThrowingTaskGroup` to race transcription vs sleep, cancel loser
 - OfflineTranscriptionError.timeout provides user-friendly error description

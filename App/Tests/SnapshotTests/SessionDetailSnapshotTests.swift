@@ -106,6 +106,33 @@ struct SessionDetailSnapshotTests {
         SnapshotHarness.assertSnapshot(of: view, named: "session_detail_no_audio")
     }
 
+    @Test func testSessionDetailMultiLineTitle() {
+        // Session with a long title that wraps to multiple lines
+        // Verifies that avatar and three-dot menu are vertically centered with the title
+        let view = SessionDetailViewPreview(
+            title: "Architecture Review: Q1 Planning and Infrastructure Updates for the Mobile Team",
+            time: "9:41 AM",
+            duration: "42:10",
+            segments: [
+                .init(
+                    speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
+                    timestamp: "00:12",
+                    text: "So we're looking at the Vapor direction."
+                ),
+                .init(
+                    speaker: .unassigned(displayOrder: 2, color: SpeakerColor.forIndex(1).color),
+                    timestamp: "00:18",
+                    text: "Exactly. It needs to feel like breath on glass. Nothing solid until it's saved."
+                )
+            ],
+            audioProgress: 0.3,
+            audioTime: "12:40",
+            isPlaying: true
+        )
+
+        SnapshotHarness.assertSnapshot(of: view, named: "session_detail_multi_line_title")
+    }
+
     @Test func testSessionDetailLongTranscript() {
         // Session with long transcript (many segments) and audio player visible (mix of assigned and unassigned)
         let view = SessionDetailViewPreview(
