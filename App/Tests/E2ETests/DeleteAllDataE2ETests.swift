@@ -82,9 +82,8 @@ final class DeleteAllDataE2ETests: XCTestCase {
         confirmButton.tap()
 
         // Verify we navigate back to timeline
-        let timelineTab = app.tabBars.buttons["Timeline"]
-        XCTAssertTrue(timelineTab.waitForExistence(timeout: 10), "Should navigate to timeline after deletion")
-        XCTAssertTrue(timelineTab.isSelected, "Timeline tab should be selected after deletion")
+        let settingsButton = app.buttons["settingsButton"]
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 10), "Should navigate to timeline after deletion")
 
         // Verify profile screen is gone (popped from navigation stack)
         let profileScreen = app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'profileScreen'")).firstMatch

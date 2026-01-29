@@ -104,6 +104,14 @@ public struct TimelineView: View {
             PageHeader(kicker: "Archive", title: "Timeline")
             Spacer()
             IconButton(
+                systemName: "person.2",
+                style: .transparent,
+                iconColor: VaporColor.textTertiary
+            ) {
+                store.send(.peopleTapped)
+            }
+            .accessibilityIdentifier("peopleButton")
+            IconButton(
                 systemName: "gearshape",
                 style: .transparent,
                 iconColor: VaporColor.textTertiary
@@ -502,6 +510,11 @@ public struct TimelineViewPreview: View {
                 HStack {
                     PageHeader(kicker: "Archive", title: "Timeline")
                     Spacer()
+                    IconButton(
+                        systemName: "person.2",
+                        style: .transparent,
+                        iconColor: VaporColor.textTertiary
+                    ) {}
                     IconButton(
                         systemName: "gearshape",
                         style: .transparent,

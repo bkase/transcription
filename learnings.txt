@@ -1255,3 +1255,14 @@
 - Alert buttons can have nested hierarchy causing multiple matches in XCUITest
 - Use `.firstMatch` when tapping alert buttons: `alert.buttons["Delete"].firstMatch.tap()`
 
+## TCA Navigation Stack path actions
+- Specific path action cases MUST be placed BEFORE the generic `case .path:` catch-all in switch statement
+- Swift matches first case encountered - generic `case .path:` will swallow all path actions if placed first
+- Example: `case let .path(.element(id: _, action: .people(.personTapped(personId)))):` must come before `case .path:`
+- Path element IDs are globally incremented in TCA TestStore - use `skipReceivedActions()` to avoid ID matching issues
+
+## E2E test TabView to NavigationStack migration
+- Replace `app.tabBars.buttons["TabName"]` with element checks like `app.buttons["settingsButton"]`
+- Remove `XCTAssertTrue(tab.isSelected, ...)` assertions when tabs are removed
+- Navigation to former tab content becomes navigation via buttons (push to path)
+

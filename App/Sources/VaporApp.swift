@@ -81,63 +81,30 @@ struct AppView: View {
 
     var body: some View {
         WithPerceptionTracking {
-            TabView(selection: Binding(
-                get: { store.currentTab },
-                set: { store.send(.tabSelected($0)) }
-            )) {
-                // Timeline tab with NavigationStack
-                NavigationStack(
-                    path: $store.scope(state: \.path, action: \.path)
-                ) {
-                    TimelineView(store: store.scope(state: \.timeline, action: \.timeline))
+            NavigationStack(
+                path: $store.scope(state: \.path, action: \.path)
+            ) {
+                TimelineView(store: store.scope(state: \.timeline, action: \.timeline))
+                    .navigationBarHidden(true)
+            } destination: { store in
+                switch store.case {
+                case let .sessionDetail(sessionDetailStore):
+                    SessionDetailView(store: sessionDetailStore)
                         .navigationBarHidden(true)
-                } destination: { store in
-                    switch store.case {
-                    case let .sessionDetail(sessionDetailStore):
-                        SessionDetailView(store: sessionDetailStore)
-                            .navigationBarHidden(true)
-                            .vaporNavigationTransition()
-                    case let .profile(profileStore):
-                        ProfileView(store: profileStore)
-                            .navigationBarHidden(true)
-                            .vaporNavigationTransition()
-                    case let .personTimeline(personTimelineStore):
-                        PersonTimelineView(store: personTimelineStore)
-                            .navigationBarHidden(true)
-                            .vaporNavigationTransition()
-                    }
-                }
-                .tabItem {
-                    Label("Timeline", systemImage: "list.bullet")
-                }
-                .tag(AppFeature.Tab.timeline)
-
-                // People tab with NavigationStack
-                NavigationStack(
-                    path: $store.scope(state: \.path, action: \.path)
-                ) {
-                    PeopleView(store: store.scope(state: \.people, action: \.people))
+                        .vaporNavigationTransition()
+                case let .profile(profileStore):
+                    ProfileView(store: profileStore)
                         .navigationBarHidden(true)
-                } destination: { store in
-                    switch store.case {
-                    case let .sessionDetail(sessionDetailStore):
-                        SessionDetailView(store: sessionDetailStore)
-                            .navigationBarHidden(true)
-                            .vaporNavigationTransition()
-                    case let .profile(profileStore):
-                        ProfileView(store: profileStore)
-                            .navigationBarHidden(true)
-                            .vaporNavigationTransition()
-                    case let .personTimeline(personTimelineStore):
-                        PersonTimelineView(store: personTimelineStore)
-                            .navigationBarHidden(true)
-                            .vaporNavigationTransition()
-                    }
+                        .vaporNavigationTransition()
+                case let .personTimeline(personTimelineStore):
+                    PersonTimelineView(store: personTimelineStore)
+                        .navigationBarHidden(true)
+                        .vaporNavigationTransition()
+                case let .people(peopleStore):
+                    PeopleView(store: peopleStore)
+                        .navigationBarHidden(true)
+                        .vaporNavigationTransition()
                 }
-                .tabItem {
-                    Label("People", systemImage: "person.2")
-                }
-                .tag(AppFeature.Tab.people)
             }
             .onAppear {
                 store.send(.onAppear)

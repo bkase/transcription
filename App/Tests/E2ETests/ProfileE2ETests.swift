@@ -50,9 +50,8 @@ final class ProfileE2ETests: XCTestCase {
         let testName = "Test User Name"
 
         // 1. Test navigation: Timeline -> Profile
-        let timelineTab = app.tabBars.buttons["Timeline"]
-        XCTAssertTrue(timelineTab.waitForExistence(timeout: 5), "Timeline tab should exist")
-        XCTAssertTrue(timelineTab.isSelected, "Timeline tab should be selected by default")
+        let settingsButton = app.buttons["settingsButton"]
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 5), "Settings button should exist")
 
         navigateToProfile()
 
@@ -94,8 +93,7 @@ final class ProfileE2ETests: XCTestCase {
 
         // 4. Test back navigation: Profile -> Timeline
         backButton.tap()
-        XCTAssertTrue(timelineTab.waitForExistence(timeout: 5), "Should return to timeline")
-        XCTAssertTrue(timelineTab.isSelected, "Timeline tab should be selected")
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 5), "Should return to timeline")
 
         // 5. Test in-session persistence: Return to Profile and verify data persists
         navigateToProfile()
@@ -134,8 +132,7 @@ final class ProfileE2ETests: XCTestCase {
         backButton.tap()
 
         // Verify we're back on timeline (cancel succeeded)
-        let timelineTab = app.tabBars.buttons["Timeline"]
-        XCTAssertTrue(timelineTab.waitForExistence(timeout: 5), "Should return to timeline")
-        XCTAssertTrue(timelineTab.isSelected, "Timeline should be selected after cancel")
+        let settingsButton = app.buttons["settingsButton"]
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 5), "Should return to timeline")
     }
 }

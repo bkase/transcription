@@ -52,6 +52,14 @@ public struct PeopleView: View {
 
     private var headerSection: some View {
         HStack {
+            IconButton(
+                systemName: "chevron.left",
+                style: .transparent,
+                iconColor: VaporColor.textTertiary
+            ) {
+                store.send(.backTapped)
+            }
+            .accessibilityIdentifier("backButton")
             PageHeader(kicker: "Directory", title: "People")
             Spacer()
             Button {

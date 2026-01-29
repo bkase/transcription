@@ -24,9 +24,9 @@ final class TimelineE2ETests: XCTestCase {
         // 1. Launch the app
         app.launch()
 
-        // 2. Verify we're on the Timeline screen
-        let timelineTab = app.tabBars.buttons["Timeline"]
-        XCTAssertTrue(timelineTab.waitForExistence(timeout: 5), "Timeline tab should exist")
+        // 2. Verify we're on the Timeline screen (no tab bar, but settings button should exist)
+        let settingsButton = app.buttons["settingsButton"]
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 5), "Settings button should exist in timeline header")
 
         // 3. Verify empty state elements
         let emptyStateTitlePredicate = NSPredicate(format: "identifier == 'emptyStateTitle'")
@@ -57,11 +57,9 @@ final class TimelineE2ETests: XCTestCase {
         // 1. Launch the app
         app.launch()
 
-        // 2. Verify we're on the Timeline screen
-        // The Timeline tab should be selected by default
-        let timelineTab = app.tabBars.buttons["Timeline"]
-        XCTAssertTrue(timelineTab.waitForExistence(timeout: 5), "Timeline tab should exist")
-        XCTAssertTrue(timelineTab.isSelected, "Timeline tab should be selected by default")
+        // 2. Verify we're on the Timeline screen (settings button should exist)
+        let settingsButton = app.buttons["settingsButton"]
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 5), "Settings button should exist in timeline header")
 
         // 3. Verify timeline is empty initially (no session cards)
         let sessionCardsPredicate = NSPredicate(format: "identifier == 'sessionCard'")
@@ -94,8 +92,8 @@ final class TimelineE2ETests: XCTestCase {
         XCTAssertTrue(backButton.waitForExistence(timeout: 5), "Back button should exist on session detail")
         backButton.tap()
 
-        // 10. Wait for timeline to appear
-        XCTAssertTrue(timelineTab.waitForExistence(timeout: 10), "Should return to timeline after tapping back")
+        // 10. Wait for timeline to appear (settings button indicates we're back)
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 10), "Should return to timeline after tapping back")
 
         // 11. Verify the session card appears in the timeline
         // Use a predicate query to find any session card

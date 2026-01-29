@@ -25,9 +25,9 @@ final class ErrorStatesE2ETests: XCTestCase {
         app.launchArguments = ["-uiTesting", "-modelDownloadFailure"]
         app.launch()
 
-        // Verify timeline tab exists
-        let timelineTab = app.tabBars.buttons["Timeline"]
-        XCTAssertTrue(timelineTab.waitForExistence(timeout: 5), "Timeline tab should exist")
+        // Verify timeline exists (settings button indicates we're on timeline)
+        let settingsButton = app.buttons["settingsButton"]
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 5), "Settings button should exist")
 
         // Verify empty state shows error variant
         let emptyStateTitlePredicate = NSPredicate(format: "identifier == 'emptyStateTitle'")
@@ -65,8 +65,8 @@ final class ErrorStatesE2ETests: XCTestCase {
         app.launch()
 
         // Verify timeline exists
-        let timelineTab = app.tabBars.buttons["Timeline"]
-        XCTAssertTrue(timelineTab.waitForExistence(timeout: 5), "Timeline tab should exist")
+        let settingsButton = app.buttons["settingsButton"]
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 5), "Settings button should exist")
 
         // Start recording
         let startRecordingButton = app.buttons["startRecordingButton"]
@@ -109,8 +109,8 @@ final class ErrorStatesE2ETests: XCTestCase {
         app.launch()
 
         // Verify timeline exists
-        let timelineTab = app.tabBars.buttons["Timeline"]
-        XCTAssertTrue(timelineTab.waitForExistence(timeout: 5), "Timeline tab should exist")
+        let settingsButton = app.buttons["settingsButton"]
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 5), "Settings button should exist")
 
         // Start recording
         let startRecordingButton = app.buttons["startRecordingButton"]

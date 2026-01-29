@@ -24,45 +24,33 @@ public struct AppFeature {
         case sessionDetail(SessionDetailFeature)
         case profile(ProfileFeature)
         case personTimeline(PersonTimelineFeature)
+        case people(PeopleFeature)
     }
 
     @ObservableState
     public struct State: Equatable {
-        public var currentTab: Tab = .timeline
         public var path: StackState<Path.State> = StackState()
         public var timeline: TimelineFeature.State
-        public var people: PeopleFeature.State
         @Presents public var recording: RecordingFeature.State?
         public var userProfile: UserProfile = .empty
 
         public init(
-            currentTab: Tab = .timeline,
             path: StackState<Path.State> = StackState(),
             timeline: TimelineFeature.State = .init(),
-            people: PeopleFeature.State = .init(),
             recording: RecordingFeature.State? = nil,
             userProfile: UserProfile = .empty
         ) {
-            self.currentTab = currentTab
             self.path = path
             self.timeline = timeline
-            self.people = people
             self.recording = recording
             self.userProfile = userProfile
         }
     }
 
-    public enum Tab: Equatable, Sendable {
-        case timeline
-        case people
-    }
-
     public enum Action: Equatable {
         case onAppear
-        case tabSelected(Tab)
         case path(StackAction<Path.State, Path.Action>)
         case timeline(TimelineFeature.Action)
-        case people(PeopleFeature.Action)
         case recording(PresentationAction<RecordingFeature.Action>)
         case dismissRecording
         case userProfileLoaded(UserProfile)
@@ -77,10 +65,6 @@ public struct AppFeature {
     public var body: some ReducerOf<Self> {
         Scope(state: \.timeline, action: \.timeline) {
             TimelineFeature()
-        }
-
-        Scope(state: \.people, action: \.people) {
-            PeopleFeature()
         }
 
         Reduce { state, action in
@@ -99,10 +83,6 @@ public struct AppFeature {
                 state.timeline.userProfile = profile
                 // Sync to any features in the navigation path that need userProfile
                 state.syncUserProfileToPath(profile)
-                return .none
-
-            case let .tabSelected(tab):
-                state.currentTab = tab
                 return .none
 
             // MARK: - Navigation Stack Actions
@@ -127,14 +107,9 @@ public struct AppFeature {
                 return .none
 
             case .path(.element(id: _, action: .profile(.delegate(.didDeleteAllData)))):
-                // Pop to root, switch to timeline tab, and reload timeline
+                // Pop to root and reload timeline
                 state.path.removeAll()
-                state.currentTab = .timeline
-                // Also reload people list in case user navigates there
-                return .merge(
-                    .send(.timeline(.loadSessions)),
-                    .send(.people(.loadPeople))
-                )
+                return .send(.timeline(.loadSessions))
 
             case .path(.element(id: _, action: .sessionDetail(.deleteCompleted))):
                 // Pop the navigation stack and reload timeline when session is deleted
@@ -186,6 +161,23 @@ public struct AppFeature {
                 state.path.append(.profile(ProfileFeature.State(profile: state.userProfile)))
                 return .none
 
+            case .path(.element(id: _, action: .people(.backTapped))):
+                // Pop the navigation stack when back is tapped in people directory
+                _ = state.path.popLast()
+                return .none
+
+            case let .path(.element(id: _, action: .people(.personTapped(personId)))):
+                // Fetch person record and navigate to person timeline
+                return .run { [databaseClient] send in
+                    if let person = try await databaseClient.fetchPerson(personId) {
+                        await send(.personLoaded(person))
+                    } else {
+                        await send(.personLoadFailed("Person not found"))
+                    }
+                } catch: { error, send in
+                    await send(.personLoadFailed(error.localizedDescription))
+                }
+
             case .path:
                 // Other path actions are handled by forEach below
                 return .none
@@ -207,6 +199,11 @@ public struct AppFeature {
                 try? FileManager.default.createDirectory(at: audioDir, withIntermediateDirectories: true)
                 return .send(.recording(.presented(.startRecording(audioDirectory: audioDir))))
 
+            case .timeline(.peopleTapped):
+                // Push people directory onto navigation stack
+                state.path.append(.people(PeopleFeature.State()))
+                return .none
+
             case .timeline(.avatarTapped):
                 // Push profile onto navigation stack with current user profile
                 state.path.append(.profile(ProfileFeature.State(profile: state.userProfile)))
@@ -215,19 +212,7 @@ public struct AppFeature {
             case .timeline:
                 return .none
 
-            // MARK: - People Actions
-
-            case let .people(.personTapped(personId)):
-                // Fetch person record and navigate to person timeline
-                return .run { [databaseClient] send in
-                    if let person = try await databaseClient.fetchPerson(personId) {
-                        await send(.personLoaded(person))
-                    } else {
-                        await send(.personLoadFailed("Person not found"))
-                    }
-                } catch: { error, send in
-                    await send(.personLoadFailed(error.localizedDescription))
-                }
+            // MARK: - People Navigation Results
 
             case let .personLoaded(person):
                 // Push person timeline onto navigation stack
@@ -239,9 +224,6 @@ public struct AppFeature {
 
             case .personLoadFailed:
                 // Silently fail - could add error handling UI later
-                return .none
-
-            case .people:
                 return .none
 
             // MARK: - Recording Actions
@@ -309,6 +291,9 @@ extension AppFeature.State {
                 path[id: id] = .profile(profileState)
             case .personTimeline:
                 // PersonTimeline uses settings icon, not avatar - no profile sync needed
+                break
+            case .people:
+                // PeopleFeature doesn't need profile sync
                 break
             }
         }

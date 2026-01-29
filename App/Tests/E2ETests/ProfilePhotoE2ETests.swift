@@ -25,13 +25,10 @@ final class ProfilePhotoE2ETests: XCTestCase {
         app.launch()
 
         // 2. Verify we're on the Timeline screen
-        let timelineTab = app.tabBars.buttons["Timeline"]
-        XCTAssertTrue(timelineTab.waitForExistence(timeout: 5), "Timeline tab should exist")
-        XCTAssertTrue(timelineTab.isSelected, "Timeline tab should be selected by default")
-
-        // 3. Tap the settings button to navigate to profile
         let settingsButton = app.buttons["settingsButton"]
         XCTAssertTrue(settingsButton.waitForExistence(timeout: 5), "Settings button should exist")
+
+        // 3. Tap the settings button to navigate to profile
         settingsButton.tap()
 
         // 4. Verify profile screen appears

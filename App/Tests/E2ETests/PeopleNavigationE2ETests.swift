@@ -19,15 +19,15 @@ final class PeopleNavigationE2ETests: XCTestCase {
     }
 
     /// Test that tapping a person in People directory navigates to PersonTimelineView.
-    /// Flow: Timeline -> People tab -> Add person -> People list -> Tap person -> PersonTimelineView
+    /// Flow: Timeline -> People icon -> Add person -> People list -> Tap person -> PersonTimelineView
     func testTapPersonNavigatesToPersonTimeline() {
         // 1. Launch the app
         app.launch()
 
-        // 2. Navigate to People tab
-        let peopleTab = app.tabBars.buttons["People"]
-        XCTAssertTrue(peopleTab.waitForExistence(timeout: 5), "People tab should exist")
-        peopleTab.tap()
+        // 2. Navigate to People directory via people icon in header
+        let peopleButton = app.buttons["peopleButton"]
+        XCTAssertTrue(peopleButton.waitForExistence(timeout: 5), "People button should exist in timeline header")
+        peopleButton.tap()
 
         // 3. Add a new person so we have someone to tap on
         let addPersonButton = app.buttons["addPersonButton"]

@@ -39,9 +39,8 @@ final class DeleteSessionE2ETests: XCTestCase {
         app.launch()
 
         // 2. Verify we're on the Timeline screen
-        let timelineTab = app.tabBars.buttons["Timeline"]
-        XCTAssertTrue(timelineTab.waitForExistence(timeout: 5), "Timeline tab should exist")
-        XCTAssertTrue(timelineTab.isSelected, "Timeline tab should be selected by default")
+        let settingsButton = app.buttons["settingsButton"]
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 5), "Settings button should exist")
 
         // 3. Start a recording to create a session
         let startRecordingButton = app.buttons["startRecordingButton"]
@@ -54,7 +53,7 @@ final class DeleteSessionE2ETests: XCTestCase {
         stopRecordingButton.tap()
 
         // 5. Wait for timeline to show with the new session
-        XCTAssertTrue(timelineTab.waitForExistence(timeout: 10), "Should return to timeline after recording stops")
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 10), "Should return to timeline after recording stops")
 
         // 6. Wait for session card to appear
         let sessionCardPredicate = NSPredicate(format: "identifier == 'sessionCard'")

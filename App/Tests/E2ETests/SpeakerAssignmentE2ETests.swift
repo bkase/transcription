@@ -29,8 +29,8 @@ final class SpeakerAssignmentE2ETests: XCTestCase {
         app.launch()
 
         // 2. Verify we're on the Timeline screen
-        let timelineTab = app.tabBars.buttons["Timeline"]
-        XCTAssertTrue(timelineTab.waitForExistence(timeout: 5), "Timeline tab should exist")
+        let settingsButton = app.buttons["settingsButton"]
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 5), "Settings button should exist")
 
         // 3. Start a recording to create a session with transcript segments
         let startRecordingButton = app.buttons["startRecordingButton"]
@@ -50,7 +50,7 @@ final class SpeakerAssignmentE2ETests: XCTestCase {
         stopRecordingButton.tap()
 
         // 6. Wait for timeline to show with the new session
-        XCTAssertTrue(timelineTab.waitForExistence(timeout: 10), "Should return to timeline")
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 10), "Should return to timeline")
 
         // 7. Find and tap the session card
         let sessionCardPredicate = NSPredicate(format: "identifier == 'sessionCard'")
@@ -117,7 +117,7 @@ final class SpeakerAssignmentE2ETests: XCTestCase {
         // 16. Navigate back to timeline and re-open the session to verify persistence
         // This forces a full reload of the session data
         backButton.tap()
-        XCTAssertTrue(timelineTab.waitForExistence(timeout: 5), "Should return to timeline")
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 5), "Should return to timeline")
 
         // Tap the session again
         XCTAssertTrue(sessionCards.firstMatch.waitForExistence(timeout: 5), "Session card should still exist")

@@ -110,6 +110,7 @@ public struct PeopleFeature {
 
     public enum Action: Equatable, Sendable {
         case onAppear
+        case backTapped
         case loadPeople
         case peopleLoaded([PersonRecord], [String: Int])
         case peopleFailed(String)
@@ -149,6 +150,10 @@ public struct PeopleFeature {
                     return .none
                 }
                 return .send(.loadPeople)
+
+            case .backTapped:
+                // Navigation intent - will be handled by parent
+                return .none
 
             case .loadPeople:
                 state.isLoading = true

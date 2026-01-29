@@ -115,7 +115,9 @@ public struct TimelineFeature {
         case searchPerformed([SessionRecord], [String: [SessionSpeakerInfo]])
         case sessionTapped(SessionID)
         case newRecordingTapped
-        /// User tapped the header avatar to navigate to profile
+        /// User tapped the people icon to navigate to people directory
+        case peopleTapped
+        /// User tapped the settings icon to navigate to profile
         case avatarTapped
         /// User tapped a recovery action in the alert
         case alertActionTapped(RecoveryAction)
@@ -272,6 +274,10 @@ public struct TimelineFeature {
                 guard state.isRecordEnabled else {
                     return .none
                 }
+                // Navigation intent - will be handled by parent
+                return .none
+
+            case .peopleTapped:
                 // Navigation intent - will be handled by parent
                 return .none
 
