@@ -120,16 +120,18 @@ public struct SpeakerOption: View {
 
             Spacer()
 
-            if isSelected {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(VaporColor.deep)
-            }
+            // Fixed-width frame prevents layout shift; opacity controls visibility
+            Image(systemName: "checkmark")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(VaporColor.deep)
+                .frame(width: 20)
+                .opacity(isSelected ? 1 : 0)
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 20)
         .background(isSelected ? VaporColor.haze : Color.clear)
         .contentShape(Rectangle())
+        .animation(nil, value: isSelected)
     }
 }
 
@@ -190,16 +192,18 @@ public struct CurrentUserOption: View {
 
             Spacer()
 
-            if isSelected {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(VaporColor.deep)
-            }
+            // Fixed-width frame prevents layout shift; opacity controls visibility
+            Image(systemName: "checkmark")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(VaporColor.deep)
+                .frame(width: 20)
+                .opacity(isSelected ? 1 : 0)
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 20)
         .background(isSelected ? VaporColor.haze : Color.clear)
         .contentShape(Rectangle())
+        .animation(nil, value: isSelected)
     }
 
     @ViewBuilder

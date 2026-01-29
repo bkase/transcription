@@ -1217,3 +1217,10 @@
 - SpeakerPickerFeature can still receive userProfile for "You" option, but parent can pass .empty
 - Delete snapshot tests that include removed avatar components, then re-record
 - Remove UIKit import only if no other UIKit types are used (check for UIImage, UIActivityViewController, etc.)
+
+## SwiftUI instant selection without animation (bd-3t26)
+- Conditional `if isSelected { View }` causes layout shifts and implicit animations
+- Fix: Always render the element but control visibility with `opacity(isSelected ? 1 : 0)`
+- Add `.animation(nil, value: isSelected)` to the container to disable all implicit animations
+- Use fixed `.frame(width: N)` on the conditionally-visible element to prevent layout shift
+- Example: checkmark in SpeakerOption row should use fixed 20pt frame with opacity toggle
