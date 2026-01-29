@@ -139,6 +139,57 @@ struct SessionCardSnapshotTests {
         SnapshotHarness.assertSnapshot(of: view, named: "session_card_in_timeline")
     }
 
+    @Test func testSessionCardTimestampAlignment() {
+        // Test that timestamps with varying widths align properly
+        // so that speaker circles appear at the same X coordinate
+        let view = VStack(alignment: .leading, spacing: 8) {
+            // Short time (single-digit hour, no period indicator in some locales)
+            SessionCard(
+                title: "Morning Standup",
+                time: "9:00 AM",
+                previewText: "Quick sync on what we're working on...",
+                speakerAvatars: [
+                    SpeakerAvatarInfo(id: "1", initials: "SC", color: .sky)
+                ]
+            )
+
+            // Medium time (double-digit hour)
+            SessionCard(
+                title: "Architecture Review",
+                time: "10:30 AM",
+                previewText: "So we're looking at the Vapor direction...",
+                speakerAvatars: [
+                    SpeakerAvatarInfo(id: "1", initials: "SC", color: .sky)
+                ]
+            )
+
+            // Longest time (double-digit hour with PM)
+            SessionCard(
+                title: "Product Strategy",
+                time: "12:59 PM",
+                previewText: "If we pivot to a local-first model...",
+                speakerAvatars: [
+                    SpeakerAvatarInfo(id: "1", initials: "SC", color: .sky)
+                ]
+            )
+
+            // Short PM time
+            SessionCard(
+                title: "Evening Reflection",
+                time: "5:30 PM",
+                previewText: "Looking back at today's progress...",
+                speakerAvatars: [
+                    SpeakerAvatarInfo(id: "1", initials: "SC", color: .sky)
+                ]
+            )
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(VaporColor.mist)
+
+        SnapshotHarness.assertSnapshot(of: view, named: "session_card_timestamp_alignment")
+    }
+
     @Test func testSessionCardWithSpeakerAvatars() {
         // Test speaker avatars on the right side near time
         let view = VStack(alignment: .leading, spacing: 24) {

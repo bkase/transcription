@@ -66,9 +66,10 @@ public struct SessionCard: View {
                 }
 
                 Text(time)
-                    .font(.system(size: 10))
+                    .font(.system(size: 10).monospacedDigit())
                     .tracking(0.5)
                     .foregroundColor(VaporColor.textTertiary)
+                    .frame(width: 52, alignment: .trailing)
             }
 
             // Preview text

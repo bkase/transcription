@@ -1178,6 +1178,12 @@
   - After: `Button { action() } label: { card }.buttonStyle(PlainButtonStyle()).contextMenu { ... }`
 - PlainButtonStyle() is important to preserve the visual appearance of the wrapped content
 
+## SwiftUI timestamp text alignment (bd-3127)
+- Timestamps in cards can have varying widths (e.g., "9:00 AM" vs "12:30 PM")
+- This causes misaligned elements (like speaker avatars) positioned after the timestamp
+- Fix: Use `.monospacedDigit()` on the font and `.frame(width: N, alignment: .trailing)` for fixed width
+- Width of ~52pt accommodates longest time format with AM/PM indicator
+
 ## Child feature state simplification when removing avatar (bd-3ee0)
 - When replacing avatar with settings icon in child feature headers, userProfile state becomes unnecessary
 - Remove userProfile property from child feature State if only used for avatar display
