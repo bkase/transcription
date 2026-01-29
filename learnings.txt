@@ -1244,3 +1244,9 @@
 - TranscriptSegment HStack order change: timestamp first, Spacer(), then speaker label on right
 - Snapshot tests capture visual layout - update reference snapshots after layout changes
 - Mock transcription may not include speaker diarization - E2E tests should handle gracefully with XCTSkip
+
+## Timestamp alignment (bd-cvkg)
+- Use `.monospacedDigit()` font modifier to ensure all digits have equal width (e.g., "11:11" same as "88:88")
+- Fixed-width frame on timestamp (40pt) ensures vertical alignment across segments
+- Subtle vertical separator (1pt Rectangle with VaporColor.fog) creates visual gutter like code editors
+- Snapshot tests with varying timestamp lengths (00:01, 59:59, 88:88, 11:11) verify alignment consistency

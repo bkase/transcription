@@ -197,4 +197,50 @@ struct TranscriptSegmentSnapshotTests {
 
         SnapshotHarness.assertSnapshot(of: view, named: "transcript_active_segment")
     }
+
+    @Test func testTimestampAlignment() {
+        // Test that timestamps of varying lengths align properly with monospaced digits
+        // and the vertical separator line creates consistent visual rhythm
+        let view = VStack(alignment: .leading, spacing: 16) {
+            // Short timestamp (00:01)
+            TranscriptSegment(
+                speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
+                timestamp: "00:01",
+                text: "First segment with short timestamp."
+            )
+
+            // Medium timestamp (05:30)
+            TranscriptSegment(
+                speaker: .unassigned(displayOrder: 2, color: SpeakerColor.forIndex(1).color),
+                timestamp: "05:30",
+                text: "Second segment with medium timestamp."
+            )
+
+            // Large timestamp (59:59)
+            TranscriptSegment(
+                speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
+                timestamp: "59:59",
+                text: "Third segment with maximum two-digit timestamp."
+            )
+
+            // Wide digits (88:88 - widest numerals)
+            TranscriptSegment(
+                speaker: .unassigned(displayOrder: 2, color: SpeakerColor.forIndex(1).color),
+                timestamp: "88:88",
+                text: "Fourth segment using widest digit (8) to verify monospaced alignment."
+            )
+
+            // Narrow digits (11:11 - narrowest numerals)
+            TranscriptSegment(
+                speaker: .unassigned(displayOrder: 1, color: SpeakerColor.forIndex(0).color),
+                timestamp: "11:11",
+                text: "Fifth segment using narrowest digit (1) to verify consistent width."
+            )
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(VaporColor.cloud)
+
+        SnapshotHarness.assertSnapshot(of: view, named: "transcript_timestamp_alignment")
+    }
 }
