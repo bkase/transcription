@@ -362,6 +362,57 @@ public struct ProfileView: View {
             .buttonStyle(PlainButtonStyle())
             .disabled(store.isExporting)
             .accessibilityIdentifier("exportAllConversationsButton")
+
+            // Delete All Data button
+            Button {
+                store.send(.deleteAllDataTapped)
+            } label: {
+                HStack {
+                    HStack(spacing: VaporSpacing.sm) {
+                        if store.isDeletingAllData {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                                .tint(VaporColor.recording)
+                        } else {
+                            Image(systemName: "trash")
+                                .font(.system(size: 20))
+                                .foregroundColor(VaporColor.recording)
+                        }
+
+                        Text(store.isDeletingAllData ? "Deleting..." : "Delete All Data")
+                            .font(.system(size: 16, weight: .light))
+                            .foregroundColor(VaporColor.recording)
+                    }
+
+                    Spacer()
+                }
+                .padding(VaporSpacing.md)
+                .background(
+                    RoundedRectangle(cornerRadius: VaporRadius.sm)
+                        .fill(VaporColor.cloud)
+                        .shadow(color: Color.black.opacity(0.03), radius: 8, x: 0, y: 2)
+                )
+            }
+            .buttonStyle(PlainButtonStyle())
+            .disabled(store.isDeletingAllData)
+            .accessibilityIdentifier("deleteAllDataButton")
+            .alert(
+                "Delete All Data?",
+                isPresented: Binding(
+                    get: { store.isShowingDeleteAllDataConfirmation },
+                    set: { if !$0 { store.send(.deleteAllDataCancelled) } }
+                )
+            ) {
+                Button("Cancel", role: .cancel) {
+                    store.send(.deleteAllDataCancelled)
+                }
+                Button("Delete", role: .destructive) {
+                    store.send(.deleteAllDataConfirmed)
+                }
+                .accessibilityIdentifier("confirmDeleteAllDataButton")
+            } message: {
+                Text("This will permanently delete all your conversations and people. Downloaded ML models will be kept. This action cannot be undone.")
+            }
         }
     }
 

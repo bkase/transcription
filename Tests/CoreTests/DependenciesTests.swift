@@ -46,7 +46,8 @@ import Dependencies
             fetchStaleRecordings: { [] },
             reconcileStaleRecordings: { _, _ in 0 },
             recoverStuckTranscriptions: { _ in 0 },
-            fetchSpeakerInfoForSessions: { _ in [:] }
+            fetchSpeakerInfoForSessions: { _ in [:] },
+            deleteAllData: { }
         )
         deps.audioCaptureClient = AudioCaptureClient(
             startCapture: { AsyncStream { _ in } },

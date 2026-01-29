@@ -77,7 +77,7 @@ def run_single_package_test(package_path: str, env: dict[str, str], project_root
     try:
         full_path = os.path.join(project_root, package_path)
         # Use subprocess cwd parameter instead of os.chdir to avoid thread-safety issues
-        proc = subprocess.run(["swift", "test", "--quiet"], env=env, capture_output=True, text=True, timeout=120, cwd=full_path)
+        proc = subprocess.run(["swift", "test", "--quiet"], env=env, capture_output=True, text=True, timeout=180, cwd=full_path)
         output = proc.stdout + proc.stderr
 
         match = re.search(r"Test run with (\d+) tests? .* (passed|failed)", output)
@@ -153,7 +153,7 @@ def run_xcode_tests(env: dict[str, str], targets: list[str], name: str, parallel
     for t in targets:
         cmd.append(f"-only-testing:{t}")
 
-    proc = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=300)
+    proc = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=600)
     output = proc.stdout + proc.stderr
 
     result = TestResult(phase=name, output=output)

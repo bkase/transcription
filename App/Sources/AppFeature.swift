@@ -126,6 +126,16 @@ public struct AppFeature {
                 state.syncUserProfileToPath(profile)
                 return .none
 
+            case .path(.element(id: _, action: .profile(.delegate(.didDeleteAllData)))):
+                // Pop to root, switch to timeline tab, and reload timeline
+                state.path.removeAll()
+                state.currentTab = .timeline
+                // Also reload people list in case user navigates there
+                return .merge(
+                    .send(.timeline(.loadSessions)),
+                    .send(.people(.loadPeople))
+                )
+
             case .path(.element(id: _, action: .sessionDetail(.deleteCompleted))):
                 // Pop the navigation stack and reload timeline when session is deleted
                 _ = state.path.popLast()

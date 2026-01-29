@@ -490,6 +490,9 @@ public struct DatabaseClient: Sendable {
     /// Fetch speaker info for multiple sessions in a single query.
     /// Returns a dictionary mapping session ID to array of speaker info (track + person data).
     public var fetchSpeakerInfoForSessions: @Sendable (_ sessionIds: [SessionID]) async throws -> [String: [SessionSpeakerInfo]] = { _ in [:] }
+
+    /// Delete all user data (sessions, transcripts, speakers, people) while preserving ML models.
+    public var deleteAllData: @Sendable () async throws -> Void
 }
 
 extension DatabaseClient: DependencyKey {
@@ -797,6 +800,17 @@ extension DatabaseClient: DependencyKey {
                         result[info.sessionId, default: []].append(info)
                     }
                     return result
+                }
+            },
+            deleteAllData: {
+                try await dbQueue.write { db in
+                    // Delete all data from tables in dependency order
+                    // FTS index is automatically cleared via triggers when transcript_segments are deleted
+                    try db.execute(sql: "DELETE FROM speaker_segments")
+                    try db.execute(sql: "DELETE FROM transcript_segments")
+                    try db.execute(sql: "DELETE FROM speaker_tracks")
+                    try db.execute(sql: "DELETE FROM sessions")
+                    try db.execute(sql: "DELETE FROM people")
                 }
             }
         )

@@ -1250,3 +1250,8 @@
 - Fixed-width frame on timestamp (40pt) ensures vertical alignment across segments
 - Subtle vertical separator (1pt Rectangle with VaporColor.fog) creates visual gutter like code editors
 - Snapshot tests with varying timestamp lengths (00:01, 59:59, 88:88, 11:11) verify alignment consistency
+
+## SwiftUI Alert XCUITest
+- Alert buttons can have nested hierarchy causing multiple matches in XCUITest
+- Use `.firstMatch` when tapping alert buttons: `alert.buttons["Delete"].firstMatch.tap()`
+

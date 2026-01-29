@@ -13,6 +13,7 @@ public struct ProfileFeature {
     @Dependency(\.userProfileClient) var userProfileClient
     @Dependency(\.profileImageClient) var profileImageClient
     @Dependency(\.exportClient) var exportClient
+    @Dependency(\.databaseClient) var databaseClient
 
     @ObservableState
     public struct State: Equatable {
@@ -32,6 +33,10 @@ public struct ProfileFeature {
         public var isExporting: Bool
         public var shareURL: URL?
 
+        // Delete all data state
+        public var isShowingDeleteAllDataConfirmation: Bool
+        public var isDeletingAllData: Bool
+
         public init(
             profile: UserProfile = .empty,
             isLoading: Bool = false,
@@ -41,7 +46,9 @@ public struct ProfileFeature {
             editingNameText: String = "",
             isShowingMockPhotoPicker: Bool = false,
             isExporting: Bool = false,
-            shareURL: URL? = nil
+            shareURL: URL? = nil,
+            isShowingDeleteAllDataConfirmation: Bool = false,
+            isDeletingAllData: Bool = false
         ) {
             self.profile = profile
             self.isLoading = isLoading
@@ -52,6 +59,8 @@ public struct ProfileFeature {
             self.isShowingMockPhotoPicker = isShowingMockPhotoPicker
             self.isExporting = isExporting
             self.shareURL = shareURL
+            self.isShowingDeleteAllDataConfirmation = isShowingDeleteAllDataConfirmation
+            self.isDeletingAllData = isDeletingAllData
         }
 
         /// Compute initials from the profile name for avatar display
@@ -101,12 +110,20 @@ public struct ProfileFeature {
         case exportAllFailed(String)
         case shareSheetDismissed
 
+        // Delete all data
+        case deleteAllDataTapped
+        case deleteAllDataConfirmed
+        case deleteAllDataCancelled
+        case deleteAllDataCompleted
+        case deleteAllDataFailed(String)
+
         // Delegate to parent
         case delegate(Delegate)
 
         @CasePathable
         public enum Delegate: Equatable, Sendable {
             case didSaveProfile(UserProfile)
+            case didDeleteAllData
         }
     }
 
@@ -282,6 +299,37 @@ public struct ProfileFeature {
 
             case .shareSheetDismissed:
                 state.shareURL = nil
+                return .none
+
+            // MARK: - Delete All Data
+
+            case .deleteAllDataTapped:
+                state.isShowingDeleteAllDataConfirmation = true
+                return .none
+
+            case .deleteAllDataConfirmed:
+                state.isShowingDeleteAllDataConfirmation = false
+                state.isDeletingAllData = true
+                state.error = nil
+
+                return .run { send in
+                    try await databaseClient.deleteAllData()
+                    await send(.deleteAllDataCompleted)
+                } catch: { error, send in
+                    await send(.deleteAllDataFailed(error.localizedDescription))
+                }
+
+            case .deleteAllDataCancelled:
+                state.isShowingDeleteAllDataConfirmation = false
+                return .none
+
+            case .deleteAllDataCompleted:
+                state.isDeletingAllData = false
+                return .send(.delegate(.didDeleteAllData))
+
+            case let .deleteAllDataFailed(errorMessage):
+                state.isDeletingAllData = false
+                state.error = errorMessage
                 return .none
             }
         }
