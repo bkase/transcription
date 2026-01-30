@@ -1285,3 +1285,11 @@
 - Use `profileImageClient.normalize()` to resize and compress photos before storing
 - Preview variants (e.g., PersonFormSheetPreview) need separate display modes for with/without photo states
 - E2E tests should verify "Remove photo" button appears only when photo is set
+
+## Initials Computation
+- Initials are computed in multiple places: ProfileFeature, TimelineFeature, RecordingFeature, Speaker.swift, PeopleView.swift
+- Use centralized `NameUtils.computeInitials(from:)` in DesignSystem to avoid duplication
+- Names with parenthetical content like "Alice (Work)" must strip parentheses before computing initials
+- `NameUtils.stripParentheticalContent()` splits on "(" and takes first part, trimming whitespace
+- Unit tests in DesignSystemTests/NameUtilsTests.swift cover edge cases
+- Snapshot tests visually verify initials display correctly

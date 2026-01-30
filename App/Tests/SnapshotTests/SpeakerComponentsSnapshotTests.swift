@@ -145,4 +145,29 @@ struct SpeakerComponentsSnapshotTests {
 
         SnapshotHarness.assertSnapshot(of: view, named: "person_card_initials")
     }
+
+    /// Test that names with parentheses strip the parenthetical content for initials.
+    /// This verifies the fix for bd-34t4: Initials should not include parentheses.
+    @Test func testPersonCardInitialsWithParentheses() {
+        let view = VStack(alignment: .leading, spacing: 16) {
+            CaptionText("Initials with Parenthetical Content")
+
+            // "Alice (Work)" -> should show "A" not "A("
+            PersonCard(name: "Alice (Work)", conversationCount: 5)
+
+            // "You (John Smith)" -> should show "Y" not "Y("
+            PersonCard(name: "You (John Smith)", conversationCount: 2, color: .lavender)
+
+            // "Mary Jane (Personal)" -> should show "MJ" not "MJ("
+            PersonCard(name: "Mary Jane (Personal)", conversationCount: 8, color: .deep)
+
+            // "Bob" -> no parentheses, should show "B"
+            PersonCard(name: "Bob", conversationCount: 1, color: .dusk)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(VaporColor.mist)
+
+        SnapshotHarness.assertSnapshot(of: view, named: "person_card_initials_with_parentheses")
+    }
 }

@@ -361,6 +361,20 @@ struct ProfileFeatureTests {
         #expect(state.initials == "MW")
     }
 
+    @Test
+    func initialsFromNameWithParentheses() {
+        // Parenthetical content should be stripped before computing initials
+        let state = ProfileFeature.State(profile: UserProfile(name: "Alice (Work)"))
+        #expect(state.initials == "A")
+    }
+
+    @Test
+    func initialsFromMultiWordNameWithParentheses() {
+        // "Mary Jane (Personal)" -> strips to "Mary Jane" -> "MJ"
+        let state = ProfileFeature.State(profile: UserProfile(name: "Mary Jane (Personal)"))
+        #expect(state.initials == "MJ")
+    }
+
     // MARK: - Back Button Test
 
     @Test

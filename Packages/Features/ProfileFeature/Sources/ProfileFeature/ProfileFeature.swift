@@ -1,6 +1,7 @@
 import CasePaths
 import ComposableArchitecture
 import Dependencies
+import DesignSystem
 import Export
 import Foundation
 import Models
@@ -65,15 +66,7 @@ public struct ProfileFeature {
 
         /// Compute initials from the profile name for avatar display
         public var initials: String {
-            let components = profile.name.split(separator: " ")
-            if components.count >= 2 {
-                let first = components[0].prefix(1)
-                let last = components[components.count - 1].prefix(1)
-                return "\(first)\(last)".uppercased()
-            } else if let first = components.first?.prefix(1) {
-                return String(first).uppercased()
-            }
-            return ""
+            NameUtils.computeInitials(from: profile.name)
         }
     }
 

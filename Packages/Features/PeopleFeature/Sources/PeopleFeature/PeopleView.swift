@@ -370,12 +370,7 @@ struct PersonFormSheet: View {
     }
 
     private func generateInitials(from name: String) -> String {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return "" }
-        let components = trimmed.split(separator: " ")
-        let first = components.first?.prefix(1) ?? ""
-        let last = components.count > 1 ? components.last?.prefix(1) ?? "" : ""
-        return String(first + last).uppercased()
+        NameUtils.computeInitials(from: name)
     }
 
     private func colorButton(for color: SpeakerColor) -> some View {
@@ -767,12 +762,7 @@ public struct PersonFormSheetPreview: View {
     }
 
     private func generateInitials(from name: String) -> String {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return "" }
-        let components = trimmed.split(separator: " ")
-        let first = components.first?.prefix(1) ?? ""
-        let last = components.count > 1 ? components.last?.prefix(1) ?? "" : ""
-        return String(first + last).uppercased()
+        NameUtils.computeInitials(from: name)
     }
 
     private func colorButton(for speakerColor: SpeakerColor) -> some View {

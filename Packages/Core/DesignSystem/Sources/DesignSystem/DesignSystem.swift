@@ -5,6 +5,39 @@ public enum VaporColors {
     public static let mist = Color(hex: "#E0E0E0")
 }
 
+// MARK: - Name Utilities
+
+/// Utilities for processing names for display.
+public enum NameUtils {
+    /// Strips parenthetical content from a name for initials calculation.
+    /// For example: "You (John Smith)" becomes "You", "Alice (Work)" becomes "Alice"
+    public static func stripParentheticalContent(_ name: String) -> String {
+        // Remove anything in parentheses and trim whitespace
+        let cleaned = name.components(separatedBy: "(").first?
+            .trimmingCharacters(in: .whitespaces) ?? name
+        return cleaned
+    }
+
+    /// Computes initials from a name, stripping any parenthetical content first.
+    /// - Parameter name: The full name (may contain parentheses like "Alice (Work)")
+    /// - Returns: Uppercase initials (e.g., "AL" for "Alice" or "JS" for "John Smith")
+    public static func computeInitials(from name: String) -> String {
+        let cleanName = stripParentheticalContent(name)
+        let trimmed = cleanName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+
+        let components = trimmed.split(separator: " ")
+        if components.count >= 2 {
+            let first = components[0].prefix(1)
+            let last = components[components.count - 1].prefix(1)
+            return "\(first)\(last)".uppercased()
+        } else if let first = components.first?.prefix(1) {
+            return String(first).uppercased()
+        }
+        return ""
+    }
+}
+
 extension Color {
     public init(hex: String) {
         let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)

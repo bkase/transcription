@@ -65,15 +65,7 @@ public struct TimelineFeature {
 
         /// Compute initials from the profile name for avatar display
         public var initials: String {
-            let components = userProfile.name.split(separator: " ")
-            if components.count >= 2 {
-                let first = components[0].prefix(1)
-                let last = components[components.count - 1].prefix(1)
-                return "\(first)\(last)".uppercased()
-            } else if let first = components.first?.prefix(1) {
-                return String(first).uppercased()
-            }
-            return ""
+            NameUtils.computeInitials(from: userProfile.name)
         }
 
         public init(

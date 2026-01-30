@@ -168,10 +168,7 @@ public struct CurrentUserOption: View {
     }
 
     private var initials: String {
-        let components = name.split(separator: " ")
-        let first = components.first?.prefix(1) ?? ""
-        let last = components.count > 1 ? components.last?.prefix(1) ?? "" : ""
-        return String(first + last).uppercased()
+        NameUtils.computeInitials(from: name)
     }
 
     public var body: some View {
@@ -305,10 +302,7 @@ public struct PersonCard: View {
     }
 
     private static func generateInitials(from name: String) -> String {
-        let components = name.split(separator: " ")
-        let first = components.first?.prefix(1) ?? ""
-        let last = components.count > 1 ? components.last?.prefix(1) ?? "" : ""
-        return String(first + last).uppercased()
+        NameUtils.computeInitials(from: name)
     }
 
     public var body: some View {
@@ -650,10 +644,7 @@ public struct SpeakerAvatarInfo: Equatable, Sendable, Identifiable {
         imageData: Data? = nil,
         colorIndex: Int
     ) -> SpeakerAvatarInfo {
-        let components = name.split(separator: " ")
-        let first = components.first?.prefix(1) ?? ""
-        let last = components.count > 1 ? components.last?.prefix(1) ?? "" : ""
-        let initials = String(first + last).uppercased()
+        let initials = NameUtils.computeInitials(from: name)
         return SpeakerAvatarInfo(
             id: id,
             imageData: imageData,
