@@ -1240,10 +1240,11 @@
 - Session header should NOT include SpeakerAvatarStack - title should be flush left per design spec
 - When implementing from design file, check component hierarchy for what elements actually exist
 
-## Transcript layout changes (bd-1216)
-- TranscriptSegment HStack order change: timestamp first, Spacer(), then speaker label on right
+## Transcript layout changes (bd-1216, bd-3i21)
+- TranscriptSegment HStack order: speaker label on left, Spacer(), timestamp on right
 - Snapshot tests capture visual layout - update reference snapshots after layout changes
 - Mock transcription may not include speaker diarization - E2E tests should handle gracefully with XCTSkip
+- Copy new snapshots from simulator temp dir to __Snapshots__ folder to update references
 
 ## Timestamp alignment (bd-cvkg)
 - Use `.monospacedDigit()` font modifier to ensure all digits have equal width (e.g., "11:11" same as "88:88")

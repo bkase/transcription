@@ -1,7 +1,8 @@
 import XCTest
 
 /// E2E tests for speaker label positioning in transcript entries.
-/// Validates that speaker labels are positioned on the right side of transcript entries.
+/// Validates that speaker labels are positioned on the left side of transcript entries,
+/// with timestamps on the right.
 ///
 /// Note: The primary validation for speaker label positioning is done via snapshot tests
 /// (TranscriptSegmentSnapshotTests) which verify the visual layout. This E2E test provides
@@ -22,12 +23,12 @@ final class SpeakerLabelPositionE2ETests: XCTestCase {
         super.tearDown()
     }
 
-    /// Test that speaker labels are positioned on the right side of transcript entries.
-    /// Layout should be: [Timestamp] ... [Speaker Label]
+    /// Test that speaker labels are positioned on the left side of transcript entries.
+    /// Layout should be: [Speaker Label] ... [Timestamp]
     ///
     /// Note: This test verifies positioning via frame coordinates. Visual layout is
     /// also verified by snapshot tests in TranscriptSegmentSnapshotTests.
-    func testSpeakerLabelOnRightSide() throws {
+    func testSpeakerLabelOnLeftSide() throws {
         // 1. Launch the app
         app.launch()
 
@@ -67,14 +68,14 @@ final class SpeakerLabelPositionE2ETests: XCTestCase {
         let segmentFrame = firstSegment.frame
         let speakerFrame = speakerLabel.frame
 
-        // 8. Verify the speaker label is on the right side
-        // The speaker label's minX should be greater than the center of the segment
+        // 8. Verify the speaker label is on the left side
+        // The speaker label's maxX should be less than the center of the segment
         let segmentCenterX = segmentFrame.midX
-        let speakerMinX = speakerFrame.minX
+        let speakerMaxX = speakerFrame.maxX
 
-        XCTAssertGreaterThan(
-            speakerMinX, segmentCenterX,
-            "Speaker label (minX: \(speakerMinX)) should be positioned to the right of segment center (\(segmentCenterX))"
+        XCTAssertLessThan(
+            speakerMaxX, segmentCenterX,
+            "Speaker label (maxX: \(speakerMaxX)) should be positioned to the left of segment center (\(segmentCenterX))"
         )
 
         // 9. Also verify the speaker label is still tappable by tapping it
@@ -83,7 +84,7 @@ final class SpeakerLabelPositionE2ETests: XCTestCase {
         // 10. Verify the speaker picker modal appears
         let addNewPersonOption = app.buttons["addNewPersonOption"]
         let modalAppeared = addNewPersonOption.waitForExistence(timeout: 5)
-        XCTAssertTrue(modalAppeared, "Speaker picker modal should appear after tapping speaker label on right side")
+        XCTAssertTrue(modalAppeared, "Speaker picker modal should appear after tapping speaker label on left side")
 
         // 11. Dismiss the modal
         // Tap outside the modal to dismiss it
