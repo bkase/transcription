@@ -72,6 +72,7 @@ public struct SessionDetailFeature {
     @Dependency(\.fileClient) var fileClient
     @Dependency(\.recordingProcessorClient) var recordingProcessorClient
     @Dependency(\.uuid) var uuid
+    @Dependency(\.continuousClock) var clock
 
     private enum CancelID {
         case transcriptionPolling
@@ -313,7 +314,7 @@ public struct SessionDetailFeature {
                 if session?.processingState == .transcribing {
                     return .run { send in
                         // Poll every 2 seconds
-                        try? await Task.sleep(for: .seconds(2))
+                        try? await clock.sleep(for: .seconds(2))
                         await send(.pollTranscriptionStatus)
                     }
                     .cancellable(id: CancelID.transcriptionPolling, cancelInFlight: true)
@@ -340,7 +341,7 @@ public struct SessionDetailFeature {
                     // If still transcribing, continue polling
                     if session.processingState == .transcribing {
                         return .run { send in
-                            try? await Task.sleep(for: .seconds(2))
+                            try? await clock.sleep(for: .seconds(2))
                             await send(.pollTranscriptionStatus)
                         }
                         .cancellable(id: CancelID.transcriptionPolling, cancelInFlight: true)

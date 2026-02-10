@@ -63,6 +63,7 @@ public struct AppFeature {
     @Dependency(\.userProfileClient) var userProfileClient
     @Dependency(\.databaseClient) var databaseClient
     @Dependency(\.fileClient) var fileClient
+    @Dependency(\.continuousClock) var clock
 
     public var body: some ReducerOf<Self> {
         Scope(state: \.timeline, action: \.timeline) {
@@ -269,7 +270,7 @@ public struct AppFeature {
                         .send(.recording(.presented(.stopRecording))),
                         .run { send in
                             // Wait a moment for recording to stop, then dismiss
-                            try? await Task.sleep(for: .milliseconds(100))
+                            try? await clock.sleep(for: .milliseconds(100))
                             await send(.recording(.dismiss))
                         }
                     )

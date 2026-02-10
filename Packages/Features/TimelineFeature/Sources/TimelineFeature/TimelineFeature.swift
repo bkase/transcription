@@ -17,6 +17,7 @@ public struct TimelineFeature {
     @Dependency(\.date) var date
     @Dependency(\.uuid) var uuid
     @Dependency(\.fluidAudioClient) var fluidAudioClient
+    @Dependency(\.continuousClock) var clock
 
     private enum CancelID {
         case transcriptionPolling
@@ -161,7 +162,7 @@ public struct TimelineFeature {
                 if shouldStartPolling {
                     effects.append(
                         .run { send in
-                            try? await Task.sleep(for: .seconds(5))
+                            try? await clock.sleep(for: .seconds(5))
                             await send(.pollTranscribingSessions)
                         }
                         .cancellable(id: CancelID.transcriptionPolling, cancelInFlight: true)
@@ -231,7 +232,7 @@ public struct TimelineFeature {
                 }
                 if hasTranscribing {
                     return .run { send in
-                        try? await Task.sleep(for: .seconds(5))
+                        try? await clock.sleep(for: .seconds(5))
                         await send(.pollTranscribingSessions)
                     }
                     .cancellable(id: CancelID.transcriptionPolling, cancelInFlight: true)
