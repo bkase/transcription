@@ -26,7 +26,8 @@ public struct VaporAppearModifier: ViewModifier {
             .blur(radius: isVisible ? 0 : 4)
             .onAppear {
                 if delay > 0 {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(Int(delay * 1000)))
                         animateIn()
                     }
                 } else {
@@ -433,7 +434,8 @@ private struct StaggeredWordView: View {
             .blur(radius: isVisible ? 0 : 4)
             .onAppear {
                 if delay > 0 {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(Int(delay * 1000)))
                         animateIn()
                     }
                 } else {

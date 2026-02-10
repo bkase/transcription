@@ -809,7 +809,8 @@ private struct ActionsMenuOverlay: View {
             isVisible = false
         }
         // Delay the actual dismiss to allow animation to complete
-        DispatchQueue.main.asyncAfter(deadline: .now() + VaporAnimation.normalDuration) {
+        Task {
+            try? await Task.sleep(for: .milliseconds(Int(VaporAnimation.normalDuration * 1000)))
             onDismiss()
         }
     }
@@ -899,7 +900,8 @@ private struct DeleteConfirmationOverlay: View {
         withAnimation(VaporAnimation.exitCurve.animation(duration: VaporAnimation.normalDuration)) {
             isVisible = false
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + VaporAnimation.normalDuration) {
+        Task {
+            try? await Task.sleep(for: .milliseconds(Int(VaporAnimation.normalDuration * 1000)))
             action()
         }
     }
@@ -940,7 +942,8 @@ private struct SpeakerPickerOverlay: View {
         withAnimation(VaporAnimation.exitCurve.animation(duration: VaporAnimation.normalDuration)) {
             isVisible = false
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + VaporAnimation.normalDuration) {
+        Task {
+            try? await Task.sleep(for: .milliseconds(Int(VaporAnimation.normalDuration * 1000)))
             onDismiss()
         }
     }
