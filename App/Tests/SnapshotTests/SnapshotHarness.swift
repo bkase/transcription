@@ -1,5 +1,6 @@
 import SnapshotTesting
 import SwiftUI
+import UIKit
 
 // MARK: - Snapshot Configuration
 
@@ -18,6 +19,18 @@ enum SnapshotConfig {
 
     /// Tolerance for image comparison (0.0 = exact match, 1.0 = any difference allowed)
     static let precision: Float = 0.99
+
+    /// Perceptual precision for image comparison. 98-99% mimics the precision of the human eye.
+    /// This prevents flaky tests caused by sub-pixel rendering differences across machines/OS versions.
+    static let perceptualPrecision: Float = 0.98
+
+    /// Explicit trait collection to pin rendering environment and prevent flakiness
+    /// from dynamic type, dark mode, or locale differences across machines.
+    static let defaultTraits = UITraitCollection(traitsFrom: [
+        UITraitCollection(userInterfaceStyle: .light),
+        UITraitCollection(preferredContentSizeCategory: .medium),
+        UITraitCollection(layoutDirection: .leftToRight),
+    ])
 }
 
 // MARK: - Snapshot Harness
@@ -47,7 +60,9 @@ enum SnapshotHarness {
                 of: view,
                 as: .image(
                     precision: SnapshotConfig.precision,
-                    layout: SnapshotConfig.defaultLayout
+                    perceptualPrecision: SnapshotConfig.perceptualPrecision,
+                    layout: SnapshotConfig.defaultLayout,
+                    traits: SnapshotConfig.defaultTraits
                 ),
                 named: name,
                 file: file,

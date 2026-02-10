@@ -1306,3 +1306,12 @@
 - `NameUtils.stripParentheticalContent()` splits on "(" and takes first part, trimming whitespace
 - Unit tests in DesignSystemTests/NameUtilsTests.swift cover edge cases
 - Snapshot tests visually verify initials display correctly
+
+## Snapshot Testing Stability
+- SnapshotHarness.swift centralizes all snapshot config: precision, perceptualPrecision, layout, traits
+- `perceptualPrecision: 0.98` prevents flaky tests from sub-pixel rendering differences across machines/OS versions (98% mimics human eye precision)
+- Explicit UITraitCollection pinning (userInterfaceStyle: .light, preferredContentSizeCategory: .medium, layoutDirection: .leftToRight) prevents environmental differences from causing flaky snapshots
+- The `traits` parameter in SnapshotTesting's `.image()` strategy is passed through to the rendering window, controlling appearance for the snapshot
+- Device configs like `.iPhone13Pro` set safe area/size/device traits; the `traits` parameter on `.image()` adds user-level traits on top
+- All 117 snapshot tests passed after adding perceptualPrecision and traits without needing to re-record reference images
+- Snapshot tests run under the "Vapor" scheme with `-only-testing:SnapshotTests` (no separate SnapshotTests scheme)
