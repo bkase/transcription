@@ -16,7 +16,7 @@ let package = Package(
         .package(path: "../../Core/DesignSystem"),
         .package(path: "../../Core/Observability"),
         .package(path: "../SpeakerPickerFeature"),
-        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.0.0"),
+        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.23.0"),
     ],
     targets: [
         .target(

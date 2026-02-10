@@ -9,7 +9,7 @@ let package = Package(
         .library(name: "Observability", targets: ["Observability"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.0.0"),
+        .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.10.0"),
     ],
     targets: [
         .target(

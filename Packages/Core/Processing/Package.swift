@@ -13,7 +13,7 @@ let package = Package(
         .package(path: "../Audio"),
         .package(path: "../Persistence"),
         .package(path: "../Observability"),
-        .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.0.0"),
+        .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.10.0"),
         .package(url: "https://github.com/FluidInference/FluidAudio", from: "0.10.0"),
     ],
     targets: [

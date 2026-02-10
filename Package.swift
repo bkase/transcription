@@ -13,7 +13,7 @@ let package = Package(
         .package(path: "Packages/Core/Processing"),
         .package(path: "Packages/Core/Export"),
         .package(path: "Packages/TestsSupport"),
-        .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.0.0"),
+        .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.10.0"),
         .package(url: "https://github.com/pointfreeco/swift-clocks", from: "1.0.0"),
     ],
     targets: [

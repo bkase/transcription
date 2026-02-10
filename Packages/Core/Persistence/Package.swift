@@ -10,7 +10,7 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../Models"),
-        .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.0.0"),
+        .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.10.0"),
         .package(url: "https://github.com/groue/GRDB.swift", from: "6.29.0"),
     ],
     targets: [

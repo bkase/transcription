@@ -12,7 +12,7 @@ let package = Package(
         .package(path: "../Models"),
         .package(path: "../Persistence"),
         .package(path: "../Audio"),
-        .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.0.0"),
+        .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.10.0"),
         .package(url: "https://github.com/weichsel/ZIPFoundation", from: "0.9.0"),
     ],
     targets: [
