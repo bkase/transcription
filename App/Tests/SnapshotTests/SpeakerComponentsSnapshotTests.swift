@@ -5,7 +5,7 @@ import SwiftUI
 
 // MARK: - Speaker Components Snapshot Tests
 
-@Suite("Speaker Component Snapshots")
+@Suite("Speaker Component Snapshots", .snapshots(record: SnapshotConfig.recordMode))
 @MainActor
 struct SpeakerComponentsSnapshotTests {
 

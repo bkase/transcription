@@ -6,7 +6,7 @@ import SwiftUI
 
 // MARK: - Session Detail View Snapshot Tests
 
-@Suite("Session Detail Snapshots")
+@Suite("Session Detail Snapshots", .snapshots(record: SnapshotConfig.recordMode))
 @MainActor
 struct SessionDetailSnapshotTests {
 

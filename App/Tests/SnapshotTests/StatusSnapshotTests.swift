@@ -5,7 +5,7 @@ import SwiftUI
 
 // MARK: - Status Component Snapshot Tests
 
-@Suite("Status Component Snapshots")
+@Suite("Status Component Snapshots", .snapshots(record: SnapshotConfig.recordMode))
 @MainActor
 struct StatusSnapshotTests {
 

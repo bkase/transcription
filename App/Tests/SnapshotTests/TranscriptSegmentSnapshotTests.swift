@@ -5,7 +5,7 @@ import SwiftUI
 
 // MARK: - Transcript Segment Snapshot Tests
 
-@Suite("Transcript Segment Component Snapshots")
+@Suite("Transcript Segment Component Snapshots", .snapshots(record: SnapshotConfig.recordMode))
 @MainActor
 struct TranscriptSegmentSnapshotTests {
 

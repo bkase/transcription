@@ -6,7 +6,7 @@ import SwiftUI
 
 // MARK: - Profile View Snapshot Tests
 
-@Suite("Profile View Snapshots")
+@Suite("Profile View Snapshots", .snapshots(record: SnapshotConfig.recordMode))
 @MainActor
 struct ProfileViewSnapshotTests {
 

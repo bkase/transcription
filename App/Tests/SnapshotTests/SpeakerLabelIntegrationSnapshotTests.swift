@@ -10,7 +10,7 @@ import SwiftUI
 /// Tests that verify speaker labels are properly wired in transcript views.
 /// These tests ensure the integration between speaker track data and the
 /// visual representation of speakers in both recording and session detail contexts.
-@Suite("Speaker Label Integration Snapshots")
+@Suite("Speaker Label Integration Snapshots", .snapshots(record: SnapshotConfig.recordMode))
 @MainActor
 struct SpeakerLabelIntegrationSnapshotTests {
 

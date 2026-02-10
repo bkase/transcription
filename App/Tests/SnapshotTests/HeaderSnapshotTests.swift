@@ -5,7 +5,7 @@ import SwiftUI
 
 // MARK: - Header Snapshot Tests
 
-@Suite("Header Component Snapshots")
+@Suite("Header Component Snapshots", .snapshots(record: SnapshotConfig.recordMode))
 @MainActor
 struct HeaderSnapshotTests {
 

@@ -6,7 +6,7 @@ import SwiftUI
 
 // MARK: - People View Snapshot Tests
 
-@Suite("People View Snapshots")
+@Suite("People View Snapshots", .snapshots(record: SnapshotConfig.recordMode))
 @MainActor
 struct PeopleViewSnapshotTests {
 
@@ -41,7 +41,7 @@ struct PeopleViewSnapshotTests {
 
 // MARK: - Person Form Sheet Snapshot Tests
 
-@Suite("Person Form Sheet Snapshots")
+@Suite("Person Form Sheet Snapshots", .snapshots(record: SnapshotConfig.recordMode))
 @MainActor
 struct PersonFormSheetSnapshotTests {
 

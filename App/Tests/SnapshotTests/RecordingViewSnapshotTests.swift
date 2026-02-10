@@ -6,7 +6,7 @@ import SwiftUI
 
 // MARK: - Recording View Snapshot Tests
 
-@Suite("Recording View Snapshots")
+@Suite("Recording View Snapshots", .snapshots(record: SnapshotConfig.recordMode))
 @MainActor
 struct RecordingViewSnapshotTests {
 

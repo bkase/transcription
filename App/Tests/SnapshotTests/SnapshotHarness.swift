@@ -23,6 +23,18 @@ enum SnapshotConfig {
     /// Uses iPhone 15 Pro dimensions for consistency.
     static let defaultLayout: SwiftUISnapshotLayout = .device(config: .iPhone13Pro)
 
+    /// Record mode for snapshot testing, configured via environment or per-test override.
+    /// Use this with the `.snapshots(record:)` Swift Testing trait on `@Suite` declarations.
+    static var recordMode: SnapshotTestingConfiguration.Record {
+        if isRecording {
+            .all
+        } else if isCI {
+            .never
+        } else {
+            .missing
+        }
+    }
+
     /// Tolerance for image comparison (0.0 = exact match, 1.0 = any difference allowed)
     static let precision: Float = 0.99
 
@@ -42,48 +54,41 @@ enum SnapshotConfig {
 // MARK: - Snapshot Harness
 
 /// Provides a standardized way to capture SwiftUI view snapshots.
-/// Wraps SnapshotTesting with project-specific defaults.
+/// Record mode is configured via the `.snapshots(record:)` Swift Testing trait
+/// applied at the `@Suite` level rather than wrapping each assertion.
 enum SnapshotHarness {
     /// Assert that a SwiftUI view matches its recorded snapshot.
+    ///
+    /// Record mode is controlled by the `.snapshots(record:)` trait on the test suite,
+    /// not by this method. Use `@Suite(.snapshots(record: SnapshotConfig.recordMode))`
+    /// on your test struct.
+    ///
     /// - Parameters:
     ///   - view: The SwiftUI view to snapshot
     ///   - name: Optional name for the snapshot file
-    ///   - record: Override the global record mode for this assertion
     ///   - file: Source file (auto-populated)
     ///   - testName: Test function name (auto-populated)
     ///   - line: Source line (auto-populated)
     static func assertSnapshot<V: View>(
         of view: V,
         named name: String? = nil,
-        record: Bool? = nil,
         file: StaticString = #file,
         testName: String = #function,
         line: UInt = #line
     ) {
-        let shouldRecord = record ?? SnapshotConfig.isRecording
-        let recordMode: SnapshotTestingConfiguration.Record =
-            if shouldRecord {
-                .all
-            } else if SnapshotConfig.isCI {
-                .never
-            } else {
-                .missing
-            }
-        withSnapshotTesting(record: recordMode) {
-            SnapshotTesting.assertSnapshot(
-                of: view,
-                as: .image(
-                    precision: SnapshotConfig.precision,
-                    perceptualPrecision: SnapshotConfig.perceptualPrecision,
-                    layout: SnapshotConfig.defaultLayout,
-                    traits: SnapshotConfig.defaultTraits
-                ),
-                named: name,
-                file: file,
-                testName: testName,
-                line: line
-            )
-        }
+        SnapshotTesting.assertSnapshot(
+            of: view,
+            as: .image(
+                precision: SnapshotConfig.precision,
+                perceptualPrecision: SnapshotConfig.perceptualPrecision,
+                layout: SnapshotConfig.defaultLayout,
+                traits: SnapshotConfig.defaultTraits
+            ),
+            named: name,
+            file: file,
+            testName: testName,
+            line: line
+        )
     }
 
     /// Check if the harness is properly configured and can be used.

@@ -6,7 +6,7 @@ import SwiftUI
 
 // MARK: - Person Timeline View Snapshot Tests
 
-@Suite("Person Timeline View Snapshots")
+@Suite("Person Timeline View Snapshots", .snapshots(record: SnapshotConfig.recordMode))
 @MainActor
 struct PersonTimelineSnapshotTests {
 

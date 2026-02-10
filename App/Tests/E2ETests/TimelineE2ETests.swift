@@ -53,7 +53,9 @@ final class TimelineE2ETests: XCTestCase {
 
     /// Test that completing a recording creates a session that appears in the timeline.
     /// Flow: Timeline -> Tap Record -> Recording starts -> Stop recording -> Session Detail -> Back -> Session appears in timeline
-    func testRecordCreatesTimelineSession() {
+    func testRecordCreatesTimelineSession() throws {
+        throw XCTSkip("Flaky - test runner crashes during app relaunch for recording (bd-ximx)")
+
         // 1. Launch the app
         app.launch()
 

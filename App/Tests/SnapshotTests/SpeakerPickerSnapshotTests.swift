@@ -6,7 +6,7 @@ import SwiftUI
 
 // MARK: - Speaker Picker View Snapshot Tests
 
-@Suite("Speaker Picker View Snapshots")
+@Suite("Speaker Picker View Snapshots", .snapshots(record: SnapshotConfig.recordMode))
 @MainActor
 struct SpeakerPickerSnapshotTests {
 

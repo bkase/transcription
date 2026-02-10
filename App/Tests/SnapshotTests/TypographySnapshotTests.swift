@@ -5,7 +5,7 @@ import SwiftUI
 
 // MARK: - Typography Snapshot Tests
 
-@Suite("Typography Component Snapshots")
+@Suite("Typography Component Snapshots", .snapshots(record: SnapshotConfig.recordMode))
 @MainActor
 struct TypographySnapshotTests {
 

@@ -113,7 +113,8 @@
 
 ## SnapshotTesting with Swift Testing
 - swift-snapshot-testing works with Swift Testing `@Test` macro (not just XCTest)
-- Use `withSnapshotTesting(record: .all)` or `.missing` to control record mode
+- Use `.snapshots(record:)` Swift Testing trait on `@Suite` declarations instead of `withSnapshotTesting` wrapper
+- `SnapshotConfig.recordMode` provides the record mode based on environment variables
 - Environment variable `SNAPSHOT_RECORD=1` can control record mode externally
 - `SwiftUISnapshotLayout.device(config: .iPhone13Pro)` for consistent device sizing
 - Separate test target for snapshots keeps concerns isolated

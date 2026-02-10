@@ -5,7 +5,7 @@ import SwiftUI
 
 // MARK: - Session Card Snapshot Tests
 
-@Suite("Session Card Component Snapshots")
+@Suite("Session Card Component Snapshots", .snapshots(record: SnapshotConfig.recordMode))
 @MainActor
 struct SessionCardSnapshotTests {
 

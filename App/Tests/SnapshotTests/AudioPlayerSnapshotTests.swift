@@ -5,7 +5,7 @@ import SwiftUI
 
 // MARK: - Audio Player Snapshot Tests
 
-@Suite("Audio Player Component Snapshots")
+@Suite("Audio Player Component Snapshots", .snapshots(record: SnapshotConfig.recordMode))
 @MainActor
 struct AudioPlayerSnapshotTests {
 

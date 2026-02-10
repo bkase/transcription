@@ -106,14 +106,18 @@ public struct SessionDetailView: View {
                 )
             }
         }
-        .overlay {
-            // Speaker picker overlay
-            if store.speakerPicker != nil,
-               let speakerPickerStore = $store.scope(state: \.speakerPicker, action: \.speakerPicker).wrappedValue {
-                SpeakerPickerOverlay(
-                    store: speakerPickerStore,
-                    onDismiss: { store.send(.speakerPicker(.presented(.closeModal))) }
-                )
+        .sheet(
+            item: $store.scope(state: \.speakerPicker, action: \.speakerPicker)
+        ) { speakerPickerStore in
+            NavigationStack {
+                SpeakerPickerView(store: speakerPickerStore)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Cancel") {
+                                store.send(.speakerPicker(.presented(.closeModal)))
+                            }
+                        }
+                    }
             }
         }
         .alert(
@@ -907,47 +911,6 @@ private struct DeleteConfirmationOverlay: View {
     }
 }
 
-// MARK: - Speaker Picker Overlay
-
-/// Overlay for the speaker picker that fades in/out instead of sliding.
-private struct SpeakerPickerOverlay: View {
-    let store: StoreOf<SpeakerPickerFeature>
-    let onDismiss: () -> Void
-
-    @State private var isVisible = false
-
-    var body: some View {
-        ZStack {
-            // Semi-transparent backdrop
-            Color.black.opacity(isVisible ? 0.3 : 0)
-                .ignoresSafeArea()
-                .onTapGesture {
-                    dismissWithAnimation()
-                }
-
-            // Modal content
-            SpeakerPickerView(store: store)
-                .padding(VaporSpacing.lg)
-                .opacity(isVisible ? 1 : 0)
-                .scaleEffect(isVisible ? 1 : 0.95)
-        }
-        .onAppear {
-            withAnimation(VaporAnimation.appearCurve.animation(duration: VaporAnimation.normalDuration)) {
-                isVisible = true
-            }
-        }
-    }
-
-    private func dismissWithAnimation() {
-        withAnimation(VaporAnimation.exitCurve.animation(duration: VaporAnimation.normalDuration)) {
-            isVisible = false
-        }
-        Task {
-            try? await Task.sleep(for: .milliseconds(Int(VaporAnimation.normalDuration * 1000)))
-            onDismiss()
-        }
-    }
-}
 #endif
 
 #if DEBUG
