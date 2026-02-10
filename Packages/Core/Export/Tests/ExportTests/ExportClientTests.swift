@@ -5,7 +5,6 @@ import ZIPFoundation
 @testable import Export
 @testable import Persistence
 @testable import Models
-@testable import Audio
 
 @Suite("Export Client Tests")
 struct ExportClientTests {

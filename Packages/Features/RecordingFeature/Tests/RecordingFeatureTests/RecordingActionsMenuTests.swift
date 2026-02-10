@@ -5,7 +5,6 @@ import Models
 import Persistence
 @testable import RecordingFeature
 @testable import Processing
-@testable import Audio
 
 @MainActor
 struct RecordingActionsMenuTests {

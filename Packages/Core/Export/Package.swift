@@ -11,7 +11,6 @@ let package = Package(
     dependencies: [
         .package(path: "../Models"),
         .package(path: "../Persistence"),
-        .package(path: "../Audio"),
         .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.10.0"),
         .package(url: "https://github.com/weichsel/ZIPFoundation", from: "0.9.0"),
     ],
@@ -21,7 +20,6 @@ let package = Package(
             dependencies: [
                 "Models",
                 "Persistence",
-                "Audio",
                 .product(name: "Dependencies", package: "swift-dependencies"),
                 .product(name: "DependenciesMacros", package: "swift-dependencies"),
                 .product(name: "ZIPFoundation", package: "ZIPFoundation"),
@@ -31,7 +29,6 @@ let package = Package(
             name: "ExportTests",
             dependencies: [
                 "Export",
-                "Audio",
                 .product(name: "ZIPFoundation", package: "ZIPFoundation"),
             ],
             resources: [

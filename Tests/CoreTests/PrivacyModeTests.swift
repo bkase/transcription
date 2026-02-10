@@ -1,7 +1,8 @@
 import Foundation
 import Testing
 import Dependencies
-@testable import Audio
+import Models
+@testable import Persistence
 
 /// Tests for privacy mode / audio retention preferences
 @Test func testPrivacyModePersists() async throws {

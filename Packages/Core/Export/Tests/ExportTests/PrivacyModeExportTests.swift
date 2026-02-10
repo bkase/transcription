@@ -4,7 +4,6 @@ import ZIPFoundation
 @testable import Export
 @testable import Persistence
 @testable import Models
-@testable import Audio
 
 @Suite("Privacy Mode Export Tests")
 struct PrivacyModeExportTests {
