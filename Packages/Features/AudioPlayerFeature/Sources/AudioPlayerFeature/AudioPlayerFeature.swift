@@ -41,7 +41,7 @@ public struct AudioPlayerFeature {
         }
     }
 
-    public enum Action: Equatable, Sendable {
+    public enum Action: Sendable {
         case playPauseTapped
         case play
         case pause

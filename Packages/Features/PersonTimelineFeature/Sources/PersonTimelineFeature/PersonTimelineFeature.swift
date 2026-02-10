@@ -33,7 +33,7 @@ public struct PersonTimelineFeature {
         }
     }
 
-    public enum Action: Equatable, Sendable {
+    public enum Action: Sendable {
         case onAppear
         case loadSessions
         case sessionsLoaded([SessionRecord])

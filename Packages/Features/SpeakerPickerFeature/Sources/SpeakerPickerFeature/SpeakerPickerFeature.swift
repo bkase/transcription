@@ -89,7 +89,7 @@ public struct SpeakerPickerFeature {
         }
     }
 
-    public enum Action: Equatable, Sendable {
+    public enum Action: Sendable {
         case onAppear
         case loadPeople
         case peopleLoaded([PersonRecord])

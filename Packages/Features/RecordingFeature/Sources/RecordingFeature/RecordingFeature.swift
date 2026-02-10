@@ -187,7 +187,7 @@ public struct RecordingFeature {
         }
     }
 
-    public enum Action: Equatable, Sendable {
+    public enum Action: Sendable {
         /// Start recording with the given audio directory
         case startRecording(audioDirectory: URL)
         /// Continue an existing recording session

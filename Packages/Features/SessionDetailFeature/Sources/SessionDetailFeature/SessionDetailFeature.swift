@@ -172,7 +172,7 @@ public struct SessionDetailFeature {
         case continueRecordingRequested(sessionID: SessionID, currentDurationMs: Int)
     }
 
-    public enum Action: Equatable, Sendable {
+    public enum Action: Sendable {
         case onAppear
         case onDisappear
         case loadSession

@@ -19,7 +19,7 @@ public struct AppFeature {
 
     // MARK: - Path (Navigation Stack)
 
-    @Reducer(state: .equatable, action: .equatable)
+    @Reducer(state: .equatable)
     public enum Path {
         case sessionDetail(SessionDetailFeature)
         case profile(ProfileFeature)
@@ -47,7 +47,7 @@ public struct AppFeature {
         }
     }
 
-    public enum Action: Equatable {
+    public enum Action {
         case onAppear
         case path(StackAction<Path.State, Path.Action>)
         case timeline(TimelineFeature.Action)

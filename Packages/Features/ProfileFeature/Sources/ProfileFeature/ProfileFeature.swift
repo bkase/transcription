@@ -82,7 +82,7 @@ public struct ProfileFeature {
         }
     }
 
-    public enum Action: Equatable, Sendable {
+    public enum Action: Sendable {
         case onAppear
         case backTapped
         case profileLoaded(UserProfile)

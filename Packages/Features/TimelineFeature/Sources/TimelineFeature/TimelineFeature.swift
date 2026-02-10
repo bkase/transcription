@@ -101,7 +101,7 @@ public struct TimelineFeature {
         }
     }
 
-    public enum Action: Equatable, Sendable {
+    public enum Action: Sendable {
         case onAppear
         case onDisappear
         case searchQueryChanged(String)

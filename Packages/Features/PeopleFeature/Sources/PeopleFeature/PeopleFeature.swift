@@ -133,7 +133,7 @@ public struct PeopleFeature {
         }
     }
 
-    public enum Action: Equatable, Sendable {
+    public enum Action: Sendable {
         case onAppear
         case backTapped
         case loadPeople
