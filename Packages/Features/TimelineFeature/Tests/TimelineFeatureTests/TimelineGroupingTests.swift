@@ -1,4 +1,5 @@
 import Testing
+import CustomDump
 import Foundation
 import Persistence
 
@@ -118,7 +119,7 @@ struct TimelineGroupingTests {
     func testBucketOrderingAllCases() {
         // Verify the allCases are in the expected display order
         let expected: [DateBucket] = [.today, .yesterday, .thisWeek, .lastWeek, .thisMonth, .older]
-        #expect(DateBucket.allCases == expected)
+        expectNoDifference(DateBucket.allCases, expected)
     }
 
     // MARK: - testEdgeCaseMidnight

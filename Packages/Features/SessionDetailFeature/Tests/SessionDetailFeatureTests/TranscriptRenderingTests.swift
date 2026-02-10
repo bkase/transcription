@@ -1,4 +1,5 @@
 import Testing
+import CustomDump
 import Foundation
 import DesignSystem
 import Models
@@ -801,14 +802,14 @@ struct TranscriptRenderingTests {
 
         // Verify ALL spk_0 segments have Alice as speaker (including middle segment - the bug)
         let aliceSpeakerType = SpeakerType.speaker(name: "Alice", color: SpeakerColor.forIndex(0).color)
-        #expect(result[0].speakerType == aliceSpeakerType, "First spk_0 segment should be Alice")
-        #expect(result[2].speakerType == aliceSpeakerType, "Middle spk_0 segment (seg-3) should be Alice")
-        #expect(result[4].speakerType == aliceSpeakerType, "Last spk_0 segment should be Alice")
+        expectNoDifference(result[0].speakerType, aliceSpeakerType)
+        expectNoDifference(result[2].speakerType, aliceSpeakerType)
+        expectNoDifference(result[4].speakerType, aliceSpeakerType)
 
         // Verify spk_1 segments are unassigned displayOrder 2
         let unassignedSpeaker2 = SpeakerType.unassigned(displayOrder: 2, color: SpeakerColor.forIndex(1).color)
-        #expect(result[1].speakerType == unassignedSpeaker2, "First spk_1 segment should be unassigned Speaker 2")
-        #expect(result[3].speakerType == unassignedSpeaker2, "Second spk_1 segment should be unassigned Speaker 2")
+        expectNoDifference(result[1].speakerType, unassignedSpeaker2)
+        expectNoDifference(result[3].speakerType, unassignedSpeaker2)
     }
 
     @Test

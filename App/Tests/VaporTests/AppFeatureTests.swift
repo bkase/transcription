@@ -1,5 +1,6 @@
 import Testing
 import ComposableArchitecture
+import CustomDump
 import Dependencies
 import Foundation
 import Models
@@ -27,7 +28,7 @@ struct AppFeatureTests {
         }
 
         // Verify initial state has empty profile
-        #expect(store.state.userProfile == .empty)
+        expectNoDifference(store.state.userProfile, .empty)
 
         // Send onAppear and verify profile is loaded
         await store.send(.onAppear)
@@ -58,7 +59,7 @@ struct AppFeatureTests {
         #expect(store.state.path.count == 1)
         if case let .people(peopleState) = store.state.path.first {
             // Verify userProfile was passed
-            #expect(peopleState.userProfile == testProfile)
+            expectNoDifference(peopleState.userProfile, testProfile)
         } else {
             Issue.record("Expected people state in path")
         }
@@ -110,7 +111,7 @@ struct AppFeatureTests {
         // Path should have people and profile
         #expect(store.state.path.count == 2)
         if case let .profile(profileState) = store.state.path.last {
-            #expect(profileState.profile == testProfile)
+            expectNoDifference(profileState.profile, testProfile)
         } else {
             Issue.record("Expected profile state in path")
         }
@@ -212,7 +213,7 @@ struct AppFeatureTests {
         }
 
         // Verify app-level profile was updated
-        #expect(store.state.userProfile == updatedProfile)
+        expectNoDifference(store.state.userProfile, updatedProfile)
     }
 
     @Test
@@ -231,7 +232,7 @@ struct AppFeatureTests {
 
         // Verify the profile in the path matches the app-level profile
         if case let .profile(profileState) = store.state.path.first {
-            #expect(profileState.profile == testProfile)
+            expectNoDifference(profileState.profile, testProfile)
         } else {
             Issue.record("Expected profile state in path")
         }
@@ -584,7 +585,7 @@ struct AppFeatureTests {
 
         // Verify PeopleFeature has updated profile
         if case let .people(peopleState) = store.state.path.first {
-            #expect(peopleState.userProfile == updatedProfile)
+            expectNoDifference(peopleState.userProfile, updatedProfile)
         } else {
             Issue.record("Expected people state in path")
         }

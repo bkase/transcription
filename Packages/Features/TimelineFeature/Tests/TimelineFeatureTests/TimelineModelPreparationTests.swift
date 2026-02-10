@@ -1,4 +1,5 @@
 import Testing
+import CustomDump
 import Foundation
 import ComposableArchitecture
 import Models
@@ -94,7 +95,7 @@ struct TimelineModelPreparationTests {
         // Verify final state is correct regardless of action order
         #expect(store.state.isLoading == false)
         #expect(store.state.sessionGroups.isEmpty)
-        #expect(store.state.modelPreparationState == .failed("Download failed"))
+        expectNoDifference(store.state.modelPreparationState, .failed("Download failed"))
         #expect(!store.state.isRecordEnabled)
     }
 
@@ -113,7 +114,7 @@ struct TimelineModelPreparationTests {
         await store.send(.newRecordingTapped)
 
         // Verify state unchanged
-        #expect(store.state.modelPreparationState == .downloading)
+        expectNoDifference(store.state.modelPreparationState, .downloading)
         #expect(!store.state.isRecordEnabled)
     }
 
@@ -130,7 +131,7 @@ struct TimelineModelPreparationTests {
         await store.send(.newRecordingTapped)
 
         // Verify state unchanged
-        #expect(store.state.modelPreparationState == .failed("Error"))
+        expectNoDifference(store.state.modelPreparationState, .failed("Error"))
         #expect(!store.state.isRecordEnabled)
     }
 
@@ -147,7 +148,7 @@ struct TimelineModelPreparationTests {
         await store.send(.newRecordingTapped)
 
         // Verify state unchanged
-        #expect(store.state.modelPreparationState == .idle)
+        expectNoDifference(store.state.modelPreparationState, .idle)
         #expect(!store.state.isRecordEnabled)
     }
 

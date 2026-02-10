@@ -1,3 +1,10 @@
+## CustomDump / expectNoDifference
+- `expectNoDifference` from CustomDump gives dramatically better diffs for struct/enum comparisons in tests
+- CustomDump is available transitively via ComposableArchitecture but must be added as an explicit package dependency in xcodegen project.yml to import it in test targets
+- Core SPM packages (Models, Routing, Export, Observability, Persistence) don't have CustomDump in their dependency tree; only Feature packages (via TCA) and VaporTests can use it
+- Use `expectNoDifference(actual, expected)` for struct/model/enum comparisons; keep `#expect(x == y)` for simple primitives (Int, Bool, String)
+- Function signature: `expectNoDifference(_ actual: T, _ expected: T)` where T: Equatable
+
 ## TCA Binding Patterns
 - `$store.property` returns `_StoreBindable_SwiftUI`, not `Binding`; must call `.sending()` to get `Binding`
 - `.sending()` requires `CaseKeyPath<Action, Value>` (action must take same type as value)
