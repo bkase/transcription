@@ -13,6 +13,12 @@ enum SnapshotConfig {
         ProcessInfo.processInfo.environment["SNAPSHOT_RECORD"] == "1"
     }
 
+    /// Detect CI environment via common CI environment variables.
+    static var isCI: Bool {
+        let env = ProcessInfo.processInfo.environment
+        return env["CI"] != nil || env["GITHUB_ACTIONS"] != nil
+    }
+
     /// Default device configuration for SwiftUI view snapshots.
     /// Uses iPhone 15 Pro dimensions for consistency.
     static let defaultLayout: SwiftUISnapshotLayout = .device(config: .iPhone13Pro)
@@ -55,7 +61,15 @@ enum SnapshotHarness {
         line: UInt = #line
     ) {
         let shouldRecord = record ?? SnapshotConfig.isRecording
-        withSnapshotTesting(record: shouldRecord ? .all : .missing) {
+        let recordMode: SnapshotTestingConfiguration.Record =
+            if shouldRecord {
+                .all
+            } else if SnapshotConfig.isCI {
+                .never
+            } else {
+                .missing
+            }
+        withSnapshotTesting(record: recordMode) {
             SnapshotTesting.assertSnapshot(
                 of: view,
                 as: .image(
