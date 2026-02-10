@@ -71,21 +71,23 @@ public struct AudioSessionClient: Sendable {
 
 extension AudioSessionClient: DependencyKey {
     #if os(iOS)
-    public static let liveValue: Self = {
+    public static var liveValue: Self {
         let observer = LiveAudioSessionObserver()
         return Self(
             startObserving: { await observer.startObserving() },
             stopObserving: { await observer.stopObserving() },
             configureForRecording: { try await observer.configureForRecording() }
         )
-    }()
+    }
     #else
     // macOS fallback - no audio session management needed
-    public static let liveValue: Self = Self(
-        startObserving: { AsyncStream { $0.finish() } },
-        stopObserving: { },
-        configureForRecording: { }
-    )
+    public static var liveValue: Self {
+        Self(
+            startObserving: { AsyncStream { $0.finish() } },
+            stopObserving: { },
+            configureForRecording: { }
+        )
+    }
     #endif
 
     public static let testValue = Self()

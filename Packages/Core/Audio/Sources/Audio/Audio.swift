@@ -33,7 +33,7 @@ public struct AudioCaptureClient: Sendable {
 }
 
 extension AudioCaptureClient: DependencyKey {
-    public static let liveValue: Self = .live()
+    public static var liveValue: Self { .live() }
 
     public static let testValue = Self()
 }
@@ -65,7 +65,7 @@ public struct AudioPlayerClient: Sendable {
 }
 
 extension AudioPlayerClient: DependencyKey {
-    public static let liveValue: Self = .live()
+    public static var liveValue: Self { .live() }
 
     public static let testValue = Self()
 }

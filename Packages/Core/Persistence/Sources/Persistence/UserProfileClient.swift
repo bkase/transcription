@@ -29,7 +29,7 @@ public enum UserProfileClientError: Error, Sendable, Equatable {
 extension UserProfileClient: DependencyKey {
     private static let storageKey = "com.vapor.userProfile"
 
-    public static let liveValue: Self = {
+    public static var liveValue: Self {
         Self(
             load: {
                 guard let data = UserDefaults.standard.data(forKey: storageKey) else {
@@ -51,7 +51,7 @@ extension UserProfileClient: DependencyKey {
                 }
             }
         )
-    }()
+    }
 
     public static let testValue = Self()
 }

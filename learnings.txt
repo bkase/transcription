@@ -1,3 +1,9 @@
+## swift-dependencies liveValue
+- Per PFW best practices, use `static var liveValue` (computed property) instead of `static let liveValue` for dependency clients
+- `static let` creates a singleton that lives forever; `static var` (computed) creates a new instance each time, better for DI testing
+- For IIFE patterns `static let liveValue: Self = { ... }()`, convert to `static var liveValue: Self { ... }` (remove `= ` and trailing `()`)
+- For simple call patterns `static let liveValue = Foo.live()`, convert to `static var liveValue: Foo { .live() }` (add explicit type annotation)
+
 ## CustomDump / expectNoDifference
 - `expectNoDifference` from CustomDump gives dramatically better diffs for struct/enum comparisons in tests
 - CustomDump is available transitively via ComposableArchitecture but must be added as an explicit package dependency in xcodegen project.yml to import it in test targets

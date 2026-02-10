@@ -552,7 +552,7 @@ extension ExportClient: DependencyKey {
         )
     }
 
-    public static let liveValue = live()
+    public static var liveValue: Self { live() }
     public static let testValue = Self()
 }
 
@@ -675,7 +675,7 @@ public final class InMemoryFileStorage: @unchecked Sendable {
 }
 
 extension FileClient: DependencyKey {
-    public static let liveValue: Self = {
+    public static var liveValue: Self {
         let fileManager = FileManager.default
         return Self(
             read: { url in try Data(contentsOf: url) },
@@ -687,7 +687,7 @@ extension FileClient: DependencyKey {
             },
             temporaryDirectory: { URL(fileURLWithPath: NSTemporaryDirectory()) }
         )
-    }()
+    }
 
     public static let testValue = Self()
 

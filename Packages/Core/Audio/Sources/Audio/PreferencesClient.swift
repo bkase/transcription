@@ -30,7 +30,7 @@ public struct PreferencesClient: Sendable {
 extension PreferencesClient: DependencyKey {
     private static let audioRetentionModeKey = "com.vapor.preferences.audioRetentionMode"
 
-    public static let liveValue: Self = {
+    public static var liveValue: Self {
         Self(
             getAudioRetentionMode: {
                 guard let rawValue = UserDefaults.standard.string(forKey: audioRetentionModeKey),
@@ -43,7 +43,7 @@ extension PreferencesClient: DependencyKey {
                 UserDefaults.standard.set(mode.rawValue, forKey: audioRetentionModeKey)
             }
         )
-    }()
+    }
 
     public static let testValue = Self()
 }

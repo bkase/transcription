@@ -87,9 +87,9 @@ extension MicrophonePermissionClient {
 
 extension MicrophonePermissionClient: DependencyKey {
     #if os(iOS)
-    public static let liveValue = MicrophonePermissionClient.live()
+    public static var liveValue: MicrophonePermissionClient { .live() }
     #else
-    public static let liveValue = MicrophonePermissionClient()
+    public static var liveValue: MicrophonePermissionClient { MicrophonePermissionClient() }
     #endif
     public static let testValue = MicrophonePermissionClient()
 }

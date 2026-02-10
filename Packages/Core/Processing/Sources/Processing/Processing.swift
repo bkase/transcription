@@ -68,7 +68,7 @@ public struct FluidAudioClient: Sendable {
 }
 
 extension FluidAudioClient: DependencyKey {
-    public static let liveValue: Self = LiveFluidAudioClient.client()
+    public static var liveValue: Self { LiveFluidAudioClient.client() }
 
     public static let testValue = Self()
 }
@@ -214,7 +214,7 @@ extension RecordingProcessorClient: DependencyKey {
         )
     }
 
-    public static let liveValue: Self = live()
+    public static var liveValue: Self { live() }
 
     public static let testValue = Self()
 }
@@ -1380,7 +1380,7 @@ extension RecoveryRoutineClient: DependencyKey {
         )
     }
 
-    public static let liveValue = live()
+    public static var liveValue: Self { live() }
     public static let testValue = Self()
 }
 

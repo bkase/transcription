@@ -183,7 +183,7 @@ private actor HapticGenerator {
 #endif
 
 extension FeedbackClient: DependencyKey {
-    public static let liveValue: Self = {
+    public static var liveValue: Self {
         #if os(iOS)
         let toneGenerator = ToneGenerator()
         let hapticGenerator = HapticGenerator()
@@ -229,7 +229,7 @@ extension FeedbackClient: DependencyKey {
             triggerStopHaptic: { }
         )
         #endif
-    }()
+    }
 
     public static let testValue = Self()
 }

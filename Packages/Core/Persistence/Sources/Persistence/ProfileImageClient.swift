@@ -37,7 +37,7 @@ public enum ProfileImageClientError: Error, Sendable, Equatable {
 
 extension ProfileImageClient: DependencyKey {
     #if os(iOS)
-    public static let liveValue: Self = {
+    public static var liveValue: Self {
         Self(
             normalize: { data, maxDimension, compressionQuality in
                 guard let image = UIImage(data: data) else {
@@ -77,14 +77,14 @@ extension ProfileImageClient: DependencyKey {
                 return finalImage.jpegData(compressionQuality: compressionQuality)
             }
         )
-    }()
+    }
     #else
     // macOS fallback - just pass through data unchanged for now
-    public static let liveValue: Self = {
+    public static var liveValue: Self {
         Self(
             normalize: { data, _, _ in data }
         )
-    }()
+    }
     #endif
 
     public static let testValue = Self()

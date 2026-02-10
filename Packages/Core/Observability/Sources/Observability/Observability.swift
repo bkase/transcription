@@ -176,7 +176,7 @@ extension LoggingClient {
 }
 
 extension LoggingClient: DependencyKey {
-    public static let liveValue = LoggingClient.live()
+    public static var liveValue: LoggingClient { .live() }
     public static let testValue = LoggingClient()
 }
 

@@ -816,7 +816,7 @@ extension DatabaseClient: DependencyKey {
         )
     }
 
-    public static let liveValue: Self = {
+    public static var liveValue: Self {
         // Create database in Application Support directory
         let fileManager = FileManager.default
         let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -829,7 +829,7 @@ extension DatabaseClient: DependencyKey {
         let dbQueue = try! makeDatabase(configuration: .file(dbPath))
 
         return .live(dbQueue: dbQueue)
-    }()
+    }
 
     public static let testValue = Self()
 }
