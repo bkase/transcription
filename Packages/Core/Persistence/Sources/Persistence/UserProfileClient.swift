@@ -53,7 +53,7 @@ extension UserProfileClient: DependencyKey {
         )
     }
 
-    public static let testValue = Self()
+    public static var testValue: Self { Self() }
 }
 
 extension DependencyValues {

@@ -553,7 +553,7 @@ extension ExportClient: DependencyKey {
     }
 
     public static var liveValue: Self { live() }
-    public static let testValue = Self()
+    public static var testValue: Self { Self() }
 }
 
 extension DependencyValues {
@@ -689,7 +689,7 @@ extension FileClient: DependencyKey {
         )
     }
 
-    public static let testValue = Self()
+    public static var testValue: Self { Self() }
 
     /// Create an in-memory FileClient for testing
     /// - Parameters:

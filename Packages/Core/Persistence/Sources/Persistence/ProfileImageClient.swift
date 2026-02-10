@@ -87,7 +87,7 @@ extension ProfileImageClient: DependencyKey {
     }
     #endif
 
-    public static let testValue = Self()
+    public static var testValue: Self { Self() }
 }
 
 extension DependencyValues {

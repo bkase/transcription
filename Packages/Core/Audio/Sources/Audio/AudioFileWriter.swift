@@ -30,7 +30,7 @@ public struct AudioFileWriterClient: Sendable {
 
 extension AudioFileWriterClient: DependencyKey {
     public static var liveValue: AudioFileWriterClient { .live() }
-    public static let testValue = Self()
+    public static var testValue: Self { Self() }
 }
 
 extension DependencyValues {

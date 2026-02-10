@@ -26,7 +26,7 @@ extension TitleGeneratorClient: DependencyKey {
         #endif
     }
 
-    public static let testValue = Self()
+    public static var testValue: Self { Self() }
 
     /// Client that always returns unavailable (for platforms/iOS versions without Foundation Models)
     private static func unavailableClient() -> Self {

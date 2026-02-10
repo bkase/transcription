@@ -91,7 +91,7 @@ extension MicrophonePermissionClient: DependencyKey {
     #else
     public static var liveValue: MicrophonePermissionClient { MicrophonePermissionClient() }
     #endif
-    public static let testValue = MicrophonePermissionClient()
+    public static var testValue: MicrophonePermissionClient { MicrophonePermissionClient() }
 }
 
 extension DependencyValues {

@@ -831,7 +831,7 @@ extension DatabaseClient: DependencyKey {
         return .live(dbQueue: dbQueue)
     }
 
-    public static let testValue = Self()
+    public static var testValue: Self { Self() }
 }
 
 extension DependencyValues {
