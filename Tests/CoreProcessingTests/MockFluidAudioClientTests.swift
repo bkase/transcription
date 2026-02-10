@@ -154,8 +154,10 @@ import Models
     }
     let _ = await actor.startTranscription(audioStream: dummyAudioStream)
 
-    // Wait a tiny bit for the stream to complete (empty script)
-    try await Task.sleep(for: .milliseconds(10))
+    // Wait for the stream to complete (empty script)
+    try await waitUntil("transcription completes") {
+        await actor.getIsTranscribing() == false
+    }
 
     // Should be done transcribing after empty script completes
     isTranscribing = await actor.getIsTranscribing()

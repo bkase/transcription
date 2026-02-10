@@ -1,3 +1,12 @@
+## Deterministic test helpers for async tests
+- Replace `Task.sleep` in tests with a `waitUntil` polling helper that checks a condition at short intervals with a generous timeout
+- Pattern: `try await waitUntil("description") { await someActor.someState() == expected }`
+- For RecordingProcessor tests, poll database state (e.g., segment count, session processing state) instead of sleeping arbitrary durations
+- The `waitUntil` helper lives in `Tests/CoreProcessingTests/TestHelpers.swift` and uses 10ms poll interval with 2s timeout
+- For "negative" tests (asserting something does NOT happen), a small `Task.sleep` is still appropriate since there's no positive condition to poll
+- Tests run dramatically faster with polling (0.036s vs 200-500ms sleeps per test)
+- Key pollable conditions: `databaseClient.fetchSessions()` state, `databaseClient.fetchTranscriptSegments()` count, actor state like `processor.getIsRecording()`, `captureState.getStopCount()`
+
 ## swift-dependencies liveValue
 - Per PFW best practices, use `static var liveValue` (computed property) instead of `static let liveValue` for dependency clients
 - `static let` creates a singleton that lives forever; `static var` (computed) creates a new instance each time, better for DI testing

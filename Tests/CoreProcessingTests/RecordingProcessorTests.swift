@@ -113,13 +113,22 @@ import Persistence
         }
     }
 
-    // Wait a bit for segments to be processed, then stop
-    try await Task.sleep(for: .milliseconds(100))
+    // Wait for all 3 segments to be stored in database
+    try await waitUntil("3 segments stored in DB") {
+        let sessions = try? await databaseClient.fetchSessions()
+        guard let session = sessions?.first else { return false }
+        let sessionId = SessionID(rawValue: session.id)
+        let segs = try? await databaseClient.fetchTranscriptSegments(sessionId)
+        return (segs?.count ?? 0) >= 3
+    }
     await processor.stopRecording()
 
-    // Wait for collection to complete
+    // Wait for finalization
+    try await waitUntil("session finalized") {
+        let sessions = try? await databaseClient.fetchSessions()
+        return sessions?.first?.processingState == .processed
+    }
     collectTask.cancel()
-    try await Task.sleep(for: .milliseconds(50))
 
     // Verify event order
     #expect(receivedEvents.count >= 4, "Should have at least 4 events (didStart, listeningChanged(true), listeningChanged(false), didFinish)")
@@ -399,8 +408,10 @@ import Persistence
         }
     }
 
-    // Wait for start
-    try await Task.sleep(for: .milliseconds(50))
+    // Wait for recording to be active
+    try await waitUntil("recording active") {
+        await processor.getIsRecording()
+    }
 
     // Initial stop count is 0
     var stopCount = await captureState.getStopCount()
@@ -409,8 +420,10 @@ import Persistence
     // Simulate interruption began
     sessionContinuation.yield(.interrupted(.began))
 
-    // Wait for event processing
-    try await Task.sleep(for: .milliseconds(50))
+    // Wait for interruption to be processed
+    try await waitUntil("interruption processed") {
+        await captureState.getStopCount() == 1
+    }
 
     // Verify processor paused capture
     stopCount = await captureState.getStopCount()
@@ -516,8 +529,10 @@ import Persistence
         }
     }
 
-    // Wait for start
-    try await Task.sleep(for: .milliseconds(50))
+    // Wait for recording to be active
+    try await waitUntil("recording active") {
+        await processor.getIsRecording()
+    }
 
     // Initial start count is 1 (from startRecording)
     var startCount = await captureState.getStartCount()
@@ -525,10 +540,14 @@ import Persistence
 
     // Simulate interruption began then ended with shouldResume
     sessionContinuation.yield(.interrupted(.began))
-    try await Task.sleep(for: .milliseconds(50))
+    try await waitUntil("interruption began processed") {
+        await processor.getIsInterrupted()
+    }
 
     sessionContinuation.yield(.interrupted(.ended(shouldResume: true)))
-    try await Task.sleep(for: .milliseconds(50))
+    try await waitUntil("capture restarted after interruption") {
+        await captureState.getStartCount() == 2
+    }
 
     // Verify auto-resume (second start call)
     startCount = await captureState.getStartCount()
@@ -633,8 +652,10 @@ import Persistence
         }
     }
 
-    // Wait for start
-    try await Task.sleep(for: .milliseconds(50))
+    // Wait for recording to be active
+    try await waitUntil("recording active") {
+        await processor.getIsRecording()
+    }
 
     // Initial counts
     var startCount = await captureState.getStartCount()
@@ -644,7 +665,11 @@ import Persistence
 
     // Simulate oldDeviceUnavailable (headphones unplugged)
     sessionContinuation.yield(.routeChanged(.oldDeviceUnavailable))
-    try await Task.sleep(for: .milliseconds(50))
+
+    // Wait for capture restart (stop + start again)
+    try await waitUntil("capture restarted after route change") {
+        await captureState.getStartCount() == 2
+    }
 
     // Verify restart (stop + start again)
     startCount = await captureState.getStartCount()
@@ -747,11 +772,17 @@ import Persistence
         }
     }
 
-    // Wait for start
-    try await Task.sleep(for: .milliseconds(50))
+    // Wait for recording to be active
+    try await waitUntil("recording active") {
+        await processor.getIsRecording()
+    }
 
     // Simulate newDeviceAvailable (headphones plugged in)
     sessionContinuation.yield(.routeChanged(.newDeviceAvailable))
+
+    // Give brief time for event to propagate through actor
+    // (We're testing that nothing happens, so we need a small delay to ensure
+    // the event has been processed before checking counts)
     try await Task.sleep(for: .milliseconds(50))
 
     // Verify NO restart (counts unchanged after initial start)
@@ -858,14 +889,23 @@ import Persistence
         return events
     }
 
-    // Wait for live segments to be processed
-    try await Task.sleep(for: .milliseconds(100))
+    // Wait for live segments to be stored in database
+    try await waitUntil("live segments stored in DB") {
+        let sessions = try? await databaseClient.fetchSessions()
+        guard let session = sessions?.first else { return false }
+        let sessionId = SessionID(rawValue: session.id)
+        let segs = try? await databaseClient.fetchTranscriptSegments(sessionId)
+        return (segs?.count ?? 0) >= 3
+    }
 
     // Stop recording (triggers offline transcription which will fail)
     await processor.stopRecording()
 
-    // Wait for collection to complete
-    try await Task.sleep(for: .milliseconds(200))
+    // Wait for offline transcription failure and session marked as partial
+    try await waitUntil("session marked as partial") {
+        let sessions = try? await databaseClient.fetchSessions()
+        return sessions?.first?.processingState == .partial
+    }
     collectTask.cancel()
 
     // Verify session is marked as partial (live segments exist, but offline failed)
@@ -1260,14 +1300,23 @@ import Persistence
         }
     }
 
-    // Wait for live segments to be processed
-    try await Task.sleep(for: .milliseconds(100))
+    // Wait for live segments to be stored in database
+    try await waitUntil("live segments stored in DB") {
+        let sessions = try? await databaseClient.fetchSessions()
+        guard let session = sessions?.first else { return false }
+        let sessionId = SessionID(rawValue: session.id)
+        let segs = try? await databaseClient.fetchTranscriptSegments(sessionId)
+        return (segs?.count ?? 0) >= 3
+    }
 
     // Stop recording (triggers offline transcription which will succeed)
     await processor.stopRecording()
 
-    // Wait for offline transcription to complete
-    try await Task.sleep(for: .milliseconds(200))
+    // Wait for offline transcription to complete and session marked as processed
+    try await waitUntil("session processed after offline transcription") {
+        let sessions = try? await databaseClient.fetchSessions()
+        return sessions?.first?.processingState == .processed
+    }
     collectTask.cancel()
 
     // Verify session is marked as processed (offline succeeded)

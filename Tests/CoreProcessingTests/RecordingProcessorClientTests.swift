@@ -144,8 +144,10 @@ import Persistence
         }
     }
 
-    // Wait a bit for events
-    try await Task.sleep(for: .milliseconds(50))
+    // Wait for transcription to start
+    try await waitUntil("transcription starts") {
+        await stateTracker.isTranscriptionStarted
+    }
 
     // Verify transcription started
     let transcriptionStarted = await stateTracker.isTranscriptionStarted
@@ -154,8 +156,10 @@ import Persistence
     // Stop recording
     await client.stopRecording()
 
-    // Wait a bit for stop to complete
-    try await Task.sleep(for: .milliseconds(50))
+    // Wait for stop to complete
+    try await waitUntil("recording stops") {
+        await client.isRecording() == false
+    }
 
     // Verify stopped state
     isRecording = await client.isRecording()

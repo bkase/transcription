@@ -84,15 +84,24 @@ import Persistence
         }
     }
 
-    // Wait for audio generation to complete and segments to process
-    try await Task.sleep(for: .milliseconds(200))
+    // Wait for all 3 segments to be stored in database
+    try await waitUntil("3 segments stored in DB") {
+        let sessions = try? await databaseClient.fetchSessions()
+        guard let session = sessions?.first else { return false }
+        let sessionId = SessionID(rawValue: session.id)
+        let segs = try? await databaseClient.fetchTranscriptSegments(sessionId)
+        return (segs?.count ?? 0) >= 3
+    }
 
     // Stop recording
     await processor.stopRecording()
 
-    // Give time for finalization
+    // Wait for finalization
+    try await waitUntil("session finalized") {
+        let sessions = try? await databaseClient.fetchSessions()
+        return sessions?.first?.processingState == .processed
+    }
     collectTask.cancel()
-    try await Task.sleep(for: .milliseconds(50))
 
     // VERIFY: Session was created in database
     let sessions = try await databaseClient.fetchSessions()
@@ -204,10 +213,18 @@ import Persistence
         }
     }
 
-    try await Task.sleep(for: .milliseconds(150))
+    // Wait for audio capture to finish (stream finishes immediately with empty script)
+    try await waitUntil("recording active") {
+        await processor.getIsRecording()
+    }
     await processor.stopRecording()
+
+    // Wait for finalization
+    try await waitUntil("session finalized") {
+        let sessions = try? await databaseClient.fetchSessions()
+        return sessions?.first?.processingState == .processed
+    }
     collectTask.cancel()
-    try await Task.sleep(for: .milliseconds(50))
 
     // Session should exist and be processed even with no segments
     let sessions = try await databaseClient.fetchSessions()
@@ -281,10 +298,22 @@ import Persistence
         for await _ in eventStream {}
     }
 
-    try await Task.sleep(for: .milliseconds(200))
+    // Wait for segments to be stored in database
+    try await waitUntil("segments stored in DB") {
+        let sessions = try? await databaseClient.fetchSessions()
+        guard let session = sessions?.first else { return false }
+        let sessionId = SessionID(rawValue: session.id)
+        let segs = try? await databaseClient.fetchTranscriptSegments(sessionId)
+        return (segs?.count ?? 0) >= 1
+    }
     await processor.stopRecording()
+
+    // Wait for finalization
+    try await waitUntil("session finalized") {
+        let sessions = try? await databaseClient.fetchSessions()
+        return sessions?.first?.processingState == .processed
+    }
     collectTask.cancel()
-    try await Task.sleep(for: .milliseconds(50))
 
     let sessions = try await databaseClient.fetchSessions()
     #expect(sessions.count == 1)
@@ -362,11 +391,18 @@ import Persistence
         for await _ in eventStream {}
     }
 
-    // Wait for audio generation to complete
-    try await Task.sleep(for: .milliseconds(300))
+    // Wait for file writer to receive at least one frame
+    try await waitUntil("file writer receives frames") {
+        await frameCounter.getCount() > 0
+    }
     await processor.stopRecording()
+
+    // Wait for finalization
+    try await waitUntil("session finalized") {
+        let sessions = try? await databaseClient.fetchSessions()
+        return sessions?.first?.processingState == .processed
+    }
     collectTask.cancel()
-    try await Task.sleep(for: .milliseconds(50))
 
     // File writer should have received frames
     let frameCount = await frameCounter.getCount()

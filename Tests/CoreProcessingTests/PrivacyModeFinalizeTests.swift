@@ -109,13 +109,22 @@ import Persistence
         }
     }
 
-    // Wait for processing
-    try await Task.sleep(for: .milliseconds(100))
+    // Wait for segment to be stored in database before stopping
+    try await waitUntil("segment stored in DB") {
+        let sessions = try? await databaseClient.fetchSessions()
+        guard let session = sessions?.first else { return false }
+        let sessionId = SessionID(rawValue: session.id)
+        let segs = try? await databaseClient.fetchTranscriptSegments(sessionId)
+        return (segs?.count ?? 0) >= 1
+    }
     await processor.stopRecording()
 
-    // Wait for finalization
+    // Wait for finalization to complete
+    try await waitUntil("session finalized") {
+        let sessions = try? await databaseClient.fetchSessions()
+        return sessions?.first?.processingState == .processed
+    }
     collectTask.cancel()
-    try await Task.sleep(for: .milliseconds(50))
 
     // Verify didFinish event was emitted
     let finishEvents = receivedEvents.filter {
@@ -214,10 +223,18 @@ import Persistence
         for await _ in eventStream { }
     }
 
-    try await Task.sleep(for: .milliseconds(100))
+    // Wait for audio file to be written
+    try await waitUntil("audio file written") {
+        await writtenFile.getPath() != nil
+    }
     await processor.stopRecording()
+
+    // Wait for finalization to complete
+    try await waitUntil("session finalized") {
+        let sessions = try? await databaseClient.fetchSessions()
+        return sessions?.first?.processingState == .processed
+    }
     collectTask.cancel()
-    try await Task.sleep(for: .milliseconds(50))
 
     // Verify audio file still exists
     let audioPath = await writtenFile.getPath()
@@ -310,10 +327,18 @@ import Persistence
         for await _ in eventStream { }
     }
 
-    try await Task.sleep(for: .milliseconds(100))
+    // Wait for audio file to be written
+    try await waitUntil("audio file written") {
+        await writtenFile.getPath() != nil
+    }
     await processor.stopRecording()
+
+    // Wait for finalization to complete
+    try await waitUntil("session finalized") {
+        let sessions = try? await databaseClient.fetchSessions()
+        return sessions?.first?.processingState == .processed
+    }
     collectTask.cancel()
-    try await Task.sleep(for: .milliseconds(50))
 
     // Verify audio file still exists (should be retained in audioOnly mode)
     let audioPath = await writtenFile.getPath()

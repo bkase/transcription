@@ -161,10 +161,17 @@ import Persistence
         for await _ in eventStream { }
     }
 
-    // Wait for segments to be processed and title generation to trigger
-    try await Task.sleep(for: .milliseconds(200))
+    // Wait for title generation to be called (triggered when segment exceeds 15s)
+    try await waitUntil("title generation called") {
+        await generatorState.getCallCount() >= 1
+    }
     await processor.stopRecording()
-    try await Task.sleep(for: .milliseconds(100))
+
+    // Wait for session to be finalized
+    try await waitUntil("session finalized") {
+        let sessions = try? await databaseClient.fetchSessions()
+        return sessions?.first?.processingState == .processed
+    }
     collectTask.cancel()
 
     // Verify title generation was called
@@ -294,9 +301,21 @@ import Persistence
         for await _ in eventStream { }
     }
 
-    try await Task.sleep(for: .milliseconds(200))
+    // Wait for segments to be stored in database
+    try await waitUntil("segments stored in DB") {
+        let sessions = try? await databaseClient.fetchSessions()
+        guard let session = sessions?.first else { return false }
+        let sessionId = SessionID(rawValue: session.id)
+        let segs = try? await databaseClient.fetchTranscriptSegments(sessionId)
+        return (segs?.count ?? 0) >= 3
+    }
     await processor.stopRecording()
-    try await Task.sleep(for: .milliseconds(200))
+
+    // Wait for session to be finalized
+    try await waitUntil("session finalized") {
+        let sessions = try? await databaseClient.fetchSessions()
+        return sessions?.first?.processingState == .processed
+    }
     collectTask.cancel()
 
     // Verify session title is nil (because title generator is unavailable)
@@ -439,9 +458,21 @@ import Persistence
         for await _ in eventStream { }
     }
 
-    try await Task.sleep(for: .milliseconds(200))
+    // Wait for segment to be stored in database
+    try await waitUntil("segment stored in DB") {
+        let sessions = try? await databaseClient.fetchSessions()
+        guard let session = sessions?.first else { return false }
+        let sessionId = SessionID(rawValue: session.id)
+        let segs = try? await databaseClient.fetchTranscriptSegments(sessionId)
+        return (segs?.count ?? 0) >= 1
+    }
     await processor.stopRecording()
-    try await Task.sleep(for: .milliseconds(100))
+
+    // Wait for session to be finalized
+    try await waitUntil("session finalized") {
+        let sessions = try? await databaseClient.fetchSessions()
+        return sessions?.first?.processingState == .processed
+    }
     collectTask.cancel()
 
     // Verify title generation was NOT called (because isAvailable is false)
@@ -561,9 +592,17 @@ import Persistence
         for await _ in eventStream { }
     }
 
-    try await Task.sleep(for: .milliseconds(200))
+    // Wait for all segments to be stored and title generation called
+    try await waitUntil("title generation called") {
+        await generatorState.getCallCount() >= 1
+    }
     await processor.stopRecording()
-    try await Task.sleep(for: .milliseconds(100))
+
+    // Wait for session to be finalized
+    try await waitUntil("session finalized") {
+        let sessions = try? await databaseClient.fetchSessions()
+        return sessions?.first?.processingState == .processed
+    }
     collectTask.cancel()
 
     // Verify title generation was called exactly ONCE
@@ -656,9 +695,21 @@ import Persistence
         }
     }
 
-    try await Task.sleep(for: .milliseconds(200))
+    // Wait for segment to be stored in database
+    try await waitUntil("segment stored in DB") {
+        let sessions = try? await databaseClient.fetchSessions()
+        guard let session = sessions?.first else { return false }
+        let sessionId = SessionID(rawValue: session.id)
+        let segs = try? await databaseClient.fetchTranscriptSegments(sessionId)
+        return (segs?.count ?? 0) >= 1
+    }
     await processor.stopRecording()
-    try await Task.sleep(for: .milliseconds(100))
+
+    // Wait for session to be finalized
+    try await waitUntil("session finalized") {
+        let sessions = try? await databaseClient.fetchSessions()
+        return sessions?.first?.processingState == .processed
+    }
     collectTask.cancel()
 
     // Verify recording completed normally despite title generation error
@@ -783,11 +834,25 @@ import Persistence
         for await _ in eventStream { }
     }
 
-    // Wait for segments to be processed
-    try await Task.sleep(for: .milliseconds(200))
+    // Wait for segments to be stored in database
+    try await waitUntil("segments stored in DB") {
+        let sessions = try? await databaseClient.fetchSessions()
+        guard let session = sessions?.first else { return false }
+        let sessionId = SessionID(rawValue: session.id)
+        let segs = try? await databaseClient.fetchTranscriptSegments(sessionId)
+        return (segs?.count ?? 0) >= 2
+    }
     await processor.stopRecording()
-    // Wait for finalization title generation to run (runs in detached Task, needs extra time for DB update)
-    try await Task.sleep(for: .milliseconds(500))
+
+    // Wait for finalization title generation to complete and update DB
+    try await waitUntil("finalization title generation complete") {
+        await generatorState.getCallCount() >= 1
+    }
+    // Wait for title to be written to database
+    try await waitUntil("title written to DB") {
+        let sessions = try? await databaseClient.fetchSessions()
+        return sessions?.first?.title != nil
+    }
     collectTask.cancel()
 
     // Verify title generation was called at finalization
@@ -905,9 +970,17 @@ import Persistence
         for await _ in eventStream { }
     }
 
-    try await Task.sleep(for: .milliseconds(200))
+    // Wait for title generation to be called during live recording (segment exceeds 15s)
+    try await waitUntil("title generation called during live") {
+        await generatorState.getCallCount() >= 1
+    }
     await processor.stopRecording()
-    try await Task.sleep(for: .milliseconds(200))
+
+    // Wait for session to be finalized
+    try await waitUntil("session finalized") {
+        let sessions = try? await databaseClient.fetchSessions()
+        return sessions?.first?.processingState == .processed
+    }
     collectTask.cancel()
 
     // Verify title generation was called exactly ONCE (during live, NOT at finalization)
@@ -1005,9 +1078,21 @@ import Persistence
         for await _ in eventStream { }
     }
 
-    try await Task.sleep(for: .milliseconds(200))
+    // Wait for segment to be stored in database
+    try await waitUntil("segment stored in DB") {
+        let sessions = try? await databaseClient.fetchSessions()
+        guard let session = sessions?.first else { return false }
+        let sessionId = SessionID(rawValue: session.id)
+        let segs = try? await databaseClient.fetchTranscriptSegments(sessionId)
+        return (segs?.count ?? 0) >= 1
+    }
     await processor.stopRecording()
-    try await Task.sleep(for: .milliseconds(200))
+
+    // Wait for session to be finalized
+    try await waitUntil("session finalized") {
+        let sessions = try? await databaseClient.fetchSessions()
+        return sessions?.first?.processingState == .processed
+    }
     collectTask.cancel()
 
     // Verify title generation was NOT called
@@ -1099,9 +1184,17 @@ import Persistence
         for await _ in eventStream { }
     }
 
-    try await Task.sleep(for: .milliseconds(200))
+    // Wait for recording to be active (empty script finishes immediately)
+    try await waitUntil("recording active") {
+        await processor.getIsRecording()
+    }
     await processor.stopRecording()
-    try await Task.sleep(for: .milliseconds(200))
+
+    // Wait for session to be finalized
+    try await waitUntil("session finalized") {
+        let sessions = try? await databaseClient.fetchSessions()
+        return sessions?.first?.processingState == .processed
+    }
     collectTask.cancel()
 
     // Verify title generation was NOT called (no transcript text)
