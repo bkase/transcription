@@ -10,6 +10,7 @@ import PersonTimelineFeature
 import Persistence
 import Processing
 import Models
+import Export
 
 // MARK: - AppFeature
 
@@ -61,6 +62,7 @@ public struct AppFeature {
     @Dependency(\.recoveryRoutineClient) var recoveryRoutineClient
     @Dependency(\.userProfileClient) var userProfileClient
     @Dependency(\.databaseClient) var databaseClient
+    @Dependency(\.fileClient) var fileClient
 
     public var body: some ReducerOf<Self> {
         Scope(state: \.timeline, action: \.timeline) {
@@ -128,15 +130,17 @@ public struct AppFeature {
                 state.recording = recordingState
 
                 // Get audio directory from caches
-                let audioDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+                let audioDir = fileClient.cachesDirectory()
                     .appendingPathComponent("recordings", isDirectory: true)
                 // Create directory if needed
-                try? FileManager.default.createDirectory(at: audioDir, withIntermediateDirectories: true)
-                return .send(.recording(.presented(.continueRecording(
-                    audioDirectory: audioDir,
-                    sessionID: sessionID,
-                    timestampOffsetMs: currentDurationMs
-                ))))
+                return .run { [fileClient] send in
+                    try? await fileClient.createDirectory(audioDir)
+                    await send(.recording(.presented(.continueRecording(
+                        audioDirectory: audioDir,
+                        sessionID: sessionID,
+                        timestampOffsetMs: currentDurationMs
+                    ))))
+                }
 
             case .path(.element(id: _, action: .sessionDetail(.titleSaved))):
                 // Reload timeline when session title is saved so the updated title is visible
@@ -198,11 +202,13 @@ public struct AppFeature {
                 // Present recording screen and start recording
                 state.recording = RecordingFeature.State(userProfile: state.userProfile)
                 // Get audio directory from caches
-                let audioDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+                let audioDir = fileClient.cachesDirectory()
                     .appendingPathComponent("recordings", isDirectory: true)
                 // Create directory if needed
-                try? FileManager.default.createDirectory(at: audioDir, withIntermediateDirectories: true)
-                return .send(.recording(.presented(.startRecording(audioDirectory: audioDir))))
+                return .run { [fileClient] send in
+                    try? await fileClient.createDirectory(audioDir)
+                    await send(.recording(.presented(.startRecording(audioDirectory: audioDir))))
+                }
 
             case .timeline(.peopleTapped):
                 // Push people directory onto navigation stack with current user profile

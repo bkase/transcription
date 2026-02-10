@@ -95,7 +95,8 @@ import Dependencies
             delete: { _ in },
             exists: { _ in false },
             createDirectory: { _ in },
-            temporaryDirectory: { URL(fileURLWithPath: NSTemporaryDirectory()) }
+            temporaryDirectory: { URL(fileURLWithPath: NSTemporaryDirectory()) },
+            cachesDirectory: { URL(fileURLWithPath: NSTemporaryDirectory()) }
         )
         deps.preferencesClient = PreferencesClient(
             getAudioRetentionMode: { .both },

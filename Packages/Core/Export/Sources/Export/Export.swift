@@ -580,6 +580,11 @@ public struct FileClient: Sendable {
     public var createDirectory: @Sendable (_ url: URL) async throws -> Void
     /// Get temporary directory URL
     public var temporaryDirectory: @Sendable () -> URL = { URL(fileURLWithPath: NSTemporaryDirectory()) }
+    /// Get caches directory URL
+    public var cachesDirectory: @Sendable () -> URL = {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSTemporaryDirectory())
+    }
 }
 
 /// Error thrown by FileClient operations
@@ -685,7 +690,11 @@ extension FileClient: DependencyKey {
             createDirectory: { url in
                 try fileManager.createDirectory(at: url, withIntermediateDirectories: true)
             },
-            temporaryDirectory: { URL(fileURLWithPath: NSTemporaryDirectory()) }
+            temporaryDirectory: { URL(fileURLWithPath: NSTemporaryDirectory()) },
+            cachesDirectory: {
+                fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first
+                    ?? URL(fileURLWithPath: NSTemporaryDirectory())
+            }
         )
     }
 
@@ -707,7 +716,8 @@ extension FileClient: DependencyKey {
             delete: { url in try storage.delete(url) },
             exists: { url in storage.exists(url) },
             createDirectory: { url in storage.createDirectory(url) },
-            temporaryDirectory: { storage.tempDirectory }
+            temporaryDirectory: { storage.tempDirectory },
+            cachesDirectory: { storage.tempDirectory }
         )
     }
 }
