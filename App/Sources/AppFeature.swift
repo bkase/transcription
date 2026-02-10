@@ -14,31 +14,31 @@ import Export
 import Routing
 import URLRouting
 
+// MARK: - AppPath (Navigation Stack)
+
+@Reducer(state: .equatable)
+public enum AppPath {
+    case sessionDetail(SessionDetailFeature)
+    case profile(ProfileFeature)
+    case personTimeline(PersonTimelineFeature)
+    case people(PeopleFeature)
+}
+
 // MARK: - AppFeature
 
 @Reducer
 public struct AppFeature {
     public init() {}
 
-    // MARK: - Path (Navigation Stack)
-
-    @Reducer(state: .equatable)
-    public enum Path {
-        case sessionDetail(SessionDetailFeature)
-        case profile(ProfileFeature)
-        case personTimeline(PersonTimelineFeature)
-        case people(PeopleFeature)
-    }
-
     @ObservableState
     public struct State: Equatable {
-        public var path: StackState<Path.State> = StackState()
+        public var path: StackState<AppPath.State> = StackState()
         public var timeline: TimelineFeature.State
         @Presents public var recording: RecordingFeature.State?
         public var userProfile: UserProfile = .empty
 
         public init(
-            path: StackState<Path.State> = StackState(),
+            path: StackState<AppPath.State> = StackState(),
             timeline: TimelineFeature.State = .init(),
             recording: RecordingFeature.State? = nil,
             userProfile: UserProfile = .empty
@@ -53,7 +53,7 @@ public struct AppFeature {
     public enum Action {
         case onAppear
         case deepLinkOpened(URL)
-        case path(StackAction<Path.State, Path.Action>)
+        case path(StackAction<AppPath.State, AppPath.Action>)
         case timeline(TimelineFeature.Action)
         case recording(PresentationAction<RecordingFeature.Action>)
         case dismissRecording
