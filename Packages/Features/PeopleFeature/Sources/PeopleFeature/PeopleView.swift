@@ -394,7 +394,7 @@ struct PersonMockPhotoPickerSheet: View {
     let store: StoreOf<PeopleFeature>
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
                 ForEach(Array(MockPhotoData.options.enumerated()), id: \.offset) { index, option in
                     Button {

@@ -478,7 +478,7 @@ struct MockPhotoPickerSheet: View {
     let store: StoreOf<ProfileFeature>
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
                 ForEach(Array(MockPhotoData.options.enumerated()), id: \.offset) { index, option in
                     Button {
