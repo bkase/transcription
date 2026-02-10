@@ -188,7 +188,7 @@ extension LoggingClient: DependencyKey {
         )
     }
 
-    public static var testValue: LoggingClient { LoggingClient() }
+    public static var testValue: LoggingClient { Self() }
 }
 
 extension DependencyValues {

@@ -100,7 +100,7 @@ extension MicrophonePermissionClient: DependencyKey {
         )
     }
 
-    public static var testValue: MicrophonePermissionClient { MicrophonePermissionClient() }
+    public static var testValue: MicrophonePermissionClient { Self() }
 }
 
 extension DependencyValues {
