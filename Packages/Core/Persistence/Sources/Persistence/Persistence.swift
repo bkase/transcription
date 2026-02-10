@@ -496,6 +496,41 @@ public struct DatabaseClient: Sendable {
 }
 
 extension DatabaseClient: DependencyKey {
+    public static var previewValue: Self {
+        Self(
+            fetchSessions: { [] },
+            fetchSession: { _ in nil },
+            createSession: { _ in },
+            updateSession: { _ in },
+            deleteSession: { _ in },
+            fetchPeople: { [] },
+            fetchPerson: { _ in nil },
+            createPerson: { _ in },
+            updatePerson: { _ in },
+            deletePerson: { _ in },
+            fetchSpeakerTracks: { _ in [] },
+            createSpeakerTrack: { _ in },
+            updateSpeakerTrack: { _ in },
+            deleteSpeakerTracksForSession: { _ in },
+            fetchTranscriptSegments: { _ in [] },
+            createTranscriptSegment: { _ in },
+            updateTranscriptSegment: { _ in },
+            deleteTranscriptSegmentsForSession: { _ in },
+            fetchSpeakerSegments: { _ in [] },
+            createSpeakerSegment: { _ in },
+            searchSessions: { _ in [] },
+            searchSessionsWithDetails: { _ in [] },
+            fetchSessionsGroupedByDate: { _ in [] },
+            fetchPersonConversationCounts: { [:] },
+            fetchSessionsForPerson: { _ in [] },
+            fetchStaleRecordings: { [] },
+            reconcileStaleRecordings: { _, _ in 0 },
+            recoverStuckTranscriptions: { _ in 0 },
+            fetchSpeakerInfoForSessions: { _ in [:] },
+            deleteAllData: { }
+        )
+    }
+
     public static func live(dbQueue: DatabaseQueue) -> Self {
         Self(
             fetchSessions: {

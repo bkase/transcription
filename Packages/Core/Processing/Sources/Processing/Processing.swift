@@ -70,6 +70,17 @@ public struct FluidAudioClient: Sendable {
 extension FluidAudioClient: DependencyKey {
     public static var liveValue: Self { LiveFluidAudioClient.client() }
 
+    public static var previewValue: Self {
+        Self(
+            prepareModels: { },
+            modelStatus: { .ready },
+            startTranscription: { _ in AsyncStream { $0.finish() } },
+            stopTranscription: { },
+            isTranscribing: { false },
+            transcribeFile: { _ in [] }
+        )
+    }
+
     public static var testValue: Self { Self() }
 }
 
@@ -215,6 +226,21 @@ extension RecordingProcessorClient: DependencyKey {
     }
 
     public static var liveValue: Self { live() }
+
+    public static var previewValue: Self {
+        Self(
+            startRecording: { _ in AsyncStream { $0.finish() } },
+            continueRecording: { _, _ in AsyncStream { $0.finish() } },
+            stopRecording: { },
+            discardRecording: { },
+            pauseRecording: { },
+            resumeRecording: { },
+            isRecording: { false },
+            isPaused: { false },
+            currentSessionID: { nil },
+            retryOfflineTranscription: { _ in false }
+        )
+    }
 
     public static var testValue: Self { Self() }
 }
@@ -1381,6 +1407,13 @@ extension RecoveryRoutineClient: DependencyKey {
     }
 
     public static var liveValue: Self { live() }
+
+    public static var previewValue: Self {
+        Self(
+            run: { .empty }
+        )
+    }
+
     public static var testValue: Self { Self() }
 }
 

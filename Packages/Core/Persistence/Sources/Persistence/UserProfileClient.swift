@@ -53,6 +53,13 @@ extension UserProfileClient: DependencyKey {
         )
     }
 
+    public static var previewValue: Self {
+        Self(
+            load: { .empty },
+            save: { _ in }
+        )
+    }
+
     public static var testValue: Self { Self() }
 }
 

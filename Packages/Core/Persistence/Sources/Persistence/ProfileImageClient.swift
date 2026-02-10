@@ -87,6 +87,12 @@ extension ProfileImageClient: DependencyKey {
     }
     #endif
 
+    public static var previewValue: Self {
+        Self(
+            normalize: { data, _, _ in data }
+        )
+    }
+
     public static var testValue: Self { Self() }
 }
 

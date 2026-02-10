@@ -553,6 +553,16 @@ extension ExportClient: DependencyKey {
     }
 
     public static var liveValue: Self { live() }
+
+    public static var previewValue: Self {
+        Self(
+            exportSession: { _, _ in ExportResult(url: URL(fileURLWithPath: "/tmp/preview-export.json"), format: .json) },
+            exportBundle: { _ in URL(fileURLWithPath: "/tmp/preview-bundle.zip") },
+            exportAllSessions: { URL(fileURLWithPath: "/tmp/preview-all.zip") },
+            availableFormats: { ExportFormat.allCases }
+        )
+    }
+
     public static var testValue: Self { Self() }
 }
 
@@ -680,6 +690,21 @@ public final class InMemoryFileStorage: @unchecked Sendable {
 }
 
 extension FileClient: DependencyKey {
+    public static var previewValue: Self {
+        Self(
+            read: { _ in Data() },
+            write: { _, _ in },
+            delete: { _ in },
+            exists: { _ in false },
+            createDirectory: { _ in },
+            temporaryDirectory: { URL(fileURLWithPath: NSTemporaryDirectory()) },
+            cachesDirectory: {
+                FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+                    ?? URL(fileURLWithPath: NSTemporaryDirectory())
+            }
+        )
+    }
+
     public static var liveValue: Self {
         let fileManager = FileManager.default
         return Self(

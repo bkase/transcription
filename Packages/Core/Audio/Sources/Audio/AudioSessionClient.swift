@@ -90,6 +90,14 @@ extension AudioSessionClient: DependencyKey {
     }
     #endif
 
+    public static var previewValue: Self {
+        Self(
+            startObserving: { AsyncStream { $0.finish() } },
+            stopObserving: { },
+            configureForRecording: { }
+        )
+    }
+
     public static var testValue: Self { Self() }
 }
 

@@ -177,6 +177,17 @@ extension LoggingClient {
 
 extension LoggingClient: DependencyKey {
     public static var liveValue: LoggingClient { .live() }
+
+    public static var previewValue: LoggingClient {
+        LoggingClient(
+            log: { _ in },
+            currentTraceId: { nil },
+            setTraceId: { _ in },
+            startTrace: { TraceID.generate() },
+            endTrace: { }
+        )
+    }
+
     public static var testValue: LoggingClient { LoggingClient() }
 }
 

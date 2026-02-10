@@ -91,6 +91,15 @@ extension MicrophonePermissionClient: DependencyKey {
     #else
     public static var liveValue: MicrophonePermissionClient { MicrophonePermissionClient() }
     #endif
+
+    public static var previewValue: Self {
+        Self(
+            getStatus: { .authorized },
+            requestPermission: { true },
+            openSettings: { }
+        )
+    }
+
     public static var testValue: MicrophonePermissionClient { MicrophonePermissionClient() }
 }
 

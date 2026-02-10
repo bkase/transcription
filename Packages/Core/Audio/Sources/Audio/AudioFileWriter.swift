@@ -30,6 +30,17 @@ public struct AudioFileWriterClient: Sendable {
 
 extension AudioFileWriterClient: DependencyKey {
     public static var liveValue: AudioFileWriterClient { .live() }
+
+    public static var previewValue: Self {
+        Self(
+            startWriting: { _, _ in },
+            appendFrame: { _ in },
+            finishWriting: { 0 },
+            cancelWriting: { },
+            isWriting: { false }
+        )
+    }
+
     public static var testValue: Self { Self() }
 }
 

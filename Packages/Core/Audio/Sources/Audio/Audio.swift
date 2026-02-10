@@ -35,6 +35,15 @@ public struct AudioCaptureClient: Sendable {
 extension AudioCaptureClient: DependencyKey {
     public static var liveValue: Self { .live() }
 
+    public static var previewValue: Self {
+        Self(
+            startCapture: { AsyncStream { $0.finish() } },
+            stopCapture: { },
+            isCapturing: { false },
+            getInputFormat: { .recording }
+        )
+    }
+
     public static var testValue: Self { Self() }
 }
 
@@ -66,6 +75,17 @@ public struct AudioPlayerClient: Sendable {
 
 extension AudioPlayerClient: DependencyKey {
     public static var liveValue: Self { .live() }
+
+    public static var previewValue: Self {
+        Self(
+            play: { _ in },
+            pause: { },
+            stop: { },
+            seek: { _ in },
+            currentTime: { 0 },
+            isPlaying: { false }
+        )
+    }
 
     public static var testValue: Self { Self() }
 }

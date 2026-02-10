@@ -26,6 +26,13 @@ extension TitleGeneratorClient: DependencyKey {
         #endif
     }
 
+    public static var previewValue: Self {
+        Self(
+            generateTitle: { _ in nil },
+            isAvailable: { false }
+        )
+    }
+
     public static var testValue: Self { Self() }
 
     /// Client that always returns unavailable (for platforms/iOS versions without Foundation Models)

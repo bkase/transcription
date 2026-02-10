@@ -45,6 +45,13 @@ extension PreferencesClient: DependencyKey {
         )
     }
 
+    public static var previewValue: Self {
+        Self(
+            getAudioRetentionMode: { .both },
+            setAudioRetentionMode: { _ in }
+        )
+    }
+
     public static var testValue: Self { Self() }
 }
 

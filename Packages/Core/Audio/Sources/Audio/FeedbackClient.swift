@@ -231,6 +231,15 @@ extension FeedbackClient: DependencyKey {
         #endif
     }
 
+    public static var previewValue: Self {
+        Self(
+            playStartSound: { },
+            playStopSound: { },
+            triggerStartHaptic: { },
+            triggerStopHaptic: { }
+        )
+    }
+
     public static var testValue: Self { Self() }
 }
 
