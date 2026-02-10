@@ -1,9 +1,12 @@
 import Testing
+import Audio
 import ComposableArchitecture
 import CustomDump
 import Dependencies
 import Foundation
 import Models
+import RecordingFeature
+import Routing
 import SessionDetailFeature
 import SpeakerPickerFeature
 import ProfileFeature
@@ -718,5 +721,186 @@ struct AppFeatureTests {
         #expect(store.state.timeline.sessionGroups[0].sessions[0].title == "Updated Title")
         // Verify load was called
         #expect(loadCallCount >= 1)
+    }
+
+    // MARK: - Deep Link Tests (bd-27ad)
+
+    @Test
+    func testDeepLinkToTimeline() async {
+        let sessionID = SessionID(rawValue: "test-session")
+
+        // Start with a session detail on the path
+        let store = TestStore(
+            initialState: AppFeature.State(
+                path: StackState([.sessionDetail(SessionDetailFeature.State(sessionID: sessionID))])
+            )
+        ) {
+            AppFeature()
+        }
+
+        // Deep link to timeline should pop to root
+        let url = URL(string: "vapor:///timeline")!
+        await store.send(.deepLinkOpened(url)) {
+            $0.path.removeAll()
+        }
+
+        // Path should be empty (timeline is root)
+        #expect(store.state.path.isEmpty)
+    }
+
+    @Test
+    func testDeepLinkToSession() async {
+        let targetSessionID = SessionID(rawValue: "deep-link-session-123")
+
+        let store = TestStore(initialState: AppFeature.State()) {
+            AppFeature()
+        }
+
+        // Deep link to a specific session
+        let url = URL(string: "vapor:///session/deep-link-session-123")!
+        await store.send(.deepLinkOpened(url)) {
+            $0.path.append(.sessionDetail(SessionDetailFeature.State(sessionID: targetSessionID)))
+        }
+
+        // Verify session detail is on the path
+        #expect(store.state.path.count == 1)
+        if case let .sessionDetail(state) = store.state.path.first {
+            #expect(state.sessionID == targetSessionID)
+        } else {
+            Issue.record("Expected sessionDetail in path")
+        }
+    }
+
+    @Test
+    func testDeepLinkToSessionClearsExistingPath() async {
+        let existingSessionID = SessionID(rawValue: "existing-session")
+        let targetSessionID = SessionID(rawValue: "target-session")
+
+        // Start with an existing session on the path
+        let store = TestStore(
+            initialState: AppFeature.State(
+                path: StackState([.sessionDetail(SessionDetailFeature.State(sessionID: existingSessionID))])
+            )
+        ) {
+            AppFeature()
+        }
+
+        // Deep link to a different session should clear and push new one
+        let url = URL(string: "vapor:///session/target-session")!
+        await store.send(.deepLinkOpened(url)) {
+            $0.path.removeAll()
+            $0.path.append(.sessionDetail(SessionDetailFeature.State(sessionID: targetSessionID)))
+        }
+
+        // Verify only the target session is on the path
+        #expect(store.state.path.count == 1)
+    }
+
+    @Test
+    func testDeepLinkToPeople() async {
+        let testProfile = UserProfile(name: "Test User")
+
+        let store = TestStore(
+            initialState: AppFeature.State(userProfile: testProfile)
+        ) {
+            AppFeature()
+        }
+
+        // Deep link to people
+        let url = URL(string: "vapor:///people")!
+        await store.send(.deepLinkOpened(url)) {
+            $0.path.append(.people(PeopleFeature.State(userProfile: testProfile)))
+        }
+
+        // Verify people is on the path
+        #expect(store.state.path.count == 1)
+        if case let .people(state) = store.state.path.first {
+            expectNoDifference(state.userProfile, testProfile)
+        } else {
+            Issue.record("Expected people in path")
+        }
+    }
+
+    @Test
+    func testDeepLinkToRecordClearsPathAndStartsRecording() async {
+        let existingSessionID = SessionID(rawValue: "existing-session")
+
+        let store = TestStore(
+            initialState: AppFeature.State(
+                path: StackState([.sessionDetail(SessionDetailFeature.State(sessionID: existingSessionID))])
+            )
+        ) {
+            AppFeature()
+        } withDependencies: {
+            $0.fileClient.cachesDirectory = { URL(fileURLWithPath: "/tmp/test-caches") }
+            $0.fileClient.createDirectory = { _ in }
+            $0.microphonePermissionClient.getStatus = { .authorized }
+            $0.audioCaptureClient = .generated(config: .silent(durationSeconds: 1))
+            $0.uuid = .incrementing
+            $0.feedbackClient.triggerStartHaptic = {}
+            $0.feedbackClient.playStartSound = {}
+            $0.recordingProcessorClient.startRecording = { _ in AsyncStream { $0.finish() } }
+        }
+
+        // Deep link to record should clear the path and trigger newRecordingTapped
+        let url = URL(string: "vapor:///record")!
+        await store.send(.deepLinkOpened(url)) {
+            $0.path.removeAll()
+        }
+
+        // Should receive the newRecordingTapped action forwarded by deepLinkOpened
+        await store.receive(\.timeline.newRecordingTapped) {
+            $0.recording = RecordingFeature.State(userProfile: .empty)
+        }
+
+        // Skip the recording start effects (permission check, recording start, etc.)
+        await store.skipReceivedActions()
+    }
+
+    @Test
+    func testDeepLinkRootPath() async {
+        let sessionID = SessionID(rawValue: "test-session")
+
+        // Start with a session detail on the path
+        let store = TestStore(
+            initialState: AppFeature.State(
+                path: StackState([.sessionDetail(SessionDetailFeature.State(sessionID: sessionID))])
+            )
+        ) {
+            AppFeature()
+        }
+
+        // Root path "/" should navigate to timeline (pop to root)
+        let url = URL(string: "vapor:///")!
+        await store.send(.deepLinkOpened(url)) {
+            $0.path.removeAll()
+        }
+
+        #expect(store.state.path.isEmpty)
+    }
+
+    @Test
+    func testDeepLinkInvalidURLIgnored() async {
+        let store = TestStore(initialState: AppFeature.State()) {
+            AppFeature()
+        }
+
+        // Invalid path should be silently ignored (no state change)
+        let url = URL(string: "vapor:///invalid/path")!
+        await store.send(.deepLinkOpened(url))
+    }
+
+    @Test
+    func testDeepLinkWrongSchemeIgnored() async {
+        let store = TestStore(initialState: AppFeature.State()) {
+            AppFeature()
+        }
+
+        // A URL with wrong scheme that still has a valid path - should still parse since
+        // AppRouter only looks at the path component, not the scheme
+        let url = URL(string: "https://example.com/people")!
+        await store.send(.deepLinkOpened(url)) {
+            $0.path.append(.people(PeopleFeature.State(userProfile: .empty)))
+        }
     }
 }

@@ -101,6 +101,8 @@ targets:
         product: Clocks
       - package: swift-url-routing
         product: URLRouting
+      - package: swift-parsing
+        product: Parsing
       - package: swift-case-paths
         product: CasePaths
       - package: swift-collections
@@ -487,9 +489,12 @@ targets:
       - path: ../App/Tests/VaporTests
     dependencies:
       - target: Vapor
+      - target: Audio
       - target: Models
       - target: Persistence
       - target: Processing
+      - target: Routing
+      - target: RecordingFeature
       - target: SessionDetailFeature
       - target: ProfileFeature
       - target: PersonTimelineFeature

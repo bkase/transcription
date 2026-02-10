@@ -33,5 +33,16 @@
     </array>
     <key>NSMicrophoneUsageDescription</key>
     <string>Vapor needs microphone access to record audio for transcription.</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.bkase.vapor</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>vapor</string>
+            </array>
+        </dict>
+    </array>
 </dict>
 </plist>

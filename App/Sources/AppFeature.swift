@@ -11,6 +11,8 @@ import Persistence
 import Processing
 import Models
 import Export
+import Routing
+import URLRouting
 
 // MARK: - AppFeature
 
@@ -50,6 +52,7 @@ public struct AppFeature {
 
     public enum Action {
         case onAppear
+        case deepLinkOpened(URL)
         case path(StackAction<Path.State, Path.Action>)
         case timeline(TimelineFeature.Action)
         case recording(PresentationAction<RecordingFeature.Action>)
@@ -78,6 +81,35 @@ public struct AppFeature {
                     _ = try? await recoveryRoutineClient.run()
                     let profile = try await userProfileClient.load()
                     await send(.userProfileLoaded(profile))
+                }
+
+            case let .deepLinkOpened(url):
+                // Parse the URL using AppRouter to determine the route
+                guard let requestData = URLRequestData(url: url) else { return .none }
+                guard let route = try? AppRouter().parse(requestData) else { return .none }
+
+                switch route {
+                case .timeline:
+                    // Pop to root (timeline is the root view)
+                    state.path.removeAll()
+                    return .none
+
+                case let .session(sessionID):
+                    // Pop to root then push session detail
+                    state.path.removeAll()
+                    state.path.append(.sessionDetail(SessionDetailFeature.State(sessionID: sessionID)))
+                    return .none
+
+                case .people:
+                    // Pop to root then push people directory
+                    state.path.removeAll()
+                    state.path.append(.people(PeopleFeature.State(userProfile: state.userProfile)))
+                    return .none
+
+                case .record:
+                    // Pop to root and start a new recording
+                    state.path.removeAll()
+                    return .send(.timeline(.newRecordingTapped))
                 }
 
             case let .userProfileLoaded(profile):

@@ -109,6 +109,9 @@ struct AppView: View {
             .onAppear {
                 store.send(.onAppear)
             }
+            .onOpenURL { url in
+                store.send(.deepLinkOpened(url))
+            }
             .fullScreenCover(
                 item: $store.scope(state: \.recording, action: \.recording)
             ) { recordingStore in
