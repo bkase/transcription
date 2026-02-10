@@ -40,10 +40,7 @@ public struct PeopleView: View {
         .onAppear {
             store.send(.onAppear)
         }
-        .sheet(isPresented: Binding(
-            get: { store.isShowingAddPersonSheet },
-            set: { if !$0 { store.send(.dismissSheet) } }
-        )) {
+        .sheet(isPresented: .dismiss(store.isShowingAddPersonSheet) { store.send(.dismissSheet) }) {
             PersonFormSheet(store: store)
         }
     }
@@ -250,10 +247,7 @@ struct PersonFormSheet: View {
                 selectedPhoto = nil
             }
             .sheet(
-                isPresented: Binding(
-                    get: { store.isShowingMockPhotoPicker },
-                    set: { if !$0 { store.send(.dismissMockPhotoPicker) } }
-                )
+                isPresented: .dismiss(store.isShowingMockPhotoPicker) { store.send(.dismissMockPhotoPicker) }
             ) {
                 PersonMockPhotoPickerSheet(store: store)
             }

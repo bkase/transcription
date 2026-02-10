@@ -1,3 +1,9 @@
+## TCA Binding Patterns
+- `$store.property` returns `_StoreBindable_SwiftUI`, not `Binding`; must call `.sending()` to get `Binding`
+- `.sending()` requires `CaseKeyPath<Action, Value>` (action must take same type as value)
+- For dismiss-on-false/nil patterns, use static `Binding` factory methods (`.dismiss()`, `.isPresent()`, `.onNilDismiss()`) defined in DesignSystem
+- Xcode project is at `xcodegen/Vapor.xcodeproj`, scheme is `Vapor` (not `Transcription`)
+
 ## Speaker Diarization
 - Speaker tracks are created with unique displayOrder values in Processing.swift's handleSegment method
 - seenSpeakers Set tracks which speaker IDs have been encountered; count after insert = displayOrder

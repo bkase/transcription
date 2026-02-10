@@ -38,6 +38,70 @@ public enum NameUtils {
     }
 }
 
+// MARK: - Binding Helpers
+
+/// Helpers for creating derived bindings without using `Binding.init(get:set:)` directly at call sites.
+/// Use these static methods instead of `Binding(get:set:)` in SwiftUI views.
+extension Binding where Value == Bool {
+    /// Creates a dismiss binding from a boolean value that sends an action when the value becomes `false`.
+    ///
+    /// Use instead of `Binding(get: { boolValue }, set: { if !$0 { dismiss() } })`.
+    ///
+    /// Usage:
+    /// ```
+    /// .sheet(isPresented: .dismiss(store.isShowing) { store.send(.dismissed) }) { ... }
+    /// ```
+    public static func dismiss(
+        _ value: @escaping @autoclosure @MainActor () -> Bool,
+        send action: @escaping @MainActor () -> Void
+    ) -> Binding<Bool> {
+        Binding(
+            get: { value() },
+            set: { if !$0 { action() } }
+        )
+    }
+
+    /// Creates a boolean binding from an optional value, `true` when non-nil.
+    /// Sends an action when the binding becomes `false` (dismissed).
+    ///
+    /// Use instead of `Binding(get: { optValue != nil }, set: { if !$0 { dismiss() } })`.
+    ///
+    /// Usage:
+    /// ```
+    /// .sheet(isPresented: .isPresent(store.shareURL) { store.send(.dismissed) }) { ... }
+    /// ```
+    public static func isPresent<T>(
+        _ value: @escaping @autoclosure @MainActor () -> T?,
+        onDismiss action: @escaping @MainActor () -> Void
+    ) -> Binding<Bool> {
+        Binding(
+            get: { value() != nil },
+            set: { if !$0 { action() } }
+        )
+    }
+}
+
+extension Binding {
+    /// Creates a dismiss binding from an optional value.
+    /// Sends an action when the value becomes `nil` (dismissed).
+    ///
+    /// Use instead of `Binding(get: { optValue }, set: { if $0 == nil { dismiss() } })`.
+    ///
+    /// Usage:
+    /// ```
+    /// .alert(item: .onNilDismiss(store.alertInfo) { store.send(.alertDismissed) }) { ... }
+    /// ```
+    public static func onNilDismiss<Wrapped>(
+        _ value: @escaping @autoclosure @MainActor () -> Wrapped?,
+        send action: @escaping @MainActor () -> Void
+    ) -> Binding<Wrapped?> {
+        Binding<Wrapped?>(
+            get: { value() },
+            set: { if $0 == nil { action() } }
+        )
+    }
+}
+
 extension Color {
     public init(hex: String) {
         let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)

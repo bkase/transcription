@@ -22,17 +22,13 @@ import SwiftUI
 
 @Test func testVaporExitModifierCanBeCreated() {
     // Should accept a binding to isPresented
-    var isPresented = true
-    let binding = Binding(get: { isPresented }, set: { isPresented = $0 })
-    let modifier = VaporExitModifier(isPresented: binding)
+    let modifier = VaporExitModifier(isPresented: .constant(true))
     #expect(true)
 }
 
 @Test func testVaporExitViewExtension() {
     // View extension should be accessible
-    var isPresented = true
-    let binding = Binding(get: { isPresented }, set: { isPresented = $0 })
-    let _ = Text("Test").vaporExit(isPresented: binding)
+    let _ = Text("Test").vaporExit(isPresented: .constant(true))
     #expect(true)
 }
 

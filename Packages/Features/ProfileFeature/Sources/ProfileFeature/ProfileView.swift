@@ -58,19 +58,13 @@ public struct ProfileView: View {
             selectedPhoto = nil
         }
         .sheet(
-            isPresented: Binding(
-                get: { store.isShowingMockPhotoPicker },
-                set: { if !$0 { store.send(.dismissMockPhotoPicker) } }
-            )
+            isPresented: .dismiss(store.isShowingMockPhotoPicker) { store.send(.dismissMockPhotoPicker) }
         ) {
             MockPhotoPickerSheet(store: store)
         }
         #if os(iOS)
         .sheet(
-            isPresented: Binding(
-                get: { store.shareURL != nil },
-                set: { if !$0 { store.send(.shareSheetDismissed) } }
-            )
+            isPresented: .isPresent(store.shareURL) { store.send(.shareSheetDismissed) }
         ) {
             if let shareURL = store.shareURL {
                 ShareSheet(items: [shareURL])
@@ -398,10 +392,7 @@ public struct ProfileView: View {
             .accessibilityIdentifier("deleteAllDataButton")
             .alert(
                 "Delete All Data?",
-                isPresented: Binding(
-                    get: { store.isShowingDeleteAllDataConfirmation },
-                    set: { if !$0 { store.send(.deleteAllDataCancelled) } }
-                )
+                isPresented: .dismiss(store.isShowingDeleteAllDataConfirmation) { store.send(.deleteAllDataCancelled) }
             ) {
                 Button("Cancel", role: .cancel) {
                     store.send(.deleteAllDataCancelled)

@@ -653,10 +653,7 @@ private extension View {
     func discardAlert(store: StoreOf<RecordingFeature>) -> some View {
         self.alert(
             "Discard Recording?",
-            isPresented: Binding(
-                get: { store.isShowingDiscardConfirmation },
-                set: { if !$0 { store.send(.discardCancelled) } }
-            )
+            isPresented: .dismiss(store.isShowingDiscardConfirmation) { store.send(.discardCancelled) }
         ) {
             Button("Cancel", role: .cancel) {
                 store.send(.discardCancelled)
@@ -674,10 +671,7 @@ private extension View {
         alertButton: @escaping (AlertInfo.AlertButton) -> Alert.Button
     ) -> some View {
         self.alert(
-            item: Binding(
-                get: { store.alertInfo },
-                set: { if $0 == nil { store.send(.alertDismissed) } }
-            )
+            item: .onNilDismiss(store.alertInfo) { store.send(.alertDismissed) }
         ) { alertInfo in
             Alert(
                 title: Text(alertInfo.title),
@@ -694,10 +688,7 @@ private extension View {
     ) -> some View {
         self.confirmationDialog(
             "Recording Options",
-            isPresented: Binding(
-                get: { store.isShowingActionsMenu },
-                set: { if !$0 { store.send(.actionsMenuDismissed) } }
-            ),
+            isPresented: .dismiss(store.isShowingActionsMenu) { store.send(.actionsMenuDismissed) },
             titleVisibility: .visible
         ) {
             Button(privacyModeLabel(.both)) {

@@ -51,10 +51,7 @@ public struct TimelineView: View {
             store.send(.onAppear)
         }
         .alert(
-            item: Binding(
-                get: { store.alertInfo },
-                set: { if $0 == nil { store.send(.alertDismissed) } }
-            )
+            item: .onNilDismiss(store.alertInfo) { store.send(.alertDismissed) }
         ) { alertInfo in
             Alert(
                 title: Text(alertInfo.title),

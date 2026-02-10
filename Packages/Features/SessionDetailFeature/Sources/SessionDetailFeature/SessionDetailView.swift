@@ -77,10 +77,7 @@ public struct SessionDetailView: View {
         }
         #if os(iOS)
         .sheet(
-            isPresented: Binding(
-                get: { store.shareURL != nil },
-                set: { if !$0 { store.send(.shareSheetDismissed) } }
-            )
+            isPresented: .isPresent(store.shareURL) { store.send(.shareSheetDismissed) }
         ) {
             if let shareURL = store.shareURL {
                 ShareSheet(items: [shareURL])
@@ -120,10 +117,7 @@ public struct SessionDetailView: View {
             }
         }
         .alert(
-            item: Binding(
-                get: { store.alertInfo },
-                set: { if $0 == nil { store.send(.alertDismissed) } }
-            )
+            item: .onNilDismiss(store.alertInfo) { store.send(.alertDismissed) }
         ) { alertInfo in
             Alert(
                 title: Text(alertInfo.title),
@@ -163,10 +157,7 @@ public struct SessionDetailView: View {
                         HStack(spacing: VaporSpacing.sm) {
                             TextField(
                                 "Session title",
-                                text: Binding(
-                                    get: { store.editedTitle },
-                                    set: { store.send(.titleChanged($0)) }
-                                )
+                                text: $store.editedTitle.sending(\.titleChanged)
                             )
                             .font(.system(size: 28, weight: .thin))
                             .tracking(-0.5)
