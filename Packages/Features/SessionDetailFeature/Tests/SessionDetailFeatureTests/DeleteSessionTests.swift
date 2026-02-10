@@ -58,12 +58,12 @@ struct DeleteSessionTests {
 
         // Tap delete shows confirmation
         await store.send(.deleteTapped) {
-            $0.isShowingDeleteConfirmation = true
+            $0.destination = .deleteConfirmation
         }
 
         // Confirm delete
         await store.send(.deleteConfirmed) {
-            $0.isShowingDeleteConfirmation = false
+            $0.destination = nil
             $0.isDeleting = true
         }
 
@@ -124,12 +124,12 @@ struct DeleteSessionTests {
 
         // Tap delete shows confirmation
         await store.send(.deleteTapped) {
-            $0.isShowingDeleteConfirmation = true
+            $0.destination = .deleteConfirmation
         }
 
         // Confirm delete
         await store.send(.deleteConfirmed) {
-            $0.isShowingDeleteConfirmation = false
+            $0.destination = nil
             $0.isDeleting = true
         }
 
@@ -178,12 +178,12 @@ struct DeleteSessionTests {
 
         // Tap delete shows confirmation
         await store.send(.deleteTapped) {
-            $0.isShowingDeleteConfirmation = true
+            $0.destination = .deleteConfirmation
         }
 
         // Cancel delete
         await store.send(.deleteCancelled) {
-            $0.isShowingDeleteConfirmation = false
+            $0.destination = nil
         }
 
         // Verify delete was NOT called
@@ -227,12 +227,12 @@ struct DeleteSessionTests {
 
         // Tap delete shows confirmation
         await store.send(.deleteTapped) {
-            $0.isShowingDeleteConfirmation = true
+            $0.destination = .deleteConfirmation
         }
 
         // Confirm delete
         await store.send(.deleteConfirmed) {
-            $0.isShowingDeleteConfirmation = false
+            $0.destination = nil
             $0.isDeleting = true
         }
 

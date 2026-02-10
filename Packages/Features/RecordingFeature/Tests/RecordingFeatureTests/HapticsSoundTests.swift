@@ -169,11 +169,11 @@ struct HapticsSoundTests {
 
         // Show discard confirmation and confirm
         await store.send(.discardTapped) {
-            $0.isShowingDiscardConfirmation = true
+            $0.destination = .discardConfirmation
         }
 
         await store.send(.discardConfirmed) {
-            $0.isShowingDiscardConfirmation = false
+            $0.destination = nil
         }
 
         // Emit didDiscard from processor

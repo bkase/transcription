@@ -38,7 +38,7 @@ struct PeopleCrudTests {
 
         // 1. Create a new person
         await store.send(.addPersonTapped) {
-            $0.isShowingAddPersonSheet = true
+            $0.destination = .addPersonSheet
             $0.editingPerson = nil
             $0.formName = ""
             $0.formColorToken = SpeakerColor.sky.rawValue
@@ -67,7 +67,7 @@ struct PeopleCrudTests {
 
         await store.receive(\.personSaved) {
             $0.isSaving = false
-            $0.isShowingAddPersonSheet = false
+            $0.destination = nil
             $0.people = [expectedPerson]
             $0.editingPerson = nil
             $0.formName = ""
@@ -83,7 +83,7 @@ struct PeopleCrudTests {
             $0.formName = "Alice Smith"
             $0.formColorToken = "lavender"
             $0.formImageData = nil
-            $0.isShowingAddPersonSheet = true
+            $0.destination = .addPersonSheet
         }
 
         await store.send(.formNameChanged("Alice Johnson")) {
@@ -104,7 +104,7 @@ struct PeopleCrudTests {
 
         await store.receive(\.personSaved) {
             $0.isSaving = false
-            $0.isShowingAddPersonSheet = false
+            $0.destination = nil
             $0.people = [renamedPerson]
             $0.editingPerson = nil
             $0.formName = ""
@@ -128,7 +128,7 @@ struct PeopleCrudTests {
 
     @Test
     func testCreatePersonWithEmptyNameFails() async {
-        let store = TestStore(initialState: PeopleFeature.State(isShowingAddPersonSheet: true)) {
+        let store = TestStore(initialState: PeopleFeature.State(destination: .addPersonSheet)) {
             PeopleFeature()
         }
 
@@ -143,7 +143,7 @@ struct PeopleCrudTests {
     @Test
     func testCreatePersonWithWhitespaceOnlyNameFails() async {
         let store = TestStore(initialState: PeopleFeature.State(
-            isShowingAddPersonSheet: true,
+            destination: .addPersonSheet,
             formName: "   "
         )) {
             PeopleFeature()
@@ -166,7 +166,7 @@ struct PeopleCrudTests {
         }
 
         let store = TestStore(initialState: PeopleFeature.State(
-            isShowingAddPersonSheet: true,
+            destination: .addPersonSheet,
             formName: "Test Person"
         )) {
             PeopleFeature()
@@ -237,7 +237,7 @@ struct PeopleCrudTests {
         )
 
         let store = TestStore(initialState: PeopleFeature.State(
-            isShowingAddPersonSheet: true,
+            destination: .addPersonSheet,
             editingPerson: existingPerson,
             formName: "Alice Modified",
             formColorToken: "deep",
@@ -247,7 +247,7 @@ struct PeopleCrudTests {
         }
 
         await store.send(.dismissSheet) {
-            $0.isShowingAddPersonSheet = false
+            $0.destination = nil
             $0.editingPerson = nil
             $0.formName = ""
             $0.formColorToken = SpeakerColor.sky.rawValue
@@ -268,7 +268,7 @@ struct PeopleCrudTests {
 
         // First: Open the sheet
         await store.send(.addPersonTapped) {
-            $0.isShowingAddPersonSheet = true
+            $0.destination = .addPersonSheet
             $0.editingPerson = nil
             $0.formName = ""
             $0.formColorToken = SpeakerColor.sky.rawValue
@@ -278,7 +278,7 @@ struct PeopleCrudTests {
 
         // Close the sheet
         await store.send(.dismissSheet) {
-            $0.isShowingAddPersonSheet = false
+            $0.destination = nil
             $0.editingPerson = nil
             $0.formName = ""
             $0.formColorToken = SpeakerColor.sky.rawValue
@@ -289,7 +289,7 @@ struct PeopleCrudTests {
 
         // Second: Open the sheet again - THIS MUST WORK
         await store.send(.addPersonTapped) {
-            $0.isShowingAddPersonSheet = true
+            $0.destination = .addPersonSheet
             $0.editingPerson = nil
             $0.formName = ""
             $0.formColorToken = SpeakerColor.sky.rawValue
@@ -312,7 +312,7 @@ struct PeopleCrudTests {
 
         // Open the sheet
         await store.send(.addPersonTapped) {
-            $0.isShowingAddPersonSheet = true
+            $0.destination = .addPersonSheet
             $0.editingPerson = nil
             $0.formName = ""
             $0.formColorToken = SpeakerColor.sky.rawValue
@@ -327,7 +327,7 @@ struct PeopleCrudTests {
 
         // Dismiss the sheet (simulating user tapping Cancel after seeing the error)
         await store.send(.dismissSheet) {
-            $0.isShowingAddPersonSheet = false
+            $0.destination = nil
             $0.editingPerson = nil
             $0.formName = ""
             $0.formColorToken = SpeakerColor.sky.rawValue
@@ -338,7 +338,7 @@ struct PeopleCrudTests {
 
         // Open the sheet again - THIS MUST WORK and error must be cleared
         await store.send(.addPersonTapped) {
-            $0.isShowingAddPersonSheet = true
+            $0.destination = .addPersonSheet
             $0.editingPerson = nil
             $0.formName = ""
             $0.formColorToken = SpeakerColor.sky.rawValue
@@ -366,7 +366,7 @@ struct PeopleCrudTests {
 
         let store = TestStore(initialState: PeopleFeature.State(
             people: people,
-            isShowingAddPersonSheet: true,
+            destination: .addPersonSheet,
             formName: "Charlie"
         )) {
             PeopleFeature()
@@ -390,7 +390,7 @@ struct PeopleCrudTests {
 
         await store.receive(\.personSaved) {
             $0.isSaving = false
-            $0.isShowingAddPersonSheet = false
+            $0.destination = nil
             $0.editingPerson = nil
             $0.formName = ""
             $0.formColorToken = SpeakerColor.sky.rawValue
@@ -421,7 +421,7 @@ struct PeopleCrudTests {
 
         let store = TestStore(initialState: PeopleFeature.State(
             people: [existingPerson],
-            isShowingAddPersonSheet: true,
+            destination: .addPersonSheet,
             editingPerson: existingPerson,
             formName: "Alice Updated",
             formColorToken: "deep"
@@ -446,7 +446,7 @@ struct PeopleCrudTests {
 
         await store.receive(\.personSaved) {
             $0.isSaving = false
-            $0.isShowingAddPersonSheet = false
+            $0.destination = nil
             $0.editingPerson = nil
             $0.formName = ""
             $0.formColorToken = SpeakerColor.sky.rawValue

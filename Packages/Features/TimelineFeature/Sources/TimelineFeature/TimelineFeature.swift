@@ -32,10 +32,16 @@ public struct TimelineFeature {
         /// Alert info for displaying errors with recovery options
         public var alertInfo: AlertInfo?
 
-        // Delete flow state
+        // Delete flow state — sessionToDelete doubles as the "is showing delete confirmation" flag.
+        // When non-nil, the delete confirmation is showing. This eliminates the impossible state
+        // where isShowingDeleteConfirmation=true but sessionToDelete=nil.
         public var sessionToDelete: SessionRecord?
-        public var isShowingDeleteConfirmation: Bool = false
         public var isDeleting: Bool = false
+
+        /// Whether the delete confirmation is showing (derived from sessionToDelete)
+        public var isShowingDeleteConfirmation: Bool {
+            sessionToDelete != nil && !isDeleting
+        }
 
         // Model preparation state
         public var modelPreparationState: ModelPreparationState = .idle
@@ -76,7 +82,6 @@ public struct TimelineFeature {
             error: String? = nil,
             alertInfo: AlertInfo? = nil,
             sessionToDelete: SessionRecord? = nil,
-            isShowingDeleteConfirmation: Bool = false,
             isDeleting: Bool = false,
             modelPreparationState: ModelPreparationState = .idle,
             userProfile: UserProfile = .empty,
@@ -89,7 +94,6 @@ public struct TimelineFeature {
             self.error = error
             self.alertInfo = alertInfo
             self.sessionToDelete = sessionToDelete
-            self.isShowingDeleteConfirmation = isShowingDeleteConfirmation
             self.isDeleting = isDeleting
             self.modelPreparationState = modelPreparationState
             self.userProfile = userProfile
@@ -296,11 +300,9 @@ public struct TimelineFeature {
 
             case let .deleteSessionTapped(session):
                 state.sessionToDelete = session
-                state.isShowingDeleteConfirmation = true
                 return .none
 
             case .deleteConfirmed:
-                state.isShowingDeleteConfirmation = false
                 guard let session = state.sessionToDelete, !state.isDeleting else { return .none }
                 state.isDeleting = true
                 let sessionID = SessionID(rawValue: session.id)
@@ -323,7 +325,6 @@ public struct TimelineFeature {
                 }
 
             case .deleteCancelled:
-                state.isShowingDeleteConfirmation = false
                 state.sessionToDelete = nil
                 return .none
 

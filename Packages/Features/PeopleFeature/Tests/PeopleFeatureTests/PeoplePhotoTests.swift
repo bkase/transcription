@@ -20,7 +20,7 @@ struct PeoplePhotoTests {
         var normalizeMaxDimension: Int?
         var normalizeCompressionQuality: Double?
 
-        let store = TestStore(initialState: PeopleFeature.State(isShowingAddPersonSheet: true)) {
+        let store = TestStore(initialState: PeopleFeature.State(destination: .addPersonSheet)) {
             PeopleFeature()
         } withDependencies: {
             $0.profileImageClient.normalize = { data, maxDim, compression in
@@ -46,7 +46,7 @@ struct PeoplePhotoTests {
     func testPhotoProcessedFailure() async {
         let mockImageData = Data([0x89, 0x50, 0x4E, 0x47])
 
-        let store = TestStore(initialState: PeopleFeature.State(isShowingAddPersonSheet: true)) {
+        let store = TestStore(initialState: PeopleFeature.State(destination: .addPersonSheet)) {
             PeopleFeature()
         } withDependencies: {
             $0.profileImageClient.normalize = { _, _, _ in nil }
@@ -64,7 +64,7 @@ struct PeoplePhotoTests {
         let imageData = Data([0x01, 0x02, 0x03])
 
         let store = TestStore(initialState: PeopleFeature.State(
-            isShowingAddPersonSheet: true,
+            destination: .addPersonSheet,
             formImageData: imageData
         )) {
             PeopleFeature()
@@ -79,7 +79,7 @@ struct PeoplePhotoTests {
 
     @Test
     func testShowMockPhotoPicker() async {
-        let store = TestStore(initialState: PeopleFeature.State(isShowingAddPersonSheet: true)) {
+        let store = TestStore(initialState: PeopleFeature.State(destination: .addPersonSheet)) {
             PeopleFeature()
         }
 
@@ -93,7 +93,7 @@ struct PeoplePhotoTests {
         let normalizedData = Data([0x01, 0x02, 0x03])
 
         let store = TestStore(initialState: PeopleFeature.State(
-            isShowingAddPersonSheet: true,
+            destination: .addPersonSheet,
             isShowingMockPhotoPicker: true
         )) {
             PeopleFeature()
@@ -116,7 +116,7 @@ struct PeoplePhotoTests {
     @Test
     func testDismissMockPhotoPicker() async {
         let store = TestStore(initialState: PeopleFeature.State(
-            isShowingAddPersonSheet: true,
+            destination: .addPersonSheet,
             isShowingMockPhotoPicker: true
         )) {
             PeopleFeature()
@@ -138,7 +138,7 @@ struct PeoplePhotoTests {
         var createdPerson: PersonRecord?
 
         let store = TestStore(initialState: PeopleFeature.State(
-            isShowingAddPersonSheet: true,
+            destination: .addPersonSheet,
             formName: "Alice Smith",
             formColorToken: "lavender",
             formImageData: imageData
@@ -167,7 +167,7 @@ struct PeoplePhotoTests {
 
         await store.receive(\.personSaved) {
             $0.isSaving = false
-            $0.isShowingAddPersonSheet = false
+            $0.destination = nil
             $0.people = [expectedPerson]
             $0.editingPerson = nil
             $0.formName = ""
@@ -200,7 +200,7 @@ struct PeoplePhotoTests {
             $0.formName = "Alice"
             $0.formColorToken = "sky"
             $0.formImageData = imageData
-            $0.isShowingAddPersonSheet = true
+            $0.destination = .addPersonSheet
         }
     }
 
@@ -222,7 +222,7 @@ struct PeoplePhotoTests {
 
         let store = TestStore(initialState: PeopleFeature.State(
             people: [existingPerson],
-            isShowingAddPersonSheet: true,
+            destination: .addPersonSheet,
             editingPerson: existingPerson,
             formName: "Alice Updated",
             formColorToken: "deep",
@@ -251,7 +251,7 @@ struct PeoplePhotoTests {
 
         await store.receive(\.personSaved) {
             $0.isSaving = false
-            $0.isShowingAddPersonSheet = false
+            $0.destination = nil
             $0.editingPerson = nil
             $0.formName = ""
             $0.formColorToken = SpeakerColor.sky.rawValue
@@ -280,7 +280,7 @@ struct PeoplePhotoTests {
 
         let store = TestStore(initialState: PeopleFeature.State(
             people: [existingPerson],
-            isShowingAddPersonSheet: true,
+            destination: .addPersonSheet,
             editingPerson: existingPerson,
             formName: "Alice",
             formColorToken: "sky",
@@ -309,7 +309,7 @@ struct PeoplePhotoTests {
 
         await store.receive(\.personSaved) {
             $0.isSaving = false
-            $0.isShowingAddPersonSheet = false
+            $0.destination = nil
             $0.editingPerson = nil
             $0.formName = ""
             $0.formColorToken = SpeakerColor.sky.rawValue
@@ -333,7 +333,7 @@ struct PeoplePhotoTests {
         }
 
         await store.send(.addPersonTapped) {
-            $0.isShowingAddPersonSheet = true
+            $0.destination = .addPersonSheet
             $0.editingPerson = nil
             $0.formName = ""
             $0.formColorToken = SpeakerColor.sky.rawValue

@@ -396,7 +396,7 @@ struct ProfileFeatureTests {
         }
 
         await store.send(.showMockPhotoPicker) {
-            $0.isShowingMockPhotoPicker = true
+            $0.destination = .mockPhotoPicker
         }
     }
 
@@ -404,13 +404,13 @@ struct ProfileFeatureTests {
     func dismissMockPhotoPicker() async throws {
         let store = TestStore(initialState: ProfileFeature.State(
             profile: testProfile,
-            isShowingMockPhotoPicker: true
+            destination: .mockPhotoPicker
         )) {
             ProfileFeature()
         }
 
         await store.send(.dismissMockPhotoPicker) {
-            $0.isShowingMockPhotoPicker = false
+            $0.destination = nil
         }
     }
 
@@ -420,7 +420,7 @@ struct ProfileFeatureTests {
 
         let store = TestStore(initialState: ProfileFeature.State(
             profile: testProfile,
-            isShowingMockPhotoPicker: true
+            destination: .mockPhotoPicker
         )) {
             ProfileFeature()
         } withDependencies: {
@@ -430,7 +430,7 @@ struct ProfileFeatureTests {
 
         // Select mock photo at index 1 (Green Square)
         await store.send(.mockPhotoSelected(1)) {
-            $0.isShowingMockPhotoPicker = false
+            $0.destination = nil
         }
 
         // Should receive photoPicked with deterministic test data

@@ -97,12 +97,25 @@ public struct RecordingFeature {
         public var speakerTracks: [LiveSpeakerTrack] = []
         /// Whether microphone permission was denied (shows special UI with Settings button)
         public var isPermissionDenied: Bool = false
-        /// Whether to show discard confirmation alert
-        public var isShowingDiscardConfirmation: Bool = false
         /// Alert info for displaying errors with recovery options
         public var alertInfo: AlertInfo?
-        /// Whether to show the actions menu (more button)
-        public var isShowingActionsMenu: Bool = false
+
+        /// Presentation destinations for RecordingFeature.
+        /// Using an enum eliminates impossible states (e.g. showing both discard confirmation and actions menu).
+        public enum Destination: Equatable, Sendable {
+            case discardConfirmation
+            case actionsMenu
+        }
+        public var destination: Destination?
+
+        /// Whether discard confirmation is showing (derived from destination)
+        public var isShowingDiscardConfirmation: Bool {
+            destination == .discardConfirmation
+        }
+        /// Whether the actions menu is showing (derived from destination)
+        public var isShowingActionsMenu: Bool {
+            destination == .actionsMenu
+        }
         /// Current audio retention mode (privacy setting)
         public var audioRetentionMode: AudioRetentionMode = .both
         /// Whether live transcription is available (may be unavailable if models failed to load)
@@ -142,9 +155,8 @@ public struct RecordingFeature {
             liveSegments: [LiveSegment] = [],
             speakerTracks: [LiveSpeakerTrack] = [],
             isPermissionDenied: Bool = false,
-            isShowingDiscardConfirmation: Bool = false,
             alertInfo: AlertInfo? = nil,
-            isShowingActionsMenu: Bool = false,
+            destination: Destination? = nil,
             audioRetentionMode: AudioRetentionMode = .both,
             isTranscriptionAvailable: Bool = true,
             transcriptionUnavailableMessage: String? = nil,
@@ -163,9 +175,8 @@ public struct RecordingFeature {
             self.liveSegments = liveSegments
             self.speakerTracks = speakerTracks
             self.isPermissionDenied = isPermissionDenied
-            self.isShowingDiscardConfirmation = isShowingDiscardConfirmation
             self.alertInfo = alertInfo
-            self.isShowingActionsMenu = isShowingActionsMenu
+            self.destination = destination
             self.audioRetentionMode = audioRetentionMode
             self.isTranscriptionAvailable = isTranscriptionAvailable
             self.transcriptionUnavailableMessage = transcriptionUnavailableMessage
@@ -356,11 +367,11 @@ public struct RecordingFeature {
 
             case .discardTapped:
                 guard state.isRecording else { return .none }
-                state.isShowingDiscardConfirmation = true
+                state.destination = .discardConfirmation
                 return .none
 
             case .discardConfirmed:
-                state.isShowingDiscardConfirmation = false
+                state.destination = nil
                 guard state.isRecording else { return .none }
 
                 // Cancel timer and call discard on processor
@@ -372,7 +383,7 @@ public struct RecordingFeature {
                 )
 
             case .discardCancelled:
-                state.isShowingDiscardConfirmation = false
+                state.destination = nil
                 return .none
 
             case .stopRecording:
@@ -626,11 +637,11 @@ public struct RecordingFeature {
                 guard state.isRecording else { return .none }
                 // Load current preference before showing menu
                 state.audioRetentionMode = preferencesClient.getAudioRetentionMode()
-                state.isShowingActionsMenu = true
+                state.destination = .actionsMenu
                 return .none
 
             case .actionsMenuDismissed:
-                state.isShowingActionsMenu = false
+                state.destination = nil
                 return .none
 
             case let .setAudioRetentionMode(mode):

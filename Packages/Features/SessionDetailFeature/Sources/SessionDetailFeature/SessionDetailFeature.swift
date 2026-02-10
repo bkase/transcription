@@ -77,6 +77,13 @@ public struct SessionDetailFeature {
         case transcriptionPolling
     }
 
+    /// Presentation destinations for SessionDetailFeature.
+    /// Using an enum eliminates impossible states (e.g. showing both actions menu and delete confirmation).
+    public enum Destination: Equatable, Sendable {
+        case actionsMenu(anchorPoint: CGPoint)
+        case deleteConfirmation
+    }
+
     @ObservableState
     public struct State: Equatable {
         public var sessionID: SessionID
@@ -92,13 +99,10 @@ public struct SessionDetailFeature {
         public var isExporting: Bool = false
         public var shareURL: URL?
 
-        // Actions menu state
-        public var isShowingActionsMenu: Bool = false
-        /// The anchor point for positioning the actions menu near the tap location
-        public var menuAnchorPoint: CGPoint = .zero
+        // Presentation destination (replaces isShowingActionsMenu + isShowingDeleteConfirmation)
+        public var destination: Destination?
 
         // Delete flow state
-        public var isShowingDeleteConfirmation: Bool = false
         public var isDeleting: Bool = false
         public var alertInfo: AlertInfo?
 
@@ -108,6 +112,21 @@ public struct SessionDetailFeature {
 
         // Retry transcription state
         public var isRetrying: Bool = false
+
+        /// Convenience computed properties for backward compatibility with views
+        public var isShowingActionsMenu: Bool {
+            if case .actionsMenu = destination { return true }
+            return false
+        }
+        public var isShowingDeleteConfirmation: Bool {
+            if case .deleteConfirmation = destination { return true }
+            return false
+        }
+        /// The anchor point for positioning the actions menu near the tap location
+        public var menuAnchorPoint: CGPoint {
+            if case let .actionsMenu(anchorPoint) = destination { return anchorPoint }
+            return .zero
+        }
 
         public init(
             sessionID: SessionID,
@@ -120,9 +139,7 @@ public struct SessionDetailFeature {
             speakerPicker: SpeakerPickerFeature.State? = nil,
             isExporting: Bool = false,
             shareURL: URL? = nil,
-            isShowingActionsMenu: Bool = false,
-            menuAnchorPoint: CGPoint = .zero,
-            isShowingDeleteConfirmation: Bool = false,
+            destination: Destination? = nil,
             isDeleting: Bool = false,
             alertInfo: AlertInfo? = nil,
             isEditingTitle: Bool = false,
@@ -139,9 +156,7 @@ public struct SessionDetailFeature {
             self.speakerPicker = speakerPicker
             self.isExporting = isExporting
             self.shareURL = shareURL
-            self.isShowingActionsMenu = isShowingActionsMenu
-            self.menuAnchorPoint = menuAnchorPoint
-            self.isShowingDeleteConfirmation = isShowingDeleteConfirmation
+            self.destination = destination
             self.isDeleting = isDeleting
             self.alertInfo = alertInfo
             self.isEditingTitle = isEditingTitle
@@ -459,19 +474,18 @@ public struct SessionDetailFeature {
             // MARK: - Actions Menu
 
             case let .moreButtonTapped(anchorPoint):
-                state.menuAnchorPoint = anchorPoint
-                state.isShowingActionsMenu = true
+                state.destination = .actionsMenu(anchorPoint: anchorPoint)
                 return .none
 
             case .actionsMenuDismissed:
-                state.isShowingActionsMenu = false
+                state.destination = nil
                 return .none
 
             // MARK: - Share Actions
 
             case .shareTapped:
                 // Share action from menu - triggers export then share
-                state.isShowingActionsMenu = false
+                state.destination = nil
                 guard !state.isExporting else { return .none }
                 state.isExporting = true
                 state.error = nil
@@ -485,7 +499,7 @@ public struct SessionDetailFeature {
 
             case .exportTapped:
                 // Export action from menu - same as share for now
-                state.isShowingActionsMenu = false
+                state.destination = nil
                 guard !state.isExporting else { return .none }
                 state.isExporting = true
                 state.error = nil
@@ -514,7 +528,7 @@ public struct SessionDetailFeature {
             // MARK: - Continue Recording
 
             case .continueRecordingTapped:
-                state.isShowingActionsMenu = false
+                state.destination = nil
                 // Only allow continuation for processed or partial sessions with audio
                 guard let session = state.session,
                       (session.processingState == .processed || session.processingState == .partial),
@@ -534,12 +548,11 @@ public struct SessionDetailFeature {
             // MARK: - Delete Actions
 
             case .deleteTapped:
-                state.isShowingActionsMenu = false
-                state.isShowingDeleteConfirmation = true
+                state.destination = .deleteConfirmation
                 return .none
 
             case .deleteConfirmed:
-                state.isShowingDeleteConfirmation = false
+                state.destination = nil
                 guard !state.isDeleting else { return .none }
                 state.isDeleting = true
 
@@ -561,7 +574,7 @@ public struct SessionDetailFeature {
                 }
 
             case .deleteCancelled:
-                state.isShowingDeleteConfirmation = false
+                state.destination = nil
                 return .none
 
             case .deleteCompleted:

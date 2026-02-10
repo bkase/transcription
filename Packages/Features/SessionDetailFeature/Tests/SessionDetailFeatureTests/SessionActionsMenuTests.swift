@@ -25,13 +25,12 @@ struct SessionActionsMenuTests {
         // Tap more button to show actions menu (with anchor point)
         let testAnchorPoint = CGPoint(x: 350, y: 150)
         await store.send(.moreButtonTapped(anchorPoint: testAnchorPoint)) {
-            $0.menuAnchorPoint = testAnchorPoint
-            $0.isShowingActionsMenu = true
+            $0.destination = .actionsMenu(anchorPoint: testAnchorPoint)
         }
 
         // Dismiss menu
         await store.send(.actionsMenuDismissed) {
-            $0.isShowingActionsMenu = false
+            $0.destination = nil
         }
     }
 
@@ -45,7 +44,7 @@ struct SessionActionsMenuTests {
         let store = TestStore(
             initialState: SessionDetailFeature.State(
                 sessionID: sessionID,
-                isShowingActionsMenu: true
+                destination: .actionsMenu(anchorPoint: .zero)
             )
         ) {
             SessionDetailFeature()
@@ -55,7 +54,7 @@ struct SessionActionsMenuTests {
 
         // Tap share in menu - dismisses menu and starts export
         await store.send(.shareTapped) {
-            $0.isShowingActionsMenu = false
+            $0.destination = nil
             $0.isExporting = true
         }
 
@@ -76,7 +75,7 @@ struct SessionActionsMenuTests {
         let store = TestStore(
             initialState: SessionDetailFeature.State(
                 sessionID: sessionID,
-                isShowingActionsMenu: true
+                destination: .actionsMenu(anchorPoint: .zero)
             )
         ) {
             SessionDetailFeature()
@@ -86,7 +85,7 @@ struct SessionActionsMenuTests {
 
         // Tap export in menu - dismisses menu and starts export
         await store.send(.exportTapped) {
-            $0.isShowingActionsMenu = false
+            $0.destination = nil
             $0.isExporting = true
         }
 
@@ -106,7 +105,7 @@ struct SessionActionsMenuTests {
         let store = TestStore(
             initialState: SessionDetailFeature.State(
                 sessionID: sessionID,
-                isShowingActionsMenu: true
+                destination: .actionsMenu(anchorPoint: .zero)
             )
         ) {
             SessionDetailFeature()
@@ -114,8 +113,7 @@ struct SessionActionsMenuTests {
 
         // Tap delete in menu - dismisses menu and shows delete confirmation
         await store.send(.deleteTapped) {
-            $0.isShowingActionsMenu = false
-            $0.isShowingDeleteConfirmation = true
+            $0.destination = .deleteConfirmation
         }
     }
 
@@ -135,20 +133,19 @@ struct SessionActionsMenuTests {
         // Tap at a specific point
         let tapPoint = CGPoint(x: 320, y: 180)
         await store.send(.moreButtonTapped(anchorPoint: tapPoint)) {
-            $0.menuAnchorPoint = tapPoint
-            $0.isShowingActionsMenu = true
+            $0.destination = .actionsMenu(anchorPoint: tapPoint)
         }
 
-        // Verify anchor point is stored
+        // Verify anchor point is stored in destination
         #expect(store.state.menuAnchorPoint == tapPoint)
 
-        // Dismiss menu - anchor point should persist (for potential reuse)
+        // Dismiss menu - anchor point resets with destination
         await store.send(.actionsMenuDismissed) {
-            $0.isShowingActionsMenu = false
+            $0.destination = nil
         }
 
-        // Anchor point persists after dismiss
-        #expect(store.state.menuAnchorPoint == tapPoint)
+        // Anchor point returns to zero when destination is nil
+        #expect(store.state.menuAnchorPoint == .zero)
     }
 
     // MARK: - testMenuWithDifferentAnchorPoints
@@ -164,19 +161,17 @@ struct SessionActionsMenuTests {
         // First tap at top-right corner area
         let firstTapPoint = CGPoint(x: 350, y: 150)
         await store.send(.moreButtonTapped(anchorPoint: firstTapPoint)) {
-            $0.menuAnchorPoint = firstTapPoint
-            $0.isShowingActionsMenu = true
+            $0.destination = .actionsMenu(anchorPoint: firstTapPoint)
         }
 
         await store.send(.actionsMenuDismissed) {
-            $0.isShowingActionsMenu = false
+            $0.destination = nil
         }
 
         // Second tap at a different point (simulating scroll position change)
         let secondTapPoint = CGPoint(x: 350, y: 250)
         await store.send(.moreButtonTapped(anchorPoint: secondTapPoint)) {
-            $0.menuAnchorPoint = secondTapPoint
-            $0.isShowingActionsMenu = true
+            $0.destination = .actionsMenu(anchorPoint: secondTapPoint)
         }
 
         // Verify anchor point was updated

@@ -46,7 +46,7 @@ struct PeopleColorTests {
         for i in 0..<5 {
             // Open add person sheet - should assign color based on people.count
             await store.send(.addPersonTapped) {
-                $0.isShowingAddPersonSheet = true
+                $0.destination = .addPersonSheet
                 $0.editingPerson = nil
                 $0.formName = ""
                 $0.formColorToken = expectedColors[i].rawValue
@@ -70,7 +70,7 @@ struct PeopleColorTests {
 
             await store.receive(\.personSaved) {
                 $0.isSaving = false
-                $0.isShowingAddPersonSheet = false
+                $0.destination = nil
                 $0.editingPerson = nil
                 $0.formName = ""
                 $0.formColorToken = SpeakerColor.sky.rawValue
@@ -116,7 +116,7 @@ struct PeopleColorTests {
 
         // With 2 existing people, next should get forIndex(2) = deep
         await store.send(.addPersonTapped) {
-            $0.isShowingAddPersonSheet = true
+            $0.destination = .addPersonSheet
             $0.editingPerson = nil
             $0.formName = ""
             $0.formColorToken = SpeakerColor.deep.rawValue
@@ -161,7 +161,7 @@ struct PeopleColorTests {
             $0.editingPerson = existingPerson
             $0.formName = "Alice"
             $0.formColorToken = "lavender"  // Should preserve original, not change to sky
-            $0.isShowingAddPersonSheet = true
+            $0.destination = .addPersonSheet
         }
     }
 }

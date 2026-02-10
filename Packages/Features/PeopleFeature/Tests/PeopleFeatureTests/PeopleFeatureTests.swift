@@ -131,7 +131,7 @@ struct PeopleFeatureTests {
         let mockImageData = Data([0x89, 0x50, 0x4E, 0x47]) // PNG header bytes
 
         let store = TestStore(initialState: PeopleFeature.State(
-            isShowingAddPersonSheet: true,
+            destination: .addPersonSheet,
             formImageData: mockImageData
         )) {
             PeopleFeature()
@@ -145,7 +145,7 @@ struct PeopleFeatureTests {
     @Test
     func testRemovePhotoTappedWhenNoPhotoDoesNothing() async {
         let store = TestStore(initialState: PeopleFeature.State(
-            isShowingAddPersonSheet: true,
+            destination: .addPersonSheet,
             formImageData: nil
         )) {
             PeopleFeature()

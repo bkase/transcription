@@ -75,12 +75,12 @@ struct RecordingDiscardTests {
 
         // User taps discard button - shows confirmation
         await store.send(.discardTapped) {
-            $0.isShowingDiscardConfirmation = true
+            $0.destination = .discardConfirmation
         }
 
         // User confirms discard
         await store.send(.discardConfirmed) {
-            $0.isShowingDiscardConfirmation = false
+            $0.destination = nil
         }
 
         // Verify discard was called on processor
@@ -151,12 +151,12 @@ struct RecordingDiscardTests {
 
         // User taps discard button
         await store.send(.discardTapped) {
-            $0.isShowingDiscardConfirmation = true
+            $0.destination = .discardConfirmation
         }
 
         // User cancels discard
         await store.send(.discardCancelled) {
-            $0.isShowingDiscardConfirmation = false
+            $0.destination = nil
         }
 
         // Verify discard was NOT called
@@ -190,14 +190,14 @@ struct RecordingDiscardTests {
     @Test
     func testDiscardConfirmedWhileNotRecordingIsIgnored() async {
         let store = TestStore(
-            initialState: RecordingFeature.State(isRecording: false, isShowingDiscardConfirmation: true)
+            initialState: RecordingFeature.State(isRecording: false, destination: .discardConfirmation)
         ) {
             RecordingFeature()
         }
 
         // Discard confirmed while not recording should just close the alert
         await store.send(.discardConfirmed) {
-            $0.isShowingDiscardConfirmation = false
+            $0.destination = nil
         }
     }
 }

@@ -460,12 +460,12 @@ struct TimelineFeatureTests {
         // Tap delete on session 1
         await store.send(.deleteSessionTapped(session1)) {
             $0.sessionToDelete = session1
-            $0.isShowingDeleteConfirmation = true
+
         }
 
         // Confirm delete
         await store.send(.deleteConfirmed) {
-            $0.isShowingDeleteConfirmation = false
+
             $0.isDeleting = true
         }
 
@@ -512,12 +512,12 @@ struct TimelineFeatureTests {
         // Tap delete
         await store.send(.deleteSessionTapped(session)) {
             $0.sessionToDelete = session
-            $0.isShowingDeleteConfirmation = true
+
         }
 
         // Confirm delete
         await store.send(.deleteConfirmed) {
-            $0.isShowingDeleteConfirmation = false
+
             $0.isDeleting = true
         }
 
@@ -561,12 +561,12 @@ struct TimelineFeatureTests {
         // Tap delete
         await store.send(.deleteSessionTapped(session)) {
             $0.sessionToDelete = session
-            $0.isShowingDeleteConfirmation = true
+
         }
 
         // Cancel delete
         await store.send(.deleteCancelled) {
-            $0.isShowingDeleteConfirmation = false
+
             $0.sessionToDelete = nil
         }
 
@@ -613,12 +613,12 @@ struct TimelineFeatureTests {
         // Tap delete
         await store.send(.deleteSessionTapped(session)) {
             $0.sessionToDelete = session
-            $0.isShowingDeleteConfirmation = true
+
         }
 
         // Confirm delete
         await store.send(.deleteConfirmed) {
-            $0.isShowingDeleteConfirmation = false
+
             $0.isDeleting = true
         }
 
@@ -775,12 +775,12 @@ struct TimelineFeatureTests {
         // Tap delete
         await store.send(.deleteSessionTapped(session)) {
             $0.sessionToDelete = session
-            $0.isShowingDeleteConfirmation = true
+
         }
 
         // Confirm delete
         await store.send(.deleteConfirmed) {
-            $0.isShowingDeleteConfirmation = false
+
             $0.isDeleting = true
         }
 

@@ -16,6 +16,13 @@ public struct ProfileFeature {
     @Dependency(\.exportClient) var exportClient
     @Dependency(\.databaseClient) var databaseClient
 
+    /// Presentation destinations for ProfileFeature.
+    /// Using an enum eliminates impossible states (e.g. showing both mock photo picker and delete confirmation).
+    public enum Destination: Equatable, Sendable {
+        case mockPhotoPicker
+        case deleteAllDataConfirmation
+    }
+
     @ObservableState
     public struct State: Equatable {
         public var profile: UserProfile
@@ -27,16 +34,23 @@ public struct ProfileFeature {
         public var isEditingName: Bool
         public var editingNameText: String
 
-        // Mock photo picker state (for UI testing)
-        public var isShowingMockPhotoPicker: Bool
+        // Presentation destination (replaces individual isShowing* booleans)
+        public var destination: Destination?
 
         // Export all conversations state
         public var isExporting: Bool
         public var shareURL: URL?
 
         // Delete all data state
-        public var isShowingDeleteAllDataConfirmation: Bool
         public var isDeletingAllData: Bool
+
+        /// Convenience computed properties for backward compatibility with views
+        public var isShowingMockPhotoPicker: Bool {
+            destination == .mockPhotoPicker
+        }
+        public var isShowingDeleteAllDataConfirmation: Bool {
+            destination == .deleteAllDataConfirmation
+        }
 
         public init(
             profile: UserProfile = .empty,
@@ -45,10 +59,9 @@ public struct ProfileFeature {
             error: String? = nil,
             isEditingName: Bool = false,
             editingNameText: String = "",
-            isShowingMockPhotoPicker: Bool = false,
+            destination: Destination? = nil,
             isExporting: Bool = false,
             shareURL: URL? = nil,
-            isShowingDeleteAllDataConfirmation: Bool = false,
             isDeletingAllData: Bool = false
         ) {
             self.profile = profile
@@ -57,10 +70,9 @@ public struct ProfileFeature {
             self.error = error
             self.isEditingName = isEditingName
             self.editingNameText = editingNameText
-            self.isShowingMockPhotoPicker = isShowingMockPhotoPicker
+            self.destination = destination
             self.isExporting = isExporting
             self.shareURL = shareURL
-            self.isShowingDeleteAllDataConfirmation = isShowingDeleteAllDataConfirmation
             self.isDeletingAllData = isDeletingAllData
         }
 
@@ -157,17 +169,17 @@ public struct ProfileFeature {
                 return .none
 
             case .showMockPhotoPicker:
-                state.isShowingMockPhotoPicker = true
+                state.destination = .mockPhotoPicker
                 return .none
 
             case let .mockPhotoSelected(index):
-                state.isShowingMockPhotoPicker = false
+                state.destination = nil
                 // Generate deterministic test image data based on index
                 let testImageData = MockPhotoData.imageData(forIndex: index)
                 return .send(.photoPicked(testImageData))
 
             case .dismissMockPhotoPicker:
-                state.isShowingMockPhotoPicker = false
+                state.destination = nil
                 return .none
 
             case let .photoPicked(data):
@@ -297,11 +309,11 @@ public struct ProfileFeature {
             // MARK: - Delete All Data
 
             case .deleteAllDataTapped:
-                state.isShowingDeleteAllDataConfirmation = true
+                state.destination = .deleteAllDataConfirmation
                 return .none
 
             case .deleteAllDataConfirmed:
-                state.isShowingDeleteAllDataConfirmation = false
+                state.destination = nil
                 state.isDeletingAllData = true
                 state.error = nil
 
@@ -313,7 +325,7 @@ public struct ProfileFeature {
                 }
 
             case .deleteAllDataCancelled:
-                state.isShowingDeleteAllDataConfirmation = false
+                state.destination = nil
                 return .none
 
             case .deleteAllDataCompleted:

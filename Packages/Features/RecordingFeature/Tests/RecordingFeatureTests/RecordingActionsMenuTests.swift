@@ -59,13 +59,13 @@ struct RecordingActionsMenuTests {
 
         // Tap more button
         await store.send(.moreButtonTapped) {
-            $0.isShowingActionsMenu = true
+            $0.destination = .actionsMenu
             $0.audioRetentionMode = .both
         }
 
         // Dismiss menu
         await store.send(.actionsMenuDismissed) {
-            $0.isShowingActionsMenu = false
+            $0.destination = nil
         }
 
         // Clean up
@@ -119,7 +119,7 @@ struct RecordingActionsMenuTests {
 
         // Open menu
         await store.send(.moreButtonTapped) {
-            $0.isShowingActionsMenu = true
+            $0.destination = .actionsMenu
             $0.audioRetentionMode = .both
         }
 
@@ -186,23 +186,23 @@ struct RecordingActionsMenuTests {
         // Open menu and tap discard - this triggers discardTapped from the menu
         // (menu closes automatically when action is selected)
         await store.send(.moreButtonTapped) {
-            $0.isShowingActionsMenu = true
+            $0.destination = .actionsMenu
             $0.audioRetentionMode = .both
         }
 
         // Dismiss menu (happens before discardTapped in real flow)
         await store.send(.actionsMenuDismissed) {
-            $0.isShowingActionsMenu = false
+            $0.destination = nil
         }
 
         // User taps discard from the menu - shows confirmation
         await store.send(.discardTapped) {
-            $0.isShowingDiscardConfirmation = true
+            $0.destination = .discardConfirmation
         }
 
         // Confirm discard
         await store.send(.discardConfirmed) {
-            $0.isShowingDiscardConfirmation = false
+            $0.destination = nil
         }
 
         // Verify discard was called
@@ -278,7 +278,7 @@ struct RecordingActionsMenuTests {
 
         // Open menu - should load transcriptOnly from preference
         await store.send(.moreButtonTapped) {
-            $0.isShowingActionsMenu = true
+            $0.destination = .actionsMenu
             $0.audioRetentionMode = .transcriptOnly
         }
 

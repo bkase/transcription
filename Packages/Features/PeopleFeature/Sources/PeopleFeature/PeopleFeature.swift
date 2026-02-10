@@ -40,6 +40,13 @@ public struct PeopleFeature {
     @Dependency(\.uuid) var uuid
     @Dependency(\.date) var date
 
+    /// Presentation destination for PeopleFeature's primary presentation.
+    /// Replaces the isShowingAddPersonSheet boolean. The mock photo picker is a nested
+    /// presentation within the add person sheet, so it stays as a separate boolean.
+    public enum Destination: Equatable, Sendable {
+        case addPersonSheet
+    }
+
     @ObservableState
     public struct State: Equatable {
         public var people: [PersonRecord] = []
@@ -49,18 +56,23 @@ public struct PeopleFeature {
         public var error: String?
 
         // CRUD form state
-        public var isShowingAddPersonSheet: Bool = false
+        public var destination: Destination?
         public var editingPerson: PersonRecord? = nil
         public var formName: String = ""
         public var formColorToken: String = SpeakerColor.sky.rawValue
         public var formImageData: Data? = nil
         public var isSaving: Bool = false
 
-        // Mock photo picker state (for UI testing)
+        // Mock photo picker state (nested presentation within add person sheet, for UI testing)
         public var isShowingMockPhotoPicker: Bool = false
 
         /// Current user profile (to detect when tapped person is self)
         public var userProfile: UserProfile = .empty
+
+        /// Whether the add person sheet is showing (derived from destination)
+        public var isShowingAddPersonSheet: Bool {
+            destination == .addPersonSheet
+        }
 
         /// Whether we're editing an existing person (vs creating new)
         public var isEditing: Bool {
@@ -96,7 +108,7 @@ public struct PeopleFeature {
             searchQuery: String = "",
             isLoading: Bool = false,
             error: String? = nil,
-            isShowingAddPersonSheet: Bool = false,
+            destination: Destination? = nil,
             editingPerson: PersonRecord? = nil,
             formName: String = "",
             formColorToken: String = SpeakerColor.sky.rawValue,
@@ -110,7 +122,7 @@ public struct PeopleFeature {
             self.searchQuery = searchQuery
             self.isLoading = isLoading
             self.error = error
-            self.isShowingAddPersonSheet = isShowingAddPersonSheet
+            self.destination = destination
             self.editingPerson = editingPerson
             self.formName = formName
             self.formColorToken = formColorToken
@@ -212,7 +224,7 @@ public struct PeopleFeature {
                 state.formName = ""
                 state.formColorToken = SpeakerColor.forIndex(state.people.count).rawValue
                 state.formImageData = nil
-                state.isShowingAddPersonSheet = true
+                state.destination = .addPersonSheet
                 state.error = nil
                 return .none
 
@@ -221,7 +233,7 @@ public struct PeopleFeature {
                 state.formName = person.name
                 state.formColorToken = person.colorToken
                 state.formImageData = person.imageData
-                state.isShowingAddPersonSheet = true
+                state.destination = .addPersonSheet
                 state.error = nil
                 return .none
 
@@ -234,7 +246,7 @@ public struct PeopleFeature {
                 }
 
             case .dismissSheet:
-                state.isShowingAddPersonSheet = false
+                state.destination = nil
                 state.editingPerson = nil
                 state.formName = ""
                 state.formColorToken = SpeakerColor.sky.rawValue
@@ -297,7 +309,7 @@ public struct PeopleFeature {
 
             case let .personSaved(person):
                 state.isSaving = false
-                state.isShowingAddPersonSheet = false
+                state.destination = nil
 
                 // Update local list
                 if let index = state.people.firstIndex(where: { $0.id == person.id }) {
