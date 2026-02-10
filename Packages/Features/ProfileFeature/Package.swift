@@ -30,6 +30,7 @@ let package = Package(
             name: "ProfileFeatureTests",
             dependencies: [
                 "ProfileFeature",
+                "DesignSystem",
                 "Export",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ]
