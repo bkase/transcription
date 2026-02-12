@@ -814,9 +814,10 @@ import Persistence
 
     let dbQueue = try makeDatabase(configuration: .inMemory)
 
-    // Set up temp directory and create a dummy audio file
+    // Set up unique temp directory to avoid file conflicts with parallel tests
     // The incrementing UUID starts with 00000000-0000-0000-0000-000000000000
-    let tempDir = FileManager.default.temporaryDirectory
+    let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("offline-failure-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
     let expectedSessionId = "00000000-0000-0000-0000-000000000000"
     let expectedAudioPath = tempDir.appendingPathComponent("\(expectedSessionId).caf")
 
@@ -923,7 +924,7 @@ import Persistence
     #expect(segments.count == 3, "Live segments should be preserved when offline transcription fails")
 
     // Clean up
-    try? FileManager.default.removeItem(at: expectedAudioPath)
+    try? FileManager.default.removeItem(at: tempDir)
 }
 
 @Test func testRetryOfflineTranscriptionSuccess() async throws {
@@ -1176,9 +1177,10 @@ import Persistence
 
     let dbQueue = try makeDatabase(configuration: .inMemory)
 
-    // Set up temp directory and create a dummy audio file
+    // Set up unique temp directory to avoid file conflicts with parallel tests
     // The incrementing UUID starts with 00000000-0000-0000-0000-000000000000
-    let tempDir = FileManager.default.temporaryDirectory
+    let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("offline-success-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
     let expectedSessionId = "00000000-0000-0000-0000-000000000000"
     let expectedAudioPath = tempDir.appendingPathComponent("\(expectedSessionId).caf")
 
@@ -1345,7 +1347,7 @@ import Persistence
     #expect(session.previewText?.contains("how are you doing today") == true, "Preview should be from offline segments")
 
     // Clean up
-    try? FileManager.default.removeItem(at: expectedAudioPath)
+    try? FileManager.default.removeItem(at: tempDir)
 }
 
 // MARK: - Timeout Error Tests
