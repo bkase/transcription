@@ -220,47 +220,6 @@ extension View {
     public func vaporExit(isPresented: Binding<Bool>) -> some View {
         modifier(VaporExitModifier(isPresented: isPresented))
     }
-
-    /// Applies vapor-drift animation timing to navigation transitions.
-    /// This modifier overrides the default navigation animation with the brand-standard
-    /// vapor-drift curve (400ms, cubic-bezier 0.25, 0.1, 0.25, 1).
-    ///
-    /// Apply this to NavigationStack destinations for consistent page transitions:
-    /// ```swift
-    /// NavigationStack(path: $path) {
-    ///     RootView()
-    /// } destination: { route in
-    ///     DestinationView(route: route)
-    ///         .vaporNavigationTransition()
-    /// }
-    /// ```
-    /// - Returns: A view with vapor-drift navigation animation timing.
-    public func vaporNavigationTransition() -> some View {
-        modifier(VaporNavigationTransitionModifier())
-    }
-}
-
-// MARK: - Vapor Navigation Transition Modifier
-
-/// A view modifier that applies the vapor-drift timing curve to navigation transitions.
-/// Implements the brand animation specification for page transitions:
-/// - Duration: 400ms
-/// - Curve: vapor-drift (cubic-bezier 0.25, 0.1, 0.25, 1) - Positional movement
-///
-/// This modifier overrides the default SwiftUI navigation animation by intercepting
-/// the transaction and replacing it with the vapor-drift timing curve.
-public struct VaporNavigationTransitionModifier: ViewModifier {
-    public init() {}
-
-    public func body(content: Content) -> some View {
-        content
-            .transaction { transaction in
-                // Override navigation animation with vapor-drift curve
-                transaction.animation = VaporAnimation.driftCurve.animation(
-                    duration: VaporAnimation.pageDuration
-                )
-            }
-    }
 }
 
 // MARK: - Vapor Page Transition

@@ -91,19 +91,15 @@ struct AppView: View {
                 case let .sessionDetail(sessionDetailStore):
                     SessionDetailView(store: sessionDetailStore)
                         .navigationBarHidden(true)
-                        .vaporNavigationTransition()
                 case let .profile(profileStore):
                     ProfileView(store: profileStore)
                         .navigationBarHidden(true)
-                        .vaporNavigationTransition()
                 case let .personTimeline(personTimelineStore):
                     PersonTimelineView(store: personTimelineStore)
                         .navigationBarHidden(true)
-                        .vaporNavigationTransition()
                 case let .people(peopleStore):
                     PeopleView(store: peopleStore)
                         .navigationBarHidden(true)
-                        .vaporNavigationTransition()
                 }
             }
             .onAppear {
@@ -118,7 +114,6 @@ struct AppView: View {
                 RecordingView(store: recordingStore) {
                     store.send(.dismissRecording)
                 }
-                .vaporNavigationTransition()
             }
         }
     }

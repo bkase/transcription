@@ -149,23 +149,6 @@ import SwiftUI
     #expect(curve.y2 == 1)
 }
 
-// MARK: - Vapor Navigation Transition Tests
-
-/// Tests for the VaporNavigationTransitionModifier that implements page transitions.
-/// Reference: brand.md Motion Design section - vapor-drift curve, 400ms duration
-
-@Test func testVaporNavigationTransitionModifierCanBeCreated() {
-    // Should be able to create the modifier
-    let modifier = VaporNavigationTransitionModifier()
-    #expect(true)
-}
-
-@Test func testVaporNavigationTransitionViewExtension() {
-    // View extension should be accessible
-    let _ = Text("Test").vaporNavigationTransition()
-    #expect(true)
-}
-
 @Test func testVaporDriftCurveMatchesBrandSpec() {
     // Verify the animation curve matches brand spec
     // vapor-drift: cubic-bezier(0.25, 0.1, 0.25, 1)

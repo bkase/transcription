@@ -941,15 +941,6 @@
 - Must wrap content state changes in `withAnimation(VaporAnimation.exitCurve.animation(duration:))` to trigger transition
 - System alerts and confirmation dialogs use their own animations - can't customize with vapor transitions
 
-## Custom navigation transitions (iOS 17)
-- Use `.transaction` modifier to override navigation animation timing for iOS 17 compatibility
-- VaporNavigationTransitionModifier intercepts transaction and replaces animation with vapor-drift curve
-- Apply `.vaporNavigationTransition()` to NavigationStack destinations in the `destination:` closure
-- fullScreenCover content can also use `.vaporNavigationTransition()` for consistent timing
-- vapor-drift curve: cubic-bezier(0.25, 0.1, 0.25, 1) for positional movement
-- Page duration: 400ms (VaporAnimation.pageDuration)
-- Custom `.vaporPage` and `.vaporPageBack` transitions for conditional views using offset + opacity
-
 ## VaporFocusBlurModifier for focus blur transitions
 - `.vaporFocusBlur(isFocused:blurRadius:)` applies blur to background content when focus state is active
 - Uses VaporAnimation.blurDuration (500ms) and VaporAnimation.appearCurve for timing
