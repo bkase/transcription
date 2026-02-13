@@ -1357,3 +1357,14 @@
 - `findDominantSpeaker` was updated to use same lexicographic tie-breaking for consistency
 - `computeOverlap` is a public static helper useful on its own for interval arithmetic
 - Swift Testing `@Suite` nesting works well for grouping related test cases in a single file
+
+## Retention and continuation policy for end-only diarization
+- transcriptOnly mode should run offline transcription BEFORE deleting audio so speaker enrichment still happens
+- Audio deletion happens after offline transcription completes (success or failure), not before
+- After transcriptOnly audio deletion, retry is impossible (no audio file) - this is by design
+- Continuation mode skips offline transcription because continuation audio is partial (only the appended segment)
+- Continuation segments have speakerId=nil; speaker enrichment deferred to future combined-diarize feature
+- audioOnly mode skips offline transcription entirely (no enrichment needed)
+- SessionRecord init parameter order: updatedAt comes before processingError
+- Package test target can import Persistence transitively but should add it explicitly for clarity
+- For tracking whether a mock closure was called, use a simple actor with a counter (TranscribeTracker pattern)

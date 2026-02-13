@@ -34,6 +34,7 @@ let package = Package(
             dependencies: [
                 "Processing",
                 "Audio",
+                "Persistence",
                 "Observability",
                 .product(name: "Dependencies", package: "swift-dependencies"),
             ]

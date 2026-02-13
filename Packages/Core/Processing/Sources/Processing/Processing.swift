@@ -888,10 +888,32 @@ public actor RecordingProcessor {
         session.speakerCount = seenSpeakers.count
         session.updatedAt = now
 
-        // For continuation mode: skip offline transcription, keep original audio path, mark as processed
+        // ────────────────────────────────────────────────────────────────────
+        // CONTINUATION POLICY
+        //
+        // Continuations record a NEW audio segment appended to an existing session.
+        // The continuation audio file only covers the appended portion, NOT the full
+        // session, so full-file offline transcription and diarization are not meaningful.
+        //
+        // Policy:
+        //   1. Live transcript segments are persisted with speakerId=nil (no live diarization).
+        //   2. Offline transcription is SKIPPED because the continuation audio is partial.
+        //   3. Speaker enrichment for the continuation portion is deferred to a future
+        //      re-diarize pass over the combined audio (not yet implemented).
+        //   4. The session transitions directly to .processed.
+        //   5. The original session audioPath is preserved (points to the initial recording).
+        //      The continuation audio file is stored separately but not tracked in the
+        //      session record.
+        //
+        // Valid state transitions:
+        //   .recording -> .processed  (always, for continuations)
+        //
+        // Speaker outcome:
+        //   Continuation segments have machineSpeakerId=nil. Existing speaker tracks from
+        //   the original recording are preserved. A future combined-diarize feature could
+        //   enrich all segments together.
+        // ────────────────────────────────────────────────────────────────────
         if isContinuation {
-            // Don't change audioPath - keep the original audio file reference
-            // The continuation audio is stored separately but we don't need to track it
             session.processingState = .processed
             NSLog("[Finalize] Continuation mode - marking as processed without offline transcription")
 
@@ -905,21 +927,51 @@ public actor RecordingProcessor {
             return
         }
 
-        // Normal (non-continuation) flow below
-        // Check privacy mode and handle audio retention
+        // ────────────────────────────────────────────────────────────────────
+        // RETENTION POLICY (non-continuation, normal recordings)
+        //
+        // AudioRetentionMode determines what happens to audio and transcription
+        // after recording stops. Three modes exist:
+        //
+        // .both (default):
+        //   - Audio file is KEPT.
+        //   - Offline transcription runs (replaces live segments with higher-quality output).
+        //   - Speaker enrichment (diarization) runs as part of offline transcription.
+        //   - State transitions: .recording -> .transcribing -> .processed
+        //   - On failure: .recording -> .transcribing -> .partial (has live segments)
+        //                                              -> .failed  (no segments at all)
+        //
+        // .transcriptOnly:
+        //   - Offline transcription runs FIRST (to get higher-quality segments + speakers).
+        //   - After offline transcription completes (success or failure), the audio file
+        //     is DELETED and audioPath is cleared.
+        //   - This ensures speaker enrichment still happens for privacy-conscious users
+        //     who don't want to retain audio long-term.
+        //   - State transitions: .recording -> .transcribing -> .processed (audio deleted)
+        //   - On failure: .recording -> .transcribing -> .partial/.failed (audio deleted)
+        //   - Retry is NOT possible after audio deletion (no audio file to re-process).
+        //
+        // .audioOnly:
+        //   - Audio file is KEPT.
+        //   - Offline transcription is SKIPPED (user chose audio-only).
+        //   - No speaker enrichment.
+        //   - State transitions: .recording -> .processed
+        //
+        // Edge case: no audio file URL:
+        //   - Offline transcription is SKIPPED (nothing to process).
+        //   - State transitions: .recording -> .processed
+        // ────────────────────────────────────────────────────────────────────
         let retentionMode = preferencesClient.getAudioRetentionMode()
-        let shouldDeleteAudio = retentionMode == .transcriptOnly
-        let canRunOfflineTranscription = !shouldDeleteAudio && audioFileURL != nil && retentionMode != .audioOnly
 
-        if shouldDeleteAudio, let audioURL = audioFileURL {
-            // Delete audio file and clear audioPath
-            try? FileManager.default.removeItem(at: audioURL)
-            session.audioPath = nil
-            // No offline transcription possible, mark as processed
-            session.processingState = .processed
-        } else if canRunOfflineTranscription {
-            // Set to transcribing state - offline transcription will run
+        // Determine processing behavior from retention mode
+        let isTranscriptOnly = retentionMode == .transcriptOnly
+        let isAudioOnly = retentionMode == .audioOnly
+        let canRunOfflineTranscription = audioFileURL != nil && !isAudioOnly
+
+        if canRunOfflineTranscription {
+            // Offline transcription will run (both or transcriptOnly modes)
             session.processingState = .transcribing
+            // Always set audioPath for offline transcription to find the file
             session.audioPath = audioFileURL?.path
         } else {
             // No offline transcription (audioOnly mode or no audio file)
@@ -928,7 +980,7 @@ public actor RecordingProcessor {
         }
 
         do {
-            NSLog("[Finalize] Updating session state to: %@", session.processingState.rawValue)
+            NSLog("[Finalize] Updating session state to: %@, retentionMode: %@", session.processingState.rawValue, retentionMode.rawValue)
             try await databaseClient.updateSession(session)
             NSLog("[Finalize] Session updated, emitting didFinish event")
             // Emit didFinish so UI can navigate to detail view
@@ -948,6 +1000,18 @@ public actor RecordingProcessor {
                 NSLog("[Finalize] Starting offline transcription...")
                 await runOfflineTranscription(sessionId: sessionId, audioFileURL: audioURL)
                 NSLog("[Finalize] Offline transcription completed")
+
+                // transcriptOnly: delete audio AFTER offline transcription (success or failure)
+                if isTranscriptOnly {
+                    NSLog("[Finalize] transcriptOnly mode - deleting audio after offline transcription")
+                    try? FileManager.default.removeItem(at: audioURL)
+                    if var updatedSession = try? await databaseClient.fetchSession(sessionId) {
+                        updatedSession.audioPath = nil
+                        updatedSession.updatedAt = date.now
+                        try? await databaseClient.updateSession(updatedSession)
+                    }
+                    NSLog("[Finalize] Audio file deleted and audioPath cleared")
+                }
             } else {
                 NSLog("[Finalize] Skipping offline transcription (canRun=%d, hasAudio=%d)", canRunOfflineTranscription ? 1 : 0, audioFileURL != nil ? 1 : 0)
             }
@@ -1127,7 +1191,26 @@ public actor RecordingProcessor {
 
     // MARK: - Retry Offline Transcription
 
-    /// Retry offline transcription for a failed/partial session
+    /// Retry offline transcription for a failed/partial session.
+    ///
+    /// ## Retry Policy
+    /// Retry is only possible when:
+    ///   - The session is in `.failed` or `.partial` state.
+    ///   - An audio file still exists on disk (pointed to by `session.audioPath`).
+    ///
+    /// Retry is NOT available for:
+    ///   - **transcriptOnly** sessions where audio was already deleted after the initial
+    ///     offline transcription attempt. These sessions have `audioPath == nil`.
+    ///   - **audioOnly** sessions (offline transcription was never attempted).
+    ///   - **continuation** sessions (no full-session audio file exists).
+    ///
+    /// The retry flow follows the same enrichment contract as `runOfflineTranscription`:
+    ///   - On success: existing segments are replaced, speaker tracks are rebuilt,
+    ///     session moves to `.processed`.
+    ///   - On failure: session moves to `.partial` (if live segments exist) or `.failed`.
+    ///   - Text is preserved if the retry fails (live segments are only deleted after
+    ///     successful offline transcription).
+    ///
     /// - Parameter sessionId: The session ID to retry transcription for
     /// - Returns: true if retry succeeded, false otherwise
     public func retryOfflineTranscription(sessionId: SessionID) async throws -> Bool {
