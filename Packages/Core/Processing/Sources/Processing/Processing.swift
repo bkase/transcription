@@ -772,8 +772,8 @@ public actor RecordingProcessor {
             eventContinuation?.yield(.didAppendSegment(segment.id))
         }
 
-        // Accumulate text for title generation
-        accumulatedTranscriptText += (accumulatedTranscriptText.isEmpty ? "" : " ") + segment.text
+        // The single live segment's text IS the full accumulated transcript
+        accumulatedTranscriptText = segment.text
 
         // Trigger title generation after 15 seconds of transcript
         if !titleGenerationTriggered && segment.endMs >= 15_000 {

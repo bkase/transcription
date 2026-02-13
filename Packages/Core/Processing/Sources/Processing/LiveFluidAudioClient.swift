@@ -22,17 +22,21 @@ public actor LiveFluidAudioClientActor {
     // Model preparation state
     private var modelState: ModelPreparationState = .idle
 
-    // Audio accumulation state
-    private var accumulatedSamples: [Float] = []
-    private var lastProcessedEndMs: UInt64 = 0
+    // Audio accumulation state – single growing segment with sliding window ASR
+    private var allAccumulatedSamples: [Float] = []
+    private var fullTranscriptText: String = ""
+    private var liveSegmentId: TranscriptSegmentID?
 
     // Configuration
     private let sampleRate: Int = 16000
-    private let chunkDurationMs: UInt64 = 5000 // Process every 5 seconds of audio
-    private let samplesPerChunk: Int
+    private let triggerIntervalSamples: Int   // 5s worth of samples
+    private let windowSizeSamples: Int        // 10s sliding window for ASR
+    private var nextTriggerAt: Int            // sample count threshold for next ASR run
 
     public init() {
-        samplesPerChunk = sampleRate * Int(chunkDurationMs) / 1000
+        triggerIntervalSamples = sampleRate * 5    // 80,000
+        windowSizeSamples = sampleRate * 10        // 160,000
+        nextTriggerAt = triggerIntervalSamples
     }
 
     /// Get the current model preparation state
@@ -183,8 +187,10 @@ public actor LiveFluidAudioClientActor {
         NSLog("[FluidAudio] ASR manager available, starting transcription...")
 
         isTranscribing = true
-        accumulatedSamples = []
-        lastProcessedEndMs = 0
+        allAccumulatedSamples = []
+        fullTranscriptText = ""
+        liveSegmentId = nil
+        nextTriggerAt = triggerIntervalSamples
 
         return AsyncStream { continuation in
             self.continuation = continuation
@@ -319,13 +325,14 @@ public actor LiveFluidAudioClientActor {
             NSLog("[FluidAudio] Resampled from \(sourceSampleRate)Hz to \(sampleRate)Hz: \(totalSamples) -> \(resampledSamples.count) samples")
         }
 
-        // Process in chunks
+        // Process in chunks (5s each for offline)
+        let offlineChunkSamples = sampleRate * 5
         var segments: [TranscriptSegment] = []
         var offset = 0
         var processedMs: UInt64 = 0
 
         while offset < resampledSamples.count {
-            let chunkSize = min(samplesPerChunk, resampledSamples.count - offset)
+            let chunkSize = min(offlineChunkSamples, resampledSamples.count - offset)
             let chunkSamples = Array(resampledSamples[offset..<(offset + chunkSize)])
 
             let chunkStartMs = processedMs
@@ -399,84 +406,117 @@ public actor LiveFluidAudioClientActor {
         // Simple decimation - take every 3rd sample
         let downsampledSamples = stride(from: 0, to: inputSamples.count, by: 3).map { inputSamples[$0] }
 
-        accumulatedSamples.append(contentsOf: downsampledSamples)
+        allAccumulatedSamples.append(contentsOf: downsampledSamples)
 
-        // Process chunks when we have enough audio
-        while accumulatedSamples.count >= samplesPerChunk {
-            await processChunk()
+        // Process window when we have enough accumulated audio
+        if allAccumulatedSamples.count >= nextTriggerAt {
+            await processWindow()
         }
     }
 
-    private func processChunk() async {
-        guard accumulatedSamples.count >= samplesPerChunk else { return }
+    private func processWindow() async {
         guard let asrManager = asrManager else {
-            NSLog("[FluidAudio] ERROR: ASR manager not available in processChunk")
+            NSLog("[FluidAudio] ERROR: ASR manager not available in processWindow")
             return
         }
 
-        // Extract chunk
-        let chunkSamples = Array(accumulatedSamples.prefix(samplesPerChunk))
-        accumulatedSamples.removeFirst(samplesPerChunk)
+        let totalSamples = allAccumulatedSamples.count
+        let windowStart = max(0, totalSamples - windowSizeSamples)
+        let windowSamples = Array(allAccumulatedSamples[windowStart...])
+        let totalMs = UInt64(totalSamples * 1000 / sampleRate)
 
-        let chunkStartMs = lastProcessedEndMs
-        let chunkEndMs = chunkStartMs + chunkDurationMs
-        lastProcessedEndMs = chunkEndMs
-
-        NSLog("[FluidAudio] Processing chunk: \(chunkStartMs)-\(chunkEndMs)ms, \(chunkSamples.count) samples")
+        NSLog("[FluidAudio] Processing window: \(windowStart)-\(totalSamples) samples (\(windowSamples.count) in window), totalMs=\(totalMs)")
 
         do {
-            // Run ASR for transcription (no live diarization - speaker IDs are assigned post-stop)
-            NSLog("[FluidAudio] Running ASR transcribe...")
-            let asrResult = try await asrManager.transcribe(chunkSamples, source: .microphone)
-            let transcriptText = asrResult.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            NSLog("[FluidAudio] ASR result: '\(transcriptText)'")
+            let asrResult = try await asrManager.transcribe(windowSamples, source: .microphone)
+            let windowText = asrResult.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            NSLog("[FluidAudio] ASR window result: '\(windowText)'")
 
-            guard !transcriptText.isEmpty else {
+            guard !windowText.isEmpty else {
                 NSLog("[FluidAudio] Empty transcription, skipping")
+                nextTriggerAt += triggerIntervalSamples
                 return
             }
 
-            // Emit segment with nil speakerId - diarization is deferred to post-stop processing
+            // Update full transcript text
+            if windowStart == 0 {
+                // Total audio <= window size: full self-correction
+                fullTranscriptText = windowText
+            } else {
+                // Total audio > window size: merge using word overlap
+                fullTranscriptText = mergeTexts(existing: fullTranscriptText, windowText: windowText)
+            }
+
+            // Create or reuse the single live segment ID
+            if liveSegmentId == nil {
+                liveSegmentId = TranscriptSegmentID(rawValue: uuid().uuidString)
+            }
+
             let segment = TranscriptSegment(
-                id: TranscriptSegmentID(rawValue: uuid().uuidString),
-                text: transcriptText,
-                startMs: chunkStartMs,
-                endMs: chunkEndMs,
+                id: liveSegmentId!,
+                text: fullTranscriptText,
+                startMs: 0,
+                endMs: totalMs,
                 speakerId: nil,
-                isFinal: true
+                isFinal: false
             )
 
-            NSLog("[FluidAudio] Yielding segment: '\(transcriptText)'")
+            NSLog("[FluidAudio] Yielding growing segment: '\(fullTranscriptText.prefix(80))...'")
             continuation?.yield(segment)
         } catch {
-            // Log error but continue processing
-            NSLog("[FluidAudio] processChunk ERROR: \(error)")
+            NSLog("[FluidAudio] processWindow ERROR: \(error)")
         }
+
+        nextTriggerAt += triggerIntervalSamples
+    }
+
+    private func mergeTexts(existing: String, windowText: String) -> String {
+        let existingWords = existing.split(separator: " ")
+        let windowWords = windowText.split(separator: " ")
+        let maxOverlap = min(existingWords.count, windowWords.count)
+
+        for overlapLen in stride(from: maxOverlap, through: 1, by: -1) {
+            if Array(existingWords.suffix(overlapLen)) == Array(windowWords.prefix(overlapLen)) {
+                let newWords = windowWords.dropFirst(overlapLen)
+                if newWords.isEmpty { return existing }
+                return existing + " " + newWords.joined(separator: " ")
+            }
+        }
+        // No overlap found, just append
+        return existing + " " + windowText
     }
 
     private func processRemainingAudio() async {
-        guard !accumulatedSamples.isEmpty else { return }
+        guard !allAccumulatedSamples.isEmpty else { return }
         guard let asrManager = asrManager else { return }
 
-        let remainingSamples = accumulatedSamples
-        accumulatedSamples = []
-
-        let chunkStartMs = lastProcessedEndMs
-        let durationMs = UInt64(remainingSamples.count * 1000 / sampleRate)
-        let chunkEndMs = chunkStartMs + durationMs
+        let totalSamples = allAccumulatedSamples.count
+        let windowStart = max(0, totalSamples - windowSizeSamples)
+        let windowSamples = Array(allAccumulatedSamples[windowStart...])
+        let totalMs = UInt64(totalSamples * 1000 / sampleRate)
 
         do {
-            let asrResult = try await asrManager.transcribe(remainingSamples, source: .microphone)
-            let transcriptText = asrResult.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let asrResult = try await asrManager.transcribe(windowSamples, source: .microphone)
+            let windowText = asrResult.text.trimmingCharacters(in: .whitespacesAndNewlines)
 
-            guard !transcriptText.isEmpty else { return }
+            guard !windowText.isEmpty else { return }
 
-            // Emit segment with nil speakerId - diarization is deferred to post-stop processing
+            if windowStart == 0 {
+                fullTranscriptText = windowText
+            } else {
+                fullTranscriptText = mergeTexts(existing: fullTranscriptText, windowText: windowText)
+            }
+
+            if liveSegmentId == nil {
+                liveSegmentId = TranscriptSegmentID(rawValue: uuid().uuidString)
+            }
+
+            // Final segment marks the end of live transcription
             let segment = TranscriptSegment(
-                id: TranscriptSegmentID(rawValue: uuid().uuidString),
-                text: transcriptText,
-                startMs: chunkStartMs,
-                endMs: chunkEndMs,
+                id: liveSegmentId!,
+                text: fullTranscriptText,
+                startMs: 0,
+                endMs: totalMs,
                 speakerId: nil,
                 isFinal: true
             )

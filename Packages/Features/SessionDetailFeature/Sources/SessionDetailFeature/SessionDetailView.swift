@@ -344,7 +344,7 @@ public struct SessionDetailView: View {
                     type: .custom(
                         icon: "exclamationmark.triangle",
                         title: "Partial transcript",
-                        description: "Some parts couldn't be processed"
+                        description: session.processingError ?? "Some parts couldn't be processed"
                     ),
                     onRetry: {
                         store.send(.retryTranscriptionTapped)
