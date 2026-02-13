@@ -363,4 +363,57 @@ public struct MockFluidAudioClient {
     ) -> FluidAudioClient {
         client(script: script, modelState: .ready, offlineBehavior: .hang)
     }
+
+    /// Create a FluidAudioClient where ASR is not initialized.
+    /// startTranscription will throw notInitialized, simulating production behavior
+    /// when ASR models haven't been loaded.
+    public static var asrNotInitialized: FluidAudioClient {
+        FluidAudioClient(
+            prepareModels: { },
+            modelStatus: { .idle },
+            startTranscription: { _ in
+                throw LiveFluidAudioClientError.notInitialized
+            },
+            stopTranscription: { },
+            isTranscribing: { false },
+            transcribeFile: { _ in
+                throw LiveFluidAudioClientError.notInitialized
+            }
+        )
+    }
+
+    /// Create a FluidAudioClient where ASR is ready (live transcription works)
+    /// but diarizer is not available (offline transcription with diarization will fail).
+    /// This simulates the decoupled model lifecycle where live path works independently.
+    public static func asrReadyDiarizerUnavailable(
+        script: MockFluidAudioScript = .twoSpeakerConversation
+    ) -> FluidAudioClient {
+        let actor = MockFluidAudioClientActor(
+            script: script,
+            modelState: .ready,
+            offlineBehavior: .failure("Diarization models unavailable")
+        )
+        return FluidAudioClient(
+            prepareModels: {
+                await actor.prepareModels()
+            },
+            modelStatus: {
+                await actor.getModelStatus()
+            },
+            startTranscription: { audioStream in
+                // ASR is ready, so live transcription works
+                await actor.startTranscription(audioStream: audioStream)
+            },
+            stopTranscription: {
+                await actor.stopTranscription()
+            },
+            isTranscribing: {
+                await actor.getIsTranscribing()
+            },
+            transcribeFile: { _ in
+                // Diarizer is not available, so offline transcription fails
+                throw LiveFluidAudioClientError.diarizationUnavailable
+            }
+        )
+    }
 }

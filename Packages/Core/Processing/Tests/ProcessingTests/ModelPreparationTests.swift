@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import Models
+import Audio
 @testable import Processing
 
 // MARK: - Model Preparation Tests
@@ -117,4 +118,103 @@ import Models
     #expect(ModelPreparationState.idle != .ready)
     #expect(ModelPreparationState.downloading != .ready)
     #expect(ModelPreparationState.failed("error") != .ready)
+}
+
+// MARK: - ASR/Diarizer Lifecycle Split Tests
+
+@Test func testASRReadyDiarizerMissing_liveTranscriptionStarts() async throws {
+    // When ASR is ready but diarizer is unavailable, live transcription should start.
+    // This is the core invariant: live start depends only on ASR readiness.
+    let client = MockFluidAudioClient.asrReadyDiarizerUnavailable()
+
+    let status = await client.modelStatus()
+    #expect(status == .ready, "Model status should be ready (ASR is ready)")
+
+    // Create a minimal audio stream that finishes immediately
+    let audioStream = AsyncStream<AudioFrame> { $0.finish() }
+
+    // startTranscription should succeed because ASR is ready
+    let segmentStream = try await client.startTranscription(audioStream)
+
+    // Consume stream to completion - it should not throw
+    var segments: [TranscriptSegment] = []
+    for await segment in segmentStream {
+        segments.append(segment)
+    }
+
+    // Live segments should have nil speakerId (diarization deferred)
+    for segment in segments {
+        #expect(segment.speakerId == nil, "Live segments should have nil speakerId")
+    }
+}
+
+@Test func testASRMissing_liveTranscriptionFails() async {
+    // When ASR is not initialized, startTranscription should throw notInitialized
+    let client = MockFluidAudioClient.asrNotInitialized
+
+    let status = await client.modelStatus()
+    #expect(status == .idle, "Model status should be idle (ASR not initialized)")
+
+    let audioStream = AsyncStream<AudioFrame> { $0.finish() }
+
+    // startTranscription should throw notInitialized
+    do {
+        _ = try await client.startTranscription(audioStream)
+        Issue.record("Expected startTranscription to throw when ASR is not initialized")
+    } catch let error as LiveFluidAudioClientError {
+        #expect(error == .notInitialized, "Error should be notInitialized, not \(error)")
+    } catch {
+        Issue.record("Expected LiveFluidAudioClientError.notInitialized, got \(error)")
+    }
+}
+
+@Test func testASRReadyDiarizerMissing_offlineTranscriptionFailsWithDiarizationError() async {
+    // When ASR is ready but diarizer is unavailable, offline transcription should fail
+    // with diarizationUnavailable (not notInitialized).
+    let client = MockFluidAudioClient.asrReadyDiarizerUnavailable()
+
+    let dummyURL = URL(fileURLWithPath: "/tmp/nonexistent.caf")
+
+    do {
+        _ = try await client.transcribeFile(dummyURL)
+        Issue.record("Expected transcribeFile to throw when diarizer is unavailable")
+    } catch let error as LiveFluidAudioClientError {
+        #expect(error == .diarizationUnavailable, "Error should be diarizationUnavailable, not \(error)")
+    } catch {
+        Issue.record("Expected LiveFluidAudioClientError.diarizationUnavailable, got \(error)")
+    }
+}
+
+@Test func testLiveActorASRNotInitialized_startTranscriptionThrows() async {
+    // Direct actor test: without ASR initialization, startTranscription should throw
+    let actor = LiveFluidAudioClientActor()
+
+    // Verify ASR is not initialized
+    let isASRReady = await actor.isASRInitialized()
+    #expect(!isASRReady, "ASR should not be initialized on fresh actor")
+
+    let audioStream = AsyncStream<AudioFrame> { $0.finish() }
+
+    do {
+        _ = try await actor.startTranscription(audioStream: audioStream)
+        Issue.record("Expected startTranscription to throw when ASR is not initialized")
+    } catch let error as LiveFluidAudioClientError {
+        #expect(error == .notInitialized, "Error should be notInitialized")
+    } catch {
+        Issue.record("Expected LiveFluidAudioClientError.notInitialized, got \(error)")
+    }
+}
+
+@Test func testModelReadyMeansASRReady() async {
+    // Verify that .ready model state means ASR is ready for live transcription,
+    // independent of diarizer state. This tests the contract that UI depends on.
+    let client = MockFluidAudioClient.asrReadyDiarizerUnavailable()
+
+    let status = await client.modelStatus()
+    #expect(status == .ready, "Ready status should indicate ASR readiness for live transcription")
+
+    // Verify live transcription works
+    let audioStream = AsyncStream<AudioFrame> { $0.finish() }
+    let segmentStream = try? await client.startTranscription(audioStream)
+    #expect(segmentStream != nil, "Live transcription should start when model status is ready")
 }

@@ -37,26 +37,27 @@ public actor LiveFluidAudioClientActor {
         modelState
     }
 
-    /// Prepare ML models (download and load). Idempotent - no-op if already ready.
+    /// Prepare ASR models for live transcription (download and load). Idempotent - no-op if already ready.
+    /// Diarization models are initialized lazily when needed for offline/post-stop processing.
     public func prepareModels() async {
         NSLog("[FluidAudio] prepareModels called, current state: \(modelState)")
         // Idempotent: if already ready or downloading, no-op
         switch modelState {
         case .ready:
-            NSLog("[FluidAudio] Models already ready, returning")
+            NSLog("[FluidAudio] ASR models already ready, returning")
             return
         case .downloading:
-            NSLog("[FluidAudio] Models already downloading, returning")
+            NSLog("[FluidAudio] ASR models already downloading, returning")
             return
         case .idle, .failed:
             break
         }
 
         modelState = .downloading
-        NSLog("[FluidAudio] Starting model download...")
+        NSLog("[FluidAudio] Starting ASR model download...")
 
         do {
-            // Initialize ASR
+            // Initialize ASR only - diarizer is deferred to post-stop usage
             NSLog("[FluidAudio] Downloading ASR models...")
             let asrModels = try await AsrModels.downloadAndLoad(version: .v3)
             NSLog("[FluidAudio] ASR models downloaded, initializing...")
@@ -65,50 +66,49 @@ public actor LiveFluidAudioClientActor {
             try await asrManager?.initialize(models: asrModels)
             NSLog("[FluidAudio] ASR initialized")
 
-            // Initialize Diarizer
-            NSLog("[FluidAudio] Downloading diarizer models...")
-            let diarizerModels = try await DiarizerModels.downloadIfNeeded()
-            NSLog("[FluidAudio] Diarizer models downloaded, initializing...")
-            let diarizerConfig = DiarizerConfig.default
-            diarizerManager = DiarizerManager(config: diarizerConfig)
-            diarizerManager?.initialize(models: diarizerModels)
-            NSLog("[FluidAudio] Diarizer initialized")
-
             modelState = .ready
-            NSLog("[FluidAudio] All models ready!")
+            NSLog("[FluidAudio] ASR models ready for live transcription!")
         } catch {
-            NSLog("[FluidAudio] Model preparation failed: \(error)")
+            NSLog("[FluidAudio] ASR model preparation failed: \(error)")
             modelState = .failed(error.localizedDescription)
         }
     }
 
-    /// Initialize the ML models (downloads if needed, then loads)
+    /// Initialize ASR models (downloads if needed, then loads).
+    /// Diarization models are initialized lazily via ensureDiarizerInitialized().
     /// @deprecated Use prepareModels() instead for async model preparation
-    public func initialize() async throws {
-        // Initialize ASR
+    public func initializeASR() async throws {
+        // Initialize ASR only
         let asrModels = try await AsrModels.downloadAndLoad(version: .v3)
         let asrConfig = ASRConfig.default
         asrManager = AsrManager(config: asrConfig)
         try await asrManager?.initialize(models: asrModels)
 
-        // Initialize Diarizer
+        modelState = .ready
+    }
+
+    /// Check if ASR models are initialized and ready for live transcription.
+    /// Diarizer availability is NOT required for live transcription.
+    public func isASRInitialized() -> Bool {
+        asrManager != nil
+    }
+
+    /// Ensure ASR models are initialized (lazy initialization for live path)
+    public func ensureASRInitialized() async throws {
+        guard !isASRInitialized() else { return }
+        try await initializeASR()
+    }
+
+    /// Initialize diarizer models lazily for offline/post-stop processing.
+    /// This is separate from ASR so live transcription can start without waiting for diarizer.
+    public func ensureDiarizerInitialized() async throws {
+        guard diarizerManager == nil else { return }
+        NSLog("[FluidAudio] Lazily initializing diarizer models...")
         let diarizerModels = try await DiarizerModels.downloadIfNeeded()
         let diarizerConfig = DiarizerConfig.default
         diarizerManager = DiarizerManager(config: diarizerConfig)
         diarizerManager?.initialize(models: diarizerModels)
-
-        modelState = .ready
-    }
-
-    /// Check if ML models are initialized and ready
-    public func isInitialized() -> Bool {
-        asrManager != nil && diarizerManager?.isAvailable == true
-    }
-
-    /// Ensure models are initialized (lazy initialization)
-    public func ensureInitialized() async throws {
-        guard !isInitialized() else { return }
-        try await initialize()
+        NSLog("[FluidAudio] Diarizer initialized (lazy)")
     }
 
     /// Start transcription on an audio stream
@@ -177,17 +177,20 @@ public actor LiveFluidAudioClientActor {
     public func transcribeFile(audioFileURL: URL) async throws -> [TranscriptSegment] {
         NSLog("[FluidAudio] transcribeFile called for: \(audioFileURL.lastPathComponent)")
         NSLog("[FluidAudio] transcribeFile: full path: \(audioFileURL.path)")
-        NSLog("[FluidAudio] transcribeFile: checking managers... asrManager=\(asrManager != nil), diarizerManager=\(diarizerManager != nil), diarizerAvailable=\(diarizerManager?.isAvailable ?? false)")
+        NSLog("[FluidAudio] transcribeFile: checking ASR... asrManager=\(asrManager != nil)")
         NSLog("[FluidAudio] transcribeFile: modelState=\(modelState)")
 
-        guard let asrManager = asrManager, let diarizerManager = diarizerManager else {
-            NSLog("[FluidAudio] ERROR: Managers not initialized for offline transcription - asrManager=\(asrManager != nil), diarizerManager=\(diarizerManager != nil)")
+        guard let asrManager = asrManager else {
+            NSLog("[FluidAudio] ERROR: ASR not initialized for offline transcription")
             throw LiveFluidAudioClientError.notInitialized
         }
 
-        guard diarizerManager.isAvailable else {
-            NSLog("[FluidAudio] ERROR: Diarizer manager not available (models not loaded)")
-            throw LiveFluidAudioClientError.notInitialized
+        // Lazily initialize diarizer for offline processing
+        try await ensureDiarizerInitialized()
+
+        guard let diarizerManager = diarizerManager, diarizerManager.isAvailable else {
+            NSLog("[FluidAudio] ERROR: Diarizer manager not available after lazy init")
+            throw LiveFluidAudioClientError.diarizationUnavailable
         }
         NSLog("[FluidAudio] transcribeFile: managers OK, opening file...")
 
@@ -458,8 +461,9 @@ public struct LiveFluidAudioClient {
                 await actor.getModelStatus()
             },
             startTranscription: { audioStream in
-                // Initialize on first use (lazy initialization inside actor)
-                try await actor.ensureInitialized()
+                // Initialize ASR on first use (lazy initialization inside actor)
+                // Diarizer is NOT needed for live transcription
+                try await actor.ensureASRInitialized()
                 return try await actor.startTranscription(audioStream: audioStream)
             },
             stopTranscription: {
@@ -469,9 +473,9 @@ public struct LiveFluidAudioClient {
                 await actor.getIsTranscribing()
             },
             transcribeFile: { audioFileURL in
-                NSLog("[FluidAudio] Client.transcribeFile called, ensuring initialized...")
-                try await actor.ensureInitialized()
-                NSLog("[FluidAudio] Client.transcribeFile: initialized, calling actor...")
+                NSLog("[FluidAudio] Client.transcribeFile called, ensuring ASR initialized...")
+                try await actor.ensureASRInitialized()
+                NSLog("[FluidAudio] Client.transcribeFile: ASR initialized, calling actor (diarizer will init lazily)...")
                 let result = try await actor.transcribeFile(audioFileURL: audioFileURL)
                 NSLog("[FluidAudio] Client.transcribeFile: got \(result.count) segments")
                 return result
@@ -482,8 +486,11 @@ public struct LiveFluidAudioClient {
 
 // MARK: - LiveFluidAudioClientError
 
-public enum LiveFluidAudioClientError: Error, Sendable {
+public enum LiveFluidAudioClientError: Error, Sendable, Equatable {
+    /// ASR models are not initialized (required for both live and offline transcription)
     case notInitialized
+    /// Diarization models failed to initialize (offline transcription only)
+    case diarizationUnavailable
     case modelDownloadFailed
     case transcriptionFailed(String)
 }

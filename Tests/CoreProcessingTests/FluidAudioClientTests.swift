@@ -30,8 +30,8 @@ import Models
     let isTranscribing = await actor.getIsTranscribing()
     #expect(!isTranscribing, "Actor should not be transcribing initially")
 
-    let isInitialized = await actor.isInitialized()
-    #expect(!isInitialized, "Actor should not be initialized before calling initialize()")
+    let isASRInitialized = await actor.isASRInitialized()
+    #expect(!isASRInitialized, "Actor should not have ASR initialized before calling initializeASR()")
 }
 
 @Test func testLiveClientStopTranscription() async throws {

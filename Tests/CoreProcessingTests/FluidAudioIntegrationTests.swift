@@ -136,15 +136,15 @@ func testLiveClientModelInitialization() async throws {
     let actor = LiveFluidAudioClientActor()
 
     // Before initialization
-    let initializedBefore = await actor.isInitialized()
-    #expect(!initializedBefore, "Actor should not be initialized before calling initialize()")
+    let initializedBefore = await actor.isASRInitialized()
+    #expect(!initializedBefore, "Actor should not have ASR initialized before calling initializeASR()")
 
-    // Initialize models (this downloads if needed)
-    try await actor.initialize()
+    // Initialize ASR models (this downloads if needed)
+    try await actor.initializeASR()
 
     // After initialization
-    let initializedAfter = await actor.isInitialized()
-    #expect(initializedAfter, "Actor should be initialized after calling initialize()")
+    let initializedAfter = await actor.isASRInitialized()
+    #expect(initializedAfter, "Actor should have ASR initialized after calling initializeASR()")
 
     // Cleanup
     await actor.cleanup()

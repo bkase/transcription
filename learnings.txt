@@ -1328,3 +1328,12 @@
 - CoreProcessingTests run as root-level SPM tests (`swift test --filter CoreProcessingTests` from project root), not through xcodebuild
 - Live segments flowing through handleSegment with speakerId=nil means no speaker tracks are created during recording; seenSpeakers stays empty, speakerCount=0 until offline enrichment runs
 - The do/catch in processChunk previously wrapped both ASR and diarization, so a diarization failure could suppress ASR segment emission; removing diarization from the live path automatically decouples these
+
+## ASR/diarizer lifecycle split (bd-2mxd)
+- prepareModels() should only prepare ASR for live readiness; diarizer is initialized lazily in transcribeFile() via ensureDiarizerInitialized()
+- ModelPreparationState.ready means "ASR ready for live transcription", not "all models ready"
+- isInitialized() -> isASRInitialized(), ensureInitialized() -> ensureASRInitialized() for clarity
+- LiveFluidAudioClientError gained diarizationUnavailable case (distinct from notInitialized) for offline-only failures
+- MockFluidAudioClient.asrNotInitialized creates a client where startTranscription throws notInitialized (for testing ASR-missing path)
+- MockFluidAudioClient.asrReadyDiarizerUnavailable creates a client where live works but transcribeFile throws diarizationUnavailable
+- When renaming actor methods, also check Tests/CoreProcessingTests/ (root-level SPM test target) not just Packages/Core/Processing/Tests/
