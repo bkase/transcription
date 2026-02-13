@@ -669,6 +669,329 @@ struct RetentionPolicyTests {
         }
     }
 
+    // ─── Post-Stop Speaker Enrichment ───────────────────────────────────
+
+    /// Successful finalization with diarization enriches segments with speaker IDs.
+    /// Session ends in .processed with non-nil speakerId on segments and speaker tracks created.
+    @Test func bothModeEnrichesSegmentsWithSpeakerIds() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let dbQueue = try makeDatabase(configuration: .inMemory)
+        let databaseClient = DatabaseClient.live(dbQueue: dbQueue)
+        let writtenFile = WrittenFile()
+
+        // Use the two-speaker conversation script with matching diarization
+        let fluidAudioClient = MockFluidAudioClient.client(
+            script: .twoSpeakerConversation,
+            offlineBehavior: .success,
+            diarizationBehavior: .twoSpeakerDefault
+        )
+
+        let processor = withDependencies {
+            $0.audioCaptureClient = makeMockAudioCapture()
+            $0.audioFileWriterClient = makeMockFileWriter(writtenFile: writtenFile)
+            $0.audioSessionClient = makeMockAudioSession()
+            $0.fluidAudioClient = fluidAudioClient
+            $0.databaseClient = databaseClient
+            $0.preferencesClient = PreferencesClient(
+                getAudioRetentionMode: { .both },
+                setAudioRetentionMode: { _ in }
+            )
+            $0.titleGeneratorClient = TitleGeneratorClient(generateTitle: { _ in nil }, isAvailable: { false })
+            $0.uuid = .incrementing
+            $0.date = .constant(Date(timeIntervalSince1970: 1000))
+        } operation: {
+            RecordingProcessor()
+        }
+
+        let eventStream = try await processor.startRecording(audioDirectory: tempDir)
+        let collectTask = Task { for await _ in eventStream { } }
+
+        // Wait for live segments (emitted with nil speakerId)
+        try await waitUntil("live segments stored") {
+            let sessions = try? await databaseClient.fetchSessions()
+            guard let session = sessions?.first else { return false }
+            let segs = try? await databaseClient.fetchTranscriptSegments(SessionID(rawValue: session.id))
+            return (segs?.count ?? 0) >= 1
+        }
+        await processor.stopRecording()
+
+        // Wait for finalization to complete
+        try await waitUntil("session finalized with enrichment") {
+            let sessions = try? await databaseClient.fetchSessions()
+            return sessions?.first?.processingState == .processed
+        }
+        collectTask.cancel()
+
+        // ASSERT: session is .processed
+        let sessions = try await databaseClient.fetchSessions()
+        let sessionId = SessionID(rawValue: sessions[0].id)
+        #expect(sessions[0].processingState == .processed)
+
+        // ASSERT: segments have speaker IDs from diarization enrichment
+        let segments = try await databaseClient.fetchTranscriptSegments(sessionId)
+        #expect(!segments.isEmpty, "Should have offline transcript segments")
+        let segmentsWithSpeaker = segments.filter { $0.machineSpeakerId != nil }
+        #expect(!segmentsWithSpeaker.isEmpty,
+                "At least some segments should have speaker IDs after enrichment")
+
+        // ASSERT: speaker tracks were created
+        let speakerTracks = try await databaseClient.fetchSpeakerTracks(sessionId)
+        #expect(!speakerTracks.isEmpty, "Speaker tracks should be created from diarization")
+
+        // ASSERT: session speakerCount reflects the enriched speakers
+        #expect(sessions[0].speakerCount > 0, "Speaker count should be > 0 after enrichment")
+    }
+
+    /// Diarization failure during finalization preserves transcript text without speaker IDs.
+    /// Session ends in .processed (ASR succeeded), segments have nil speakerId.
+    @Test func diarizationFailureDuringFinalizationPreservesTranscript() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let dbQueue = try makeDatabase(configuration: .inMemory)
+        let databaseClient = DatabaseClient.live(dbQueue: dbQueue)
+        let writtenFile = WrittenFile()
+
+        // ASR works fine, but diarization fails
+        let fluidAudioClient = MockFluidAudioClient.client(
+            script: .twoSpeakerConversation,
+            offlineBehavior: .success,
+            diarizationBehavior: .failure("Diarization model crashed")
+        )
+
+        let processor = withDependencies {
+            $0.audioCaptureClient = makeMockAudioCapture()
+            $0.audioFileWriterClient = makeMockFileWriter(writtenFile: writtenFile)
+            $0.audioSessionClient = makeMockAudioSession()
+            $0.fluidAudioClient = fluidAudioClient
+            $0.databaseClient = databaseClient
+            $0.preferencesClient = PreferencesClient(
+                getAudioRetentionMode: { .both },
+                setAudioRetentionMode: { _ in }
+            )
+            $0.titleGeneratorClient = TitleGeneratorClient(generateTitle: { _ in nil }, isAvailable: { false })
+            $0.uuid = .incrementing
+            $0.date = .constant(Date(timeIntervalSince1970: 1000))
+        } operation: {
+            RecordingProcessor()
+        }
+
+        let eventStream = try await processor.startRecording(audioDirectory: tempDir)
+        let collectTask = Task { for await _ in eventStream { } }
+
+        // Wait for live segments
+        try await waitUntil("live segments stored") {
+            let sessions = try? await databaseClient.fetchSessions()
+            guard let session = sessions?.first else { return false }
+            let segs = try? await databaseClient.fetchTranscriptSegments(SessionID(rawValue: session.id))
+            return (segs?.count ?? 0) >= 1
+        }
+        await processor.stopRecording()
+
+        // Wait for finalization
+        try await waitUntil("session finalized after diarization failure") {
+            let sessions = try? await databaseClient.fetchSessions()
+            return sessions?.first?.processingState == .processed
+        }
+        collectTask.cancel()
+
+        // ASSERT: session is .processed (ASR succeeded even though diarization failed)
+        let sessions = try await databaseClient.fetchSessions()
+        let sessionId = SessionID(rawValue: sessions[0].id)
+        #expect(sessions[0].processingState == .processed)
+
+        // ASSERT: transcript text is preserved (invariant I3)
+        let segments = try await databaseClient.fetchTranscriptSegments(sessionId)
+        #expect(!segments.isEmpty, "Transcript segments must be preserved when diarization fails")
+
+        // Verify text content is present
+        let texts = segments.map(\.text)
+        #expect(texts.contains(where: { !$0.isEmpty }),
+                "Segments should have non-empty text")
+
+        // ASSERT: segments have nil speakerId (diarization failed)
+        for segment in segments {
+            #expect(segment.machineSpeakerId == nil,
+                    "Segments should have nil speakerId when diarization fails")
+        }
+    }
+
+    // ─── Retry with Speaker Enrichment ────────────────────────────────
+
+    /// Retry success enriches segments with speaker IDs and ends in .processed.
+    @Test func retrySuccessEnrichesWithSpeakerIds() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let dbQueue = try makeDatabase(configuration: .inMemory)
+        let databaseClient = DatabaseClient.live(dbQueue: dbQueue)
+
+        // Create a failed session with audio file
+        let audioPath = tempDir.appendingPathComponent("retry-session.caf")
+        try Data("mock audio data".utf8).write(to: audioPath)
+
+        let sessionId = "retry-session-001"
+        let failedSession = SessionRecord(
+            id: sessionId,
+            startedAt: Date(timeIntervalSince1970: 500),
+            endedAt: Date(timeIntervalSince1970: 600),
+            audioPath: audioPath.path,
+            processingState: .failed,
+            speakerCount: 0,
+            updatedAt: Date(timeIntervalSince1970: 600),
+            processingError: "Previous offline transcription failed"
+        )
+        try await databaseClient.createSession(failedSession)
+
+        // Insert a stale live segment (should be replaced by retry)
+        let staleSegment = TranscriptSegmentRecord(
+            id: "stale-seg-001",
+            sessionId: sessionId,
+            startMs: 0,
+            endMs: 1000,
+            machineSpeakerId: nil,
+            text: "Old live segment",
+            isFinal: true,
+            createdAt: Date(timeIntervalSince1970: 500),
+            updatedAt: Date(timeIntervalSince1970: 500)
+        )
+        try await databaseClient.createTranscriptSegment(staleSegment)
+
+        // Mock: both ASR and diarization succeed
+        let fluidAudioClient = MockFluidAudioClient.client(
+            script: .twoSpeakerConversation,
+            offlineBehavior: .success,
+            diarizationBehavior: .twoSpeakerDefault
+        )
+
+        let processor = withDependencies {
+            $0.audioCaptureClient = makeMockAudioCapture()
+            $0.audioFileWriterClient = makeMockFileWriter(writtenFile: WrittenFile())
+            $0.audioSessionClient = makeMockAudioSession()
+            $0.fluidAudioClient = fluidAudioClient
+            $0.databaseClient = databaseClient
+            $0.preferencesClient = PreferencesClient(
+                getAudioRetentionMode: { .both },
+                setAudioRetentionMode: { _ in }
+            )
+            $0.titleGeneratorClient = TitleGeneratorClient(generateTitle: { _ in nil }, isAvailable: { false })
+            $0.uuid = .incrementing
+            $0.date = .constant(Date(timeIntervalSince1970: 1000))
+        } operation: {
+            RecordingProcessor()
+        }
+
+        let result = try await processor.retryOfflineTranscription(sessionId: SessionID(rawValue: sessionId))
+
+        // ASSERT: retry succeeded
+        #expect(result == true, "Retry should succeed")
+
+        // ASSERT: session is .processed
+        let session = try await databaseClient.fetchSession(SessionID(rawValue: sessionId))
+        #expect(session?.processingState == .processed)
+        #expect(session?.processingError == nil, "Error should be cleared after successful retry")
+
+        // ASSERT: segments have speaker IDs from enrichment
+        let segments = try await databaseClient.fetchTranscriptSegments(SessionID(rawValue: sessionId))
+        #expect(!segments.isEmpty, "Should have transcript segments after retry")
+        let segmentsWithSpeaker = segments.filter { $0.machineSpeakerId != nil }
+        #expect(!segmentsWithSpeaker.isEmpty,
+                "At least some segments should have speaker IDs after retry enrichment")
+
+        // ASSERT: old stale segment was replaced
+        let staleFound = segments.contains { $0.text == "Old live segment" }
+        #expect(!staleFound, "Old live segment should be replaced by retry results")
+
+        // ASSERT: speaker tracks created
+        let tracks = try await databaseClient.fetchSpeakerTracks(SessionID(rawValue: sessionId))
+        #expect(!tracks.isEmpty, "Speaker tracks should be created from diarization")
+
+        // ASSERT: session speakerCount > 0
+        #expect(session?.speakerCount ?? 0 > 0, "Speaker count should reflect enriched speakers")
+    }
+
+    /// Retry with diarization failure preserves transcript text, ends in .processed.
+    @Test func retryDiarizationFailurePreservesTranscript() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let dbQueue = try makeDatabase(configuration: .inMemory)
+        let databaseClient = DatabaseClient.live(dbQueue: dbQueue)
+
+        // Create a partial session with audio file
+        let audioPath = tempDir.appendingPathComponent("retry-diarize-fail.caf")
+        try Data("mock audio data".utf8).write(to: audioPath)
+
+        let sessionId = "retry-diarize-fail-001"
+        let partialSession = SessionRecord(
+            id: sessionId,
+            startedAt: Date(timeIntervalSince1970: 500),
+            endedAt: Date(timeIntervalSince1970: 600),
+            audioPath: audioPath.path,
+            processingState: .partial,
+            speakerCount: 0,
+            updatedAt: Date(timeIntervalSince1970: 600),
+            processingError: "Previous attempt failed"
+        )
+        try await databaseClient.createSession(partialSession)
+
+        // Mock: ASR succeeds but diarization fails
+        let fluidAudioClient = MockFluidAudioClient.client(
+            script: .twoSpeakerConversation,
+            offlineBehavior: .success,
+            diarizationBehavior: .failure("Diarization model unavailable")
+        )
+
+        let processor = withDependencies {
+            $0.audioCaptureClient = makeMockAudioCapture()
+            $0.audioFileWriterClient = makeMockFileWriter(writtenFile: WrittenFile())
+            $0.audioSessionClient = makeMockAudioSession()
+            $0.fluidAudioClient = fluidAudioClient
+            $0.databaseClient = databaseClient
+            $0.preferencesClient = PreferencesClient(
+                getAudioRetentionMode: { .both },
+                setAudioRetentionMode: { _ in }
+            )
+            $0.titleGeneratorClient = TitleGeneratorClient(generateTitle: { _ in nil }, isAvailable: { false })
+            $0.uuid = .incrementing
+            $0.date = .constant(Date(timeIntervalSince1970: 1000))
+        } operation: {
+            RecordingProcessor()
+        }
+
+        let result = try await processor.retryOfflineTranscription(sessionId: SessionID(rawValue: sessionId))
+
+        // ASSERT: retry succeeded (ASR worked, diarization failure is non-fatal)
+        #expect(result == true, "Retry should succeed even when diarization fails")
+
+        // ASSERT: session is .processed
+        let session = try await databaseClient.fetchSession(SessionID(rawValue: sessionId))
+        #expect(session?.processingState == .processed)
+
+        // ASSERT: transcript segments preserved with text (invariant I3)
+        let segments = try await databaseClient.fetchTranscriptSegments(SessionID(rawValue: sessionId))
+        #expect(!segments.isEmpty, "Transcript segments must be present after retry")
+        let texts = segments.map(\.text)
+        #expect(texts.contains(where: { !$0.isEmpty }),
+                "Segments should have non-empty text")
+
+        // ASSERT: segments have nil speakerId (diarization failed)
+        for segment in segments {
+            #expect(segment.machineSpeakerId == nil,
+                    "Segments should have nil speakerId when diarization fails during retry")
+        }
+
+        // ASSERT: session speakerCount is 0 (no speakers assigned)
+        #expect(session?.speakerCount == 0,
+                "Speaker count should be 0 when diarization fails")
+    }
+
     // ─── Retry Policy ──────────────────────────────────────────────────
 
     /// Policy: retry is not available when audioPath is nil (e.g. after transcriptOnly deletion).

@@ -1091,62 +1091,46 @@ public actor RecordingProcessor {
                 return
             }
 
+            // ────────────────────────────────────────────────────────────────
+            // POST-STOP SPEAKER ENRICHMENT
+            //
+            // After ASR transcription succeeds, run full-file diarization to
+            // get stable speaker identities across the entire recording. Map
+            // diarization results onto transcript intervals using overlap-based
+            // assignment. If diarization fails, preserve transcript text without
+            // speaker labels (invariant I3).
+            // ────────────────────────────────────────────────────────────────
+            let enrichedSegments = await enrichSegmentsWithDiarization(
+                segments: segments,
+                audioFileURL: audioFileURL,
+                logPrefix: "[OfflineTranscription]"
+            )
+
             // Only delete existing segments AFTER we successfully got offline segments
             try await databaseClient.deleteTranscriptSegmentsForSession(sessionId)
             NSLog("[OfflineTranscription] Deleted existing transcript segments")
 
-            // Track speakers for this session
-            var offlineSeenSpeakers: Set<String> = []
-
-            // Delete existing speaker tracks and recreate them based on offline results
+            // Delete existing speaker tracks and recreate them based on enriched results
             try await databaseClient.deleteSpeakerTracksForSession(sessionId)
 
-            let now = date.now
-
-            // Insert new segments from offline transcription
-            for segment in segments {
-                // Create speaker track if this is a new speaker
-                if let speakerId = segment.speakerId, !offlineSeenSpeakers.contains(speakerId) {
-                    offlineSeenSpeakers.insert(speakerId)
-                    let displayOrder = offlineSeenSpeakers.count
-                    let trackId = uuid().uuidString
-
-                    let speakerTrack = SpeakerTrackRecord(
-                        id: trackId,
-                        sessionId: sessionId.rawValue,
-                        machineSpeakerId: speakerId,
-                        displayOrder: displayOrder
-                    )
-                    try await databaseClient.createSpeakerTrack(speakerTrack)
-                }
-
-                // Create transcript segment
-                let segmentRecord = TranscriptSegmentRecord(
-                    id: segment.id.rawValue,
-                    sessionId: sessionId.rawValue,
-                    startMs: Int(segment.startMs),
-                    endMs: Int(segment.endMs),
-                    machineSpeakerId: segment.speakerId,
-                    text: segment.text,
-                    isFinal: segment.isFinal,
-                    createdAt: now,
-                    updatedAt: now
-                )
-                try await databaseClient.createTranscriptSegment(segmentRecord)
-            }
-            NSLog("[OfflineTranscription] Inserted \(segments.count) new segments")
+            // Persist enriched segments and build speaker tracks
+            let speakerCount = try await persistEnrichedSegments(
+                enrichedSegments,
+                sessionId: sessionId,
+                logPrefix: "[OfflineTranscription]"
+            )
 
             // Update session to processed state
             if var session = try await databaseClient.fetchSession(sessionId) {
                 // Recompute preview text from offline segments
-                let previewText = segments
+                let previewText = enrichedSegments
                     .filter { $0.isFinal }
                     .prefix(3)
                     .map { $0.text }
                     .joined(separator: " ")
 
                 session.previewText = previewText.isEmpty ? nil : String(previewText.prefix(200))
-                session.speakerCount = offlineSeenSpeakers.count
+                session.speakerCount = speakerCount
                 session.processingState = .processed
                 session.updatedAt = date.now
                 try await databaseClient.updateSession(session)
@@ -1180,6 +1164,154 @@ public actor RecordingProcessor {
                 // Silent failure - recovery routine will clean up
             }
         }
+    }
+
+    // MARK: - Post-Stop Speaker Enrichment Helpers
+
+    /// Enrich ASR transcript segments with full-file diarization speaker IDs.
+    ///
+    /// Runs `diarizeFile` on the audio, then maps speaker segments onto transcript
+    /// intervals using `DiarizationMapping.mapSpeakers`. On diarization failure,
+    /// returns the original segments with `speakerId = nil` (text preserved, I3).
+    ///
+    /// - Parameters:
+    ///   - segments: ASR transcript segments (may already have per-chunk speaker IDs).
+    ///   - audioFileURL: URL to the audio file for full-file diarization.
+    ///   - logPrefix: Log prefix for consistent logging context.
+    /// - Returns: Enriched segments with full-file speaker IDs, or original segments
+    ///   with nil speakers on diarization failure.
+    private func enrichSegmentsWithDiarization(
+        segments: [TranscriptSegment],
+        audioFileURL: URL,
+        logPrefix: String
+    ) async -> [TranscriptSegment] {
+        NSLog("\(logPrefix) Starting post-stop speaker enrichment via full-file diarization...")
+
+        // Attempt full-file diarization
+        let speakerSegments: [DiarizationMapping.SpeakerSegment]
+        do {
+            speakerSegments = try await fluidAudioClient.diarizeFile(audioFileURL)
+            NSLog("\(logPrefix) Diarization returned \(speakerSegments.count) speaker segments")
+        } catch {
+            NSLog("\(logPrefix) Diarization failed: \(error.localizedDescription) — preserving transcript without speaker labels")
+            // Return segments with speakerId stripped (don't trust per-chunk diarization
+            // when full-file diarization was requested but failed)
+            return segments.map { seg in
+                TranscriptSegment(
+                    id: seg.id,
+                    text: seg.text,
+                    startMs: seg.startMs,
+                    endMs: seg.endMs,
+                    speakerId: nil,
+                    isFinal: seg.isFinal
+                )
+            }
+        }
+
+        // If diarization returned no speaker segments, return segments without speaker IDs
+        guard !speakerSegments.isEmpty else {
+            NSLog("\(logPrefix) Diarization returned 0 speaker segments — preserving transcript without speaker labels")
+            return segments.map { seg in
+                TranscriptSegment(
+                    id: seg.id,
+                    text: seg.text,
+                    startMs: seg.startMs,
+                    endMs: seg.endMs,
+                    speakerId: nil,
+                    isFinal: seg.isFinal
+                )
+            }
+        }
+
+        // Build transcript intervals for mapping
+        let intervals = segments.map { seg in
+            DiarizationMapping.TranscriptInterval(
+                id: seg.id,
+                startTimeSeconds: Float(seg.startMs) / 1000.0,
+                endTimeSeconds: Float(seg.endMs) / 1000.0
+            )
+        }
+
+        // Map speakers onto transcript intervals
+        let mappingResult = DiarizationMapping.mapSpeakers(
+            intervals: intervals,
+            speakerSegments: speakerSegments
+        )
+
+        // Build a lookup from interval ID to assigned speaker
+        var speakerByIntervalId: [TranscriptSegmentID: String] = [:]
+        for assignment in mappingResult.assignments {
+            if let speakerId = assignment.speakerId {
+                speakerByIntervalId[assignment.intervalId] = speakerId
+            }
+        }
+
+        // Apply speaker IDs to segments
+        let enrichedSegments = segments.map { seg in
+            TranscriptSegment(
+                id: seg.id,
+                text: seg.text,
+                startMs: seg.startMs,
+                endMs: seg.endMs,
+                speakerId: speakerByIntervalId[seg.id],
+                isFinal: seg.isFinal
+            )
+        }
+
+        let assignedCount = enrichedSegments.filter { $0.speakerId != nil }.count
+        NSLog("\(logPrefix) Speaker enrichment complete: \(assignedCount)/\(enrichedSegments.count) segments assigned speakers")
+
+        return enrichedSegments
+    }
+
+    /// Persist enriched transcript segments and build speaker tracks.
+    ///
+    /// - Parameters:
+    ///   - segments: The enriched transcript segments to persist.
+    ///   - sessionId: The session ID to associate segments with.
+    ///   - logPrefix: Log prefix for consistent logging context.
+    /// - Returns: The number of distinct speakers found.
+    private func persistEnrichedSegments(
+        _ segments: [TranscriptSegment],
+        sessionId: SessionID,
+        logPrefix: String
+    ) async throws -> Int {
+        var seenSpeakers: Set<String> = []
+        let now = date.now
+
+        for segment in segments {
+            // Create speaker track if this is a new speaker
+            if let speakerId = segment.speakerId, !seenSpeakers.contains(speakerId) {
+                seenSpeakers.insert(speakerId)
+                let displayOrder = seenSpeakers.count
+                let trackId = uuid().uuidString
+
+                let speakerTrack = SpeakerTrackRecord(
+                    id: trackId,
+                    sessionId: sessionId.rawValue,
+                    machineSpeakerId: speakerId,
+                    displayOrder: displayOrder
+                )
+                try await databaseClient.createSpeakerTrack(speakerTrack)
+            }
+
+            // Create transcript segment record
+            let segmentRecord = TranscriptSegmentRecord(
+                id: segment.id.rawValue,
+                sessionId: sessionId.rawValue,
+                startMs: Int(segment.startMs),
+                endMs: Int(segment.endMs),
+                machineSpeakerId: segment.speakerId,
+                text: segment.text,
+                isFinal: segment.isFinal,
+                createdAt: now,
+                updatedAt: now
+            )
+            try await databaseClient.createTranscriptSegment(segmentRecord)
+        }
+
+        NSLog("\(logPrefix) Persisted \(segments.count) segments, \(seenSpeakers.count) speakers")
+        return seenSpeakers.count
     }
 
     /// Fork an audio stream into two independent streams
@@ -1288,62 +1420,38 @@ public actor RecordingProcessor {
                 return false
             }
 
+            // Post-stop speaker enrichment (same contract as runOfflineTranscription)
+            let enrichedSegments = await enrichSegmentsWithDiarization(
+                segments: segments,
+                audioFileURL: audioFileURL,
+                logPrefix: "[RetryOfflineTranscription]"
+            )
+
             // Delete existing segments (old live or previous retry)
             try await databaseClient.deleteTranscriptSegmentsForSession(sessionId)
             NSLog("[RetryOfflineTranscription] Deleted existing transcript segments")
 
-            // Track speakers for this session
-            var retrySpeakers: Set<String> = []
-
-            // Delete existing speaker tracks and recreate them based on new results
+            // Delete existing speaker tracks and recreate them based on enriched results
             try await databaseClient.deleteSpeakerTracksForSession(sessionId)
 
-            let now = date.now
-
-            // Insert new segments from offline transcription
-            for segment in segments {
-                // Create speaker track if this is a new speaker
-                if let speakerId = segment.speakerId, !retrySpeakers.contains(speakerId) {
-                    retrySpeakers.insert(speakerId)
-                    let displayOrder = retrySpeakers.count
-                    let trackId = uuid().uuidString
-
-                    let speakerTrack = SpeakerTrackRecord(
-                        id: trackId,
-                        sessionId: sessionId.rawValue,
-                        machineSpeakerId: speakerId,
-                        displayOrder: displayOrder
-                    )
-                    try await databaseClient.createSpeakerTrack(speakerTrack)
-                }
-
-                // Create transcript segment
-                let segmentRecord = TranscriptSegmentRecord(
-                    id: segment.id.rawValue,
-                    sessionId: sessionId.rawValue,
-                    startMs: Int(segment.startMs),
-                    endMs: Int(segment.endMs),
-                    machineSpeakerId: segment.speakerId,
-                    text: segment.text,
-                    isFinal: segment.isFinal,
-                    createdAt: now,
-                    updatedAt: now
-                )
-                try await databaseClient.createTranscriptSegment(segmentRecord)
-            }
-            NSLog("[RetryOfflineTranscription] Inserted \(segments.count) new segments")
+            // Persist enriched segments and build speaker tracks
+            let speakerCount = try await persistEnrichedSegments(
+                enrichedSegments,
+                sessionId: sessionId,
+                logPrefix: "[RetryOfflineTranscription]"
+            )
 
             // Update session to processed state
             if var finalSession = try await databaseClient.fetchSession(sessionId) {
-                // Recompute preview text from offline segments
-                let previewText = segments
+                // Recompute preview text from enriched segments
+                let previewText = enrichedSegments
                     .filter { $0.isFinal }
                     .prefix(3)
                     .map { $0.text }
                     .joined(separator: " ")
 
                 finalSession.previewText = previewText.isEmpty ? nil : String(previewText.prefix(200))
-                finalSession.speakerCount = retrySpeakers.count
+                finalSession.speakerCount = speakerCount
                 finalSession.processingState = .processed
                 finalSession.processingError = nil
                 finalSession.updatedAt = date.now

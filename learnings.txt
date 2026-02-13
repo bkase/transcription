@@ -1368,3 +1368,10 @@
 - SessionRecord init parameter order: updatedAt comes before processingError
 - Package test target can import Persistence transitively but should add it explicitly for clarity
 - For tracking whether a mock closure was called, use a simple actor with a counter (TranscribeTracker pattern)
+
+## Post-stop speaker enrichment orchestration
+- Extract `enrichSegmentsWithDiarization` and `persistEnrichedSegments` as reusable helpers to share between `runOfflineTranscription` and `retryOfflineTranscription`
+- Enrichment flow: ASR transcribeFile -> diarizeFile -> DiarizationMapping.mapSpeakers -> persist enriched segments with speaker IDs
+- On diarization failure, strip speaker IDs from ASR segments (return nil speakerId) to avoid trusting partial per-chunk diarization
+- MockFluidAudioClient supports separate `offlineBehavior` (ASR) and `diarizationBehavior` (diarizeFile) for testing independent success/failure of each
+- Retry tests don't need full recording flow - create session + audio file directly, then call retryOfflineTranscription
