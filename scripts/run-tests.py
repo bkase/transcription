@@ -201,6 +201,7 @@ def main() -> int:
 
     results.append(run_spm_tests(env))
     results.append(run_xcode_tests(env, ["VaporTests", "SnapshotTests"], "unit/snapshot", parallel=True, project_root=project_root))
+    results.append(run_xcode_tests(env, ["ScreenshotCatalog"], "screenshot-catalog", parallel=True, project_root=project_root))
     # E2E tests run serially for now - RecordingE2ETests.testLiveSegmentsAppear has timing issues in parallel
     results.append(run_xcode_tests(env, ["E2ETests"], "e2e", parallel=False, project_root=project_root))
 

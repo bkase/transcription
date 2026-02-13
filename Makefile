@@ -1,4 +1,4 @@
-.PHONY: bootstrap gen test test-slow ci clean help
+.PHONY: bootstrap gen test test-slow ci clean help screenshot-catalog
 
 # Default target
 help:
@@ -12,6 +12,7 @@ help:
 	@echo "  test         - Run all tests with parallel execution (PR gate)"
 	@echo "  test-slow    - Run integration tests with real ML (nightly)"
 	@echo "  ci           - Full CI pipeline (bootstrap -> gen -> test)"
+	@echo "  screenshot-catalog - Generate screenshot catalog"
 	@echo "  clean        - Remove generated files"
 	@echo ""
 	@echo "Before running tests, source your simulator config:"
@@ -104,6 +105,24 @@ _test-speakerpicker:
 
 _test-profile:
 	@cd Packages/Features/ProfileFeature && swift test --quiet 2>&1 | tail -5
+
+# Generate screenshot catalog
+screenshot-catalog: gen
+	@echo "Running screenshot catalog..."
+	@mkdir -p docs/screenshot-catalog/screenshots
+	xcodebuild build-for-testing \
+		-project xcodegen/Vapor.xcodeproj \
+		-scheme ScreenshotCatalog \
+		-derivedDataPath $(AGENT_DERIVED_DATA) \
+		-destination "id=$(AGENT_SIM_UDID)" \
+		-skipMacroValidation -skipPackagePluginValidation -quiet
+	xcodebuild test-without-building \
+		-project xcodegen/Vapor.xcodeproj \
+		-scheme ScreenshotCatalog \
+		-derivedDataPath $(AGENT_DERIVED_DATA) \
+		-destination "id=$(AGENT_SIM_UDID)" \
+		-skipMacroValidation -skipPackagePluginValidation
+	@echo "Catalog: docs/screenshot-catalog/CATALOG.md"
 
 # Run slow integration tests (nightly)
 test-slow: gen
