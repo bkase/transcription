@@ -114,7 +114,7 @@ public actor LiveFluidAudioClientActor {
     /// Start transcription on an audio stream
     public func startTranscription(audioStream: AsyncStream<AudioFrame>) async throws -> AsyncStream<TranscriptSegment> {
         NSLog("[FluidAudio] startTranscription called")
-        guard let asrManager = asrManager else {
+        guard asrManager != nil else {
             NSLog("[FluidAudio] ERROR: ASR not initialized!")
             throw LiveFluidAudioClientError.notInitialized
         }
@@ -343,8 +343,8 @@ public actor LiveFluidAudioClientActor {
 
     private func processChunk() async {
         guard accumulatedSamples.count >= samplesPerChunk else { return }
-        guard let asrManager = asrManager, let diarizerManager = diarizerManager else {
-            NSLog("[FluidAudio] ERROR: managers not available in processChunk")
+        guard let asrManager = asrManager else {
+            NSLog("[FluidAudio] ERROR: ASR manager not available in processChunk")
             return
         }
 
@@ -359,7 +359,7 @@ public actor LiveFluidAudioClientActor {
         NSLog("[FluidAudio] Processing chunk: \(chunkStartMs)-\(chunkEndMs)ms, \(chunkSamples.count) samples")
 
         do {
-            // Run ASR for transcription
+            // Run ASR for transcription (no live diarization - speaker IDs are assigned post-stop)
             NSLog("[FluidAudio] Running ASR transcribe...")
             let asrResult = try await asrManager.transcribe(chunkSamples, source: .microphone)
             let transcriptText = asrResult.text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -370,26 +370,13 @@ public actor LiveFluidAudioClientActor {
                 return
             }
 
-            // Run diarization
-            NSLog("[FluidAudio] Running diarization...")
-            let startTimeSeconds = TimeInterval(chunkStartMs) / 1000.0
-            let diarizationResult = try diarizerManager.performCompleteDiarization(
-                chunkSamples,
-                sampleRate: sampleRate,
-                atTime: startTimeSeconds
-            )
-
-            // Find the dominant speaker for this chunk
-            let speakerId = findDominantSpeaker(in: diarizationResult)
-            NSLog("[FluidAudio] Diarization complete, speaker: \(speakerId ?? "unknown")")
-
-            // Emit segment
+            // Emit segment with nil speakerId - diarization is deferred to post-stop processing
             let segment = TranscriptSegment(
                 id: TranscriptSegmentID(rawValue: uuid().uuidString),
                 text: transcriptText,
                 startMs: chunkStartMs,
                 endMs: chunkEndMs,
-                speakerId: speakerId,
+                speakerId: nil,
                 isFinal: true
             )
 
@@ -403,7 +390,7 @@ public actor LiveFluidAudioClientActor {
 
     private func processRemainingAudio() async {
         guard !accumulatedSamples.isEmpty else { return }
-        guard let asrManager = asrManager, let diarizerManager = diarizerManager else { return }
+        guard let asrManager = asrManager else { return }
 
         let remainingSamples = accumulatedSamples
         accumulatedSamples = []
@@ -418,27 +405,19 @@ public actor LiveFluidAudioClientActor {
 
             guard !transcriptText.isEmpty else { return }
 
-            let startTimeSeconds = TimeInterval(chunkStartMs) / 1000.0
-            let diarizationResult = try diarizerManager.performCompleteDiarization(
-                remainingSamples,
-                sampleRate: sampleRate,
-                atTime: startTimeSeconds
-            )
-
-            let speakerId = findDominantSpeaker(in: diarizationResult)
-
+            // Emit segment with nil speakerId - diarization is deferred to post-stop processing
             let segment = TranscriptSegment(
                 id: TranscriptSegmentID(rawValue: uuid().uuidString),
                 text: transcriptText,
                 startMs: chunkStartMs,
                 endMs: chunkEndMs,
-                speakerId: speakerId,
+                speakerId: nil,
                 isFinal: true
             )
 
             continuation?.yield(segment)
         } catch {
-            print("FluidAudio processing error: \(error)")
+            NSLog("[FluidAudio] processRemainingAudio error: \(error)")
         }
     }
 

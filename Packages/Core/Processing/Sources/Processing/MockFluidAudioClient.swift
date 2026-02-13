@@ -205,6 +205,7 @@ public actor MockFluidAudioClientActor {
     }
 
     /// Start transcription and return a stream of segments
+    /// Live segments are emitted with speakerId=nil (diarization is deferred to post-stop processing)
     public func startTranscription(audioStream: AsyncStream<AudioFrame>) -> AsyncStream<TranscriptSegment> {
         isTranscribing = true
         let segments = self.script.segments
@@ -213,11 +214,20 @@ public actor MockFluidAudioClientActor {
             self.continuation = continuation
 
             Task { [weak self] in
-                // Emit all scripted segments immediately
+                // Emit all scripted segments immediately, but with nil speakerId
+                // (matches production behavior: live segments have no speaker labels)
                 for segment in segments {
                     guard let self else { break }
                     guard await self.getIsTranscribing() else { break }
-                    continuation.yield(segment.toTranscriptSegment())
+                    let liveSegment = TranscriptSegment(
+                        id: segment.id,
+                        text: segment.text,
+                        startMs: segment.startMs,
+                        endMs: segment.endMs,
+                        speakerId: nil,
+                        isFinal: segment.isFinal
+                    )
+                    continuation.yield(liveSegment)
                 }
 
                 // Mark transcription as complete

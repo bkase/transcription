@@ -122,10 +122,16 @@ import Persistence
     #expect(sortedSegments[1].text == "I'm doing well, thank you for asking.")
     #expect(sortedSegments[2].text == "That's great to hear!")
 
-    // VERIFY: Speaker tracks were created
+    // Verify live segments have nil machineSpeakerId (I1 invariant)
+    for segment in sortedSegments {
+        #expect(segment.machineSpeakerId == nil, "Live segment '\(segment.text)' should have nil machineSpeakerId")
+    }
+
+    // Live segments have nil speakerId (diarization deferred to post-stop processing)
+    // so no speaker tracks are created during live recording
     let speakerTracks = try await databaseClient.fetchSpeakerTracks(sessionId)
-    #expect(speakerTracks.count == 2, "Expected 2 speaker tracks, got \(speakerTracks.count)")
-    #expect(session.speakerCount == 2, "Session should have speakerCount = 2")
+    #expect(speakerTracks.count == 0, "Live recording should have no speaker tracks (diarization deferred)")
+    #expect(session.speakerCount == 0, "Live recording should have speakerCount = 0 (diarization deferred)")
 
     // VERIFY: Events were emitted correctly
     #expect(receivedEvents.count >= 4, "Should have at least 4 events")

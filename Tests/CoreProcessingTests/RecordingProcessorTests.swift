@@ -168,7 +168,9 @@ import Persistence
 
     let session = sessions[0]
     #expect(session.processingState == .processed, "Session should be in processed state")
-    #expect(session.speakerCount == 2, "Session should have 2 speakers")
+    // Live segments have nil speakerId (diarization deferred to post-stop processing)
+    // so no speaker tracks are created during live recording
+    #expect(session.speakerCount == 0, "Live recording should have 0 speakers (diarization deferred)")
     #expect(session.durationMs == 7000, "Session duration should be 7000ms")
     #expect(session.previewText != nil, "Session should have preview text")
 
@@ -177,23 +179,14 @@ import Persistence
     let segments = try await databaseClient.fetchTranscriptSegments(sessionId)
     #expect(segments.count == 3, "Should have 3 transcript segments in database")
 
-    // Verify speaker tracks in database
+    // Verify live segments have nil machineSpeakerId (I1 invariant)
+    for segment in segments {
+        #expect(segment.machineSpeakerId == nil, "Live segment '\(segment.text)' should have nil machineSpeakerId")
+    }
+
+    // No speaker tracks during live recording (diarization deferred to post-stop)
     let speakerTracks = try await databaseClient.fetchSpeakerTracks(sessionId)
-    #expect(speakerTracks.count == 2, "Should have 2 speaker tracks in database")
-
-    // Verify speaker tracks have unique display orders (bd-2w89 fix)
-    let displayOrders = Set(speakerTracks.map { $0.displayOrder })
-    #expect(displayOrders.count == 2, "Each speaker track should have a unique displayOrder")
-    #expect(displayOrders.contains(1), "First speaker should have displayOrder 1")
-    #expect(displayOrders.contains(2), "Second speaker should have displayOrder 2")
-
-    // Verify each speaker track maps to correct machine speaker ID
-    let spk0Track = speakerTracks.first { $0.machineSpeakerId == "spk_0" }
-    let spk1Track = speakerTracks.first { $0.machineSpeakerId == "spk_1" }
-    #expect(spk0Track != nil, "Speaker track for spk_0 should exist")
-    #expect(spk1Track != nil, "Speaker track for spk_1 should exist")
-    #expect(spk0Track!.displayOrder == 1, "First speaker (spk_0) should have displayOrder 1")
-    #expect(spk1Track!.displayOrder == 2, "Second speaker (spk_1) should have displayOrder 2")
+    #expect(speakerTracks.count == 0, "Live recording should have no speaker tracks (diarization deferred)")
 }
 
 @Test func testProcessorAlreadyRecordingThrows() async throws {
@@ -1253,11 +1246,20 @@ import Persistence
         prepareModels: { await mockFluidAudioActor.prepareModels() },
         modelStatus: { await mockFluidAudioActor.getModelStatus() },
         startTranscription: { audioStream in
-            // For live transcription, use the original live script
+            // For live transcription, emit segments with nil speakerId
+            // (matches production behavior: diarization deferred to post-stop)
             return AsyncStream { continuation in
                 Task {
                     for segment in liveScript.segments {
-                        continuation.yield(segment.toTranscriptSegment())
+                        let liveSegment = TranscriptSegment(
+                            id: segment.id,
+                            text: segment.text,
+                            startMs: segment.startMs,
+                            endMs: segment.endMs,
+                            speakerId: nil,
+                            isFinal: segment.isFinal
+                        )
+                        continuation.yield(liveSegment)
                     }
                     continuation.finish()
                 }

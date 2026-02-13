@@ -54,12 +54,12 @@ import Models
     // Verify all segments were emitted
     #expect(receivedSegments.count == 3, "Should receive exactly 3 segments")
 
-    // Verify first segment
+    // Verify first segment (live segments have nil speakerId - diarization deferred to post-stop)
     #expect(receivedSegments[0].id.rawValue == "test-seg-1")
     #expect(receivedSegments[0].text == "First segment")
     #expect(receivedSegments[0].startMs == 0)
     #expect(receivedSegments[0].endMs == 1000)
-    #expect(receivedSegments[0].speakerId == "spk_0")
+    #expect(receivedSegments[0].speakerId == nil, "Live segments should have nil speakerId")
     #expect(receivedSegments[0].isFinal == true)
 
     // Verify second segment
@@ -67,12 +67,13 @@ import Models
     #expect(receivedSegments[1].text == "Second segment")
     #expect(receivedSegments[1].startMs == 1500)
     #expect(receivedSegments[1].endMs == 2500)
-    #expect(receivedSegments[1].speakerId == "spk_1")
+    #expect(receivedSegments[1].speakerId == nil, "Live segments should have nil speakerId")
     #expect(receivedSegments[1].isFinal == true)
 
     // Verify third segment (partial)
     #expect(receivedSegments[2].id.rawValue == "test-seg-3")
     #expect(receivedSegments[2].text == "Third segment")
+    #expect(receivedSegments[2].speakerId == nil, "Live segments should have nil speakerId")
     #expect(receivedSegments[2].isFinal == false)
 }
 
@@ -109,10 +110,10 @@ import Models
 
     #expect(receivedSegments.count == 3, "Two speaker conversation should have 3 segments")
 
-    // Verify speaker alternation
-    #expect(receivedSegments[0].speakerId == "spk_0")
-    #expect(receivedSegments[1].speakerId == "spk_1")
-    #expect(receivedSegments[2].speakerId == "spk_0")
+    // Live segments have nil speakerId (diarization deferred to post-stop processing)
+    #expect(receivedSegments[0].speakerId == nil, "Live segments should have nil speakerId")
+    #expect(receivedSegments[1].speakerId == nil, "Live segments should have nil speakerId")
+    #expect(receivedSegments[2].speakerId == nil, "Live segments should have nil speakerId")
 
     // Verify all are final
     #expect(receivedSegments.allSatisfy { $0.isFinal })

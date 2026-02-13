@@ -50,13 +50,13 @@ import Persistence
         startTranscription: { _ in
             await stateTracker.setTranscriptionStarted(true)
             return AsyncStream { continuation in
-                // Emit one segment
+                // Emit one segment (nil speakerId - diarization deferred to post-stop)
                 let segment = TranscriptSegment(
                     id: TranscriptSegmentID(rawValue: "seg-001"),
                     text: "Test segment",
                     startMs: 0,
                     endMs: 1000,
-                    speakerId: "spk_0",
+                    speakerId: nil,
                     isFinal: true
                 )
                 continuation.yield(segment)
