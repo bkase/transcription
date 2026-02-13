@@ -14,6 +14,8 @@ public actor LiveFluidAudioClientActor {
     private var asrManager: AsrManager?
     private var diarizerManager: DiarizerManager?
     private var offlineDiarizerManager: OfflineDiarizerManager?
+    private var isOfflineDiarizerInitializing: Bool = false
+    private var isDiarizerInitializing: Bool = false
     private var isTranscribing: Bool = false
     private var continuation: AsyncStream<TranscriptSegment>.Continuation?
 
@@ -109,6 +111,9 @@ public actor LiveFluidAudioClientActor {
         if let existing = diarizerManager, existing.isAvailable {
             return
         }
+        guard !isDiarizerInitializing else { return }
+        isDiarizerInitializing = true
+        defer { isDiarizerInitializing = false }
         NSLog("[FluidAudio] Lazily initializing diarizer models...")
         let diarizerModels = try await DiarizerModels.downloadIfNeeded()
         let diarizerConfig = DiarizerConfig.default
@@ -120,10 +125,14 @@ public actor LiveFluidAudioClientActor {
 
     /// Initialize offline diarizer models lazily for full-file post-stop diarization.
     /// Uses OfflineDiarizerManager with VBx clustering for higher quality results.
+    /// Guards against actor reentrancy: only one initialization runs at a time.
     private func ensureOfflineDiarizerInitialized() async throws {
         if offlineDiarizerManager != nil {
             return
         }
+        guard !isOfflineDiarizerInitializing else { return }
+        isOfflineDiarizerInitializing = true
+        defer { isOfflineDiarizerInitializing = false }
         NSLog("[FluidAudio] Lazily initializing offline diarizer models...")
         let manager = OfflineDiarizerManager(config: .default)
         try await manager.prepareModels()
