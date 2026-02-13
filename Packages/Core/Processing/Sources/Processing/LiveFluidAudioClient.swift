@@ -13,6 +13,7 @@ public actor LiveFluidAudioClientActor {
 
     private var asrManager: AsrManager?
     private var diarizerManager: DiarizerManager?
+    private var offlineDiarizerManager: OfflineDiarizerManager?
     private var isTranscribing: Bool = false
     private var continuation: AsyncStream<TranscriptSegment>.Continuation?
 
@@ -117,6 +118,52 @@ public actor LiveFluidAudioClientActor {
         NSLog("[FluidAudio] Diarizer initialized (lazy)")
     }
 
+    /// Initialize offline diarizer models lazily for full-file post-stop diarization.
+    /// Uses OfflineDiarizerManager with VBx clustering for higher quality results.
+    private func ensureOfflineDiarizerInitialized() async throws {
+        if offlineDiarizerManager != nil {
+            return
+        }
+        NSLog("[FluidAudio] Lazily initializing offline diarizer models...")
+        let manager = OfflineDiarizerManager(config: .default)
+        try await manager.prepareModels()
+        offlineDiarizerManager = manager
+        NSLog("[FluidAudio] Offline diarizer initialized (lazy)")
+    }
+
+    /// Diarize a complete audio file in a single pass using the offline (VBx) pipeline.
+    /// Returns an array of speaker segments with timing info, suitable for mapping onto transcript segments.
+    /// This is data-oriented: no DB writes occur here.
+    /// - Parameter audioFileURL: URL to the audio file (any format supported by OfflineDiarizerManager)
+    /// - Returns: Array of speaker segments from the full-file diarization
+    /// - Throws: `LiveFluidAudioClientError.diarizationUnavailable` if offline diarizer fails to initialize,
+    ///           or rethrows errors from the diarization pipeline.
+    public func diarizeFile(audioFileURL: URL) async throws -> [DiarizationMapping.SpeakerSegment] {
+        NSLog("[FluidAudio] diarizeFile called for: \(audioFileURL.lastPathComponent)")
+
+        try await ensureOfflineDiarizerInitialized()
+
+        guard let offlineDiarizerManager = offlineDiarizerManager else {
+            NSLog("[FluidAudio] ERROR: Offline diarizer manager not available after lazy init")
+            throw LiveFluidAudioClientError.diarizationUnavailable
+        }
+
+        NSLog("[FluidAudio] diarizeFile: running offline diarization on full file...")
+        let result = try await offlineDiarizerManager.process(audioFileURL)
+        NSLog("[FluidAudio] diarizeFile: diarization complete, \(result.segments.count) segments")
+
+        // Convert FluidAudio TimedSpeakerSegments to our data-oriented SpeakerSegment type
+        let segments = result.segments.map { segment in
+            DiarizationMapping.SpeakerSegment(
+                speakerId: segment.speakerId,
+                startTimeSeconds: segment.startTimeSeconds,
+                endTimeSeconds: segment.endTimeSeconds
+            )
+        }
+
+        return segments
+    }
+
     /// Start transcription on an audio stream
     public func startTranscription(audioStream: AsyncStream<AudioFrame>) async throws -> AsyncStream<TranscriptSegment> {
         NSLog("[FluidAudio] startTranscription called")
@@ -175,6 +222,7 @@ public actor LiveFluidAudioClientActor {
         asrManager?.cleanup()
         asrManager = nil
         diarizerManager = nil
+        offlineDiarizerManager = nil
     }
 
     /// Transcribe an entire audio file (offline processing)
@@ -484,6 +532,12 @@ public struct LiveFluidAudioClient {
                 NSLog("[FluidAudio] Client.transcribeFile: ASR initialized, calling actor (diarizer will init lazily)...")
                 let result = try await actor.transcribeFile(audioFileURL: audioFileURL)
                 NSLog("[FluidAudio] Client.transcribeFile: got \(result.count) segments")
+                return result
+            },
+            diarizeFile: { audioFileURL in
+                NSLog("[FluidAudio] Client.diarizeFile called for: \(audioFileURL.lastPathComponent)")
+                let result = try await actor.diarizeFile(audioFileURL: audioFileURL)
+                NSLog("[FluidAudio] Client.diarizeFile: got \(result.count) speaker segments")
                 return result
             }
         )

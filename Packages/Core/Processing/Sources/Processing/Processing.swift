@@ -65,6 +65,10 @@ public struct FluidAudioClient: Sendable {
     public var isTranscribing: @Sendable () async -> Bool = { false }
     /// Transcribe an entire audio file (offline processing). Returns all segments.
     public var transcribeFile: @Sendable (_ audioFileURL: URL) async throws -> [TranscriptSegment] = { _ in [] }
+    /// Diarize an entire audio file using the offline (VBx) pipeline.
+    /// Returns speaker segments with timing info (no DB writes).
+    /// This runs full-file diarization in a single pass for stable speaker identities.
+    public var diarizeFile: @Sendable (_ audioFileURL: URL) async throws -> [DiarizationMapping.SpeakerSegment] = { _ in [] }
 }
 
 extension FluidAudioClient: DependencyKey {
@@ -77,7 +81,8 @@ extension FluidAudioClient: DependencyKey {
             startTranscription: { _ in AsyncStream { $0.finish() } },
             stopTranscription: { },
             isTranscribing: { false },
-            transcribeFile: { _ in [] }
+            transcribeFile: { _ in [] },
+            diarizeFile: { _ in [] }
         )
     }
 

@@ -1337,3 +1337,13 @@
 - MockFluidAudioClient.asrNotInitialized creates a client where startTranscription throws notInitialized (for testing ASR-missing path)
 - MockFluidAudioClient.asrReadyDiarizerUnavailable creates a client where live works but transcribeFile throws diarizationUnavailable
 - When renaming actor methods, also check Tests/CoreProcessingTests/ (root-level SPM test target) not just Packages/Core/Processing/Tests/
+
+## Full-file diarization API (OfflineDiarizerManager)
+- FluidAudio's OfflineDiarizerManager uses VBx clustering for higher quality diarization (~13.89% DER vs ~17.7% for online)
+- OfflineDiarizerManager.process(url:) handles memory-mapped streaming, format conversion to 16kHz, and chunked processing internally
+- OfflineDiarizerManager.prepareModels() is async and idempotent (downloads/compiles on first call, no-op after)
+- DiarizationResult.segments contains TimedSpeakerSegment with speakerId, startTimeSeconds, endTimeSeconds, qualityScore, embedding
+- For data-oriented API output, convert TimedSpeakerSegment to DiarizationMapping.SpeakerSegment (drops embedding/quality fields)
+- When adding a new closure to @DependencyClient struct, must update all creation sites: liveValue, previewValue, testValue, and all mock factories
+- DiarizationBehavior enum parallels OfflineTranscriptionBehavior for controlling mock diarizeFile behavior in tests
+- OfflineDiarizerManager is a separate class from DiarizerManager - use it for file-level post-stop diarization

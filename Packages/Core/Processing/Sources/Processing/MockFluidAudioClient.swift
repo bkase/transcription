@@ -138,6 +138,42 @@ public enum OfflineTranscriptionBehavior: Sendable {
     case hang
 }
 
+/// Configuration for offline (file) diarization behavior
+public enum DiarizationBehavior: Sendable {
+    /// Return predefined speaker segments
+    case success([DiarizationMapping.SpeakerSegment])
+    /// Return empty array (no speakers detected)
+    case empty
+    /// Throw an error
+    case failure(String)
+    /// Hang indefinitely (for timeout testing)
+    case hang
+}
+
+/// Default two-speaker diarization segments for testing
+extension DiarizationBehavior {
+    /// A default two-speaker diarization result matching twoSpeakerConversation script
+    public static var twoSpeakerDefault: DiarizationBehavior {
+        .success([
+            DiarizationMapping.SpeakerSegment(
+                speakerId: "spk_0",
+                startTimeSeconds: 0.0,
+                endTimeSeconds: 2.5
+            ),
+            DiarizationMapping.SpeakerSegment(
+                speakerId: "spk_1",
+                startTimeSeconds: 2.5,
+                endTimeSeconds: 5.5
+            ),
+            DiarizationMapping.SpeakerSegment(
+                speakerId: "spk_0",
+                startTimeSeconds: 5.5,
+                endTimeSeconds: 7.0
+            ),
+        ])
+    }
+}
+
 /// Actor that manages mock transcription state
 public actor MockFluidAudioClientActor {
     private var script: MockFluidAudioScript
@@ -145,15 +181,18 @@ public actor MockFluidAudioClientActor {
     private var continuation: AsyncStream<TranscriptSegment>.Continuation?
     private var modelState: ModelPreparationState
     private var offlineBehavior: OfflineTranscriptionBehavior
+    private var diarizationBehavior: DiarizationBehavior
 
     public init(
         script: MockFluidAudioScript = .twoSpeakerConversation,
         modelState: ModelPreparationState = .ready,
-        offlineBehavior: OfflineTranscriptionBehavior = .success
+        offlineBehavior: OfflineTranscriptionBehavior = .success,
+        diarizationBehavior: DiarizationBehavior = .twoSpeakerDefault
     ) {
         self.script = script
         self.modelState = modelState
         self.offlineBehavior = offlineBehavior
+        self.diarizationBehavior = diarizationBehavior
     }
 
     /// Update the script to use for the next transcription
@@ -174,6 +213,16 @@ public actor MockFluidAudioClientActor {
     /// Get the offline behavior
     public func getOfflineBehavior() -> OfflineTranscriptionBehavior {
         offlineBehavior
+    }
+
+    /// Update the diarization behavior
+    public func setDiarizationBehavior(_ behavior: DiarizationBehavior) {
+        self.diarizationBehavior = behavior
+    }
+
+    /// Get the diarization behavior
+    public func getDiarizationBehavior() -> DiarizationBehavior {
+        diarizationBehavior
     }
 
     /// Get the script segments
@@ -276,9 +325,15 @@ public struct MockFluidAudioClient {
     public static func client(
         script: MockFluidAudioScript = .twoSpeakerConversation,
         modelState: ModelPreparationState = .ready,
-        offlineBehavior: OfflineTranscriptionBehavior = .success
+        offlineBehavior: OfflineTranscriptionBehavior = .success,
+        diarizationBehavior: DiarizationBehavior = .twoSpeakerDefault
     ) -> FluidAudioClient {
-        let actor = MockFluidAudioClientActor(script: script, modelState: modelState, offlineBehavior: offlineBehavior)
+        let actor = MockFluidAudioClientActor(
+            script: script,
+            modelState: modelState,
+            offlineBehavior: offlineBehavior,
+            diarizationBehavior: diarizationBehavior
+        )
 
         return FluidAudioClient(
             prepareModels: {
@@ -310,6 +365,20 @@ public struct MockFluidAudioClient {
                 case .hang:
                     // Hang indefinitely (for timeout testing)
                     // Sleep for a very long time (effectively forever)
+                    try await Task.sleep(for: .seconds(3600))
+                    return []
+                }
+            },
+            diarizeFile: { _ in
+                let behavior = await actor.getDiarizationBehavior()
+                switch behavior {
+                case .success(let segments):
+                    return segments
+                case .empty:
+                    return []
+                case .failure(let message):
+                    throw MockOfflineTranscriptionError(message: message)
+                case .hang:
                     try await Task.sleep(for: .seconds(3600))
                     return []
                 }
@@ -378,6 +447,9 @@ public struct MockFluidAudioClient {
             isTranscribing: { false },
             transcribeFile: { _ in
                 throw LiveFluidAudioClientError.notInitialized
+            },
+            diarizeFile: { _ in
+                throw LiveFluidAudioClientError.notInitialized
             }
         )
     }
@@ -391,7 +463,8 @@ public struct MockFluidAudioClient {
         let actor = MockFluidAudioClientActor(
             script: script,
             modelState: .ready,
-            offlineBehavior: .failure("Diarization models unavailable")
+            offlineBehavior: .failure("Diarization models unavailable"),
+            diarizationBehavior: .failure("Diarization models unavailable")
         )
         return FluidAudioClient(
             prepareModels: {
@@ -413,7 +486,32 @@ public struct MockFluidAudioClient {
             transcribeFile: { _ in
                 // Diarizer is not available, so offline transcription fails
                 throw LiveFluidAudioClientError.diarizationUnavailable
+            },
+            diarizeFile: { _ in
+                throw LiveFluidAudioClientError.diarizationUnavailable
             }
         )
+    }
+
+    /// Create a FluidAudioClient where diarization fails with an error
+    public static func diarizationFailure(
+        script: MockFluidAudioScript = .twoSpeakerConversation,
+        errorMessage: String = "Mock diarization error"
+    ) -> FluidAudioClient {
+        client(script: script, modelState: .ready, diarizationBehavior: .failure(errorMessage))
+    }
+
+    /// Create a FluidAudioClient where diarization returns empty (no speakers)
+    public static func diarizationEmpty(
+        script: MockFluidAudioScript = .twoSpeakerConversation
+    ) -> FluidAudioClient {
+        client(script: script, modelState: .ready, diarizationBehavior: .empty)
+    }
+
+    /// Create a FluidAudioClient where diarization hangs indefinitely (for timeout testing)
+    public static func diarizationHang(
+        script: MockFluidAudioScript = .twoSpeakerConversation
+    ) -> FluidAudioClient {
+        client(script: script, modelState: .ready, diarizationBehavior: .hang)
     }
 }
