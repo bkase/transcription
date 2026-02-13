@@ -1270,7 +1270,8 @@ import Persistence
         transcribeFile: { _ in
             // Return offline script segments
             offlineScript.segments.map { $0.toTranscriptSegment() }
-        }
+        },
+        diarizeFile: { _ in [] }
     )
 
     let databaseClient = DatabaseClient.live(dbQueue: dbQueue)

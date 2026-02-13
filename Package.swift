@@ -43,7 +43,10 @@ let package = Package(
                 "Persistence",
                 .product(name: "Dependencies", package: "swift-dependencies"),
             ],
-            path: "Tests/CoreProcessingTests"
+            path: "Tests/CoreProcessingTests",
+            resources: [
+                .copy("Fixtures")
+            ]
         ),
     ]
 )

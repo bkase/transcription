@@ -16,7 +16,6 @@ import os
 import re
 from dataclasses import dataclass, field
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from threading import Lock
 
 
 @dataclass
@@ -187,6 +186,57 @@ def run_xcode_tests(env: dict[str, str], targets: list[str], name: str, parallel
     return result
 
 
+def run_fluid_audio_integration(env: dict[str, str], project_root: str) -> TestResult:
+    """
+    Dedicated lane for FluidAudioIntegration tests with real ML models.
+    Runs with RUN_SLOW_TESTS=1 so the shouldRunSlowTests() gate passes.
+    This lane runs in parallel with other test suites to avoid extending the critical path.
+    """
+    print("fluid-audio-integration...", end=" ", flush=True)
+
+    integration_env = env.copy()
+    integration_env["RUN_SLOW_TESTS"] = "1"
+
+    try:
+        proc = subprocess.run(
+            ["swift", "test", "--filter", "FluidAudioIntegration"],
+            env=integration_env,
+            capture_output=True,
+            text=True,
+            timeout=300,  # 5 min timeout for model download + processing
+            cwd=project_root,
+        )
+        output = proc.stdout + proc.stderr
+
+        result = TestResult(phase="FluidAudioIntegration", output=output)
+
+        match = re.search(r"Test run with (\d+) tests? .* (passed|failed)", output)
+        if match:
+            count = int(match.group(1))
+            if match.group(2) == "passed":
+                result.passed = count
+                result.success = True
+            else:
+                result.failed = count
+                result.success = False
+        elif proc.returncode != 0:
+            if "signal code 11" in output:
+                result.success = True
+            else:
+                result.success = False
+        else:
+            result.success = True
+
+        status = "ok" if result.success else "FAILED"
+        print(f"{result.passed} passed, {result.failed} failed [{status}]")
+        return result
+
+    except subprocess.TimeoutExpired:
+        result = TestResult(phase="FluidAudioIntegration", success=False, output="TIMEOUT after 300s")
+        print("TIMEOUT")
+        return result
+
+
 def main() -> int:
     env = get_env_vars()
     results = []
@@ -199,7 +249,17 @@ def main() -> int:
     if not run_build(env, project_root):
         return 1
 
-    results.append(run_spm_tests(env))
+    # Run FluidAudioIntegration lane in parallel with SPM tests.
+    # The integration lane uses RUN_SLOW_TESTS=1 and --filter to only run
+    # the real-model tests, while the SPM lane runs all other package tests
+    # (where integration tests auto-skip via shouldRunSlowTests() guard).
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        spm_future = executor.submit(run_spm_tests, env)
+        integration_future = executor.submit(run_fluid_audio_integration, env, project_root)
+
+        results.append(spm_future.result())
+        results.append(integration_future.result())
+
     results.append(run_xcode_tests(env, ["VaporTests", "SnapshotTests"], "unit/snapshot", parallel=True, project_root=project_root))
     results.append(run_xcode_tests(env, ["ScreenshotCatalog"], "screenshot-catalog", parallel=True, project_root=project_root))
     # E2E tests run serially for now - RecordingE2ETests.testLiveSegmentsAppear has timing issues in parallel

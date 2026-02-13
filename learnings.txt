@@ -1382,3 +1382,10 @@
 - On diarization failure, strip speaker IDs from ASR segments (return nil speakerId) to avoid trusting partial per-chunk diarization
 - MockFluidAudioClient supports separate `offlineBehavior` (ASR) and `diarizationBehavior` (diarizeFile) for testing independent success/failure of each
 - Retry tests don't need full recording flow - create session + audio file directly, then call retryOfflineTranscription
+
+## FluidAudioIntegration test lane
+- `swift test --filter` still builds ALL test targets in the package, so all targets must compile even if you only want to run one
+- When adding a new field to a `@DependencyClient` struct (like `diarizeFile` on `FluidAudioClient`), every manual initializer across all test files must be updated - search all test targets
+- Integration tests gated by `shouldRunSlowTests()` pass cleanly when the env var is unset (guard-return counts as pass)
+- `run-tests.py` can run the integration lane in parallel with SPM tests using `ThreadPoolExecutor` - the integration lane sets `RUN_SLOW_TESTS=1` in its env copy
+- WAV fixture files (~96KB for 3s at 16kHz mono) are small enough to commit; generate with Python `wave` module

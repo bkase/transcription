@@ -71,7 +71,8 @@ import Persistence
             let stopped = await stateTracker.isTranscriptionStopped
             return started && !stopped
         },
-        transcribeFile: { _ in [] }
+        transcribeFile: { _ in [] },
+        diarizeFile: { _ in [] }
     )
 
     // Create database client
