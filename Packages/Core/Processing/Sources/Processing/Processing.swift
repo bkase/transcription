@@ -1034,6 +1034,9 @@ public actor RecordingProcessor {
     /// Timeout for offline transcription (5 minutes)
     private static let offlineTranscriptionTimeout: TimeInterval = 5 * 60
 
+    /// Timeout for full-file diarization (5 minutes)
+    private static let diarizationTimeout: TimeInterval = 5 * 60
+
     /// Run offline transcription on the saved audio file
     /// This provides a higher quality full-pass transcription after recording stops
     private func runOfflineTranscription(sessionId: SessionID, audioFileURL: URL) async {
@@ -1187,10 +1190,23 @@ public actor RecordingProcessor {
     ) async -> [TranscriptSegment] {
         NSLog("\(logPrefix) Starting post-stop speaker enrichment via full-file diarization...")
 
-        // Attempt full-file diarization
+        // Attempt full-file diarization with timeout
         let speakerSegments: [DiarizationMapping.SpeakerSegment]
         do {
-            speakerSegments = try await fluidAudioClient.diarizeFile(audioFileURL)
+            speakerSegments = try await withThrowingTaskGroup(of: [DiarizationMapping.SpeakerSegment].self) { group in
+                group.addTask { [fluidAudioClient] in
+                    try await fluidAudioClient.diarizeFile(audioFileURL)
+                }
+                group.addTask {
+                    try await Task.sleep(for: .seconds(Self.diarizationTimeout))
+                    throw OfflineTranscriptionError.timeout
+                }
+                guard let result = try await group.next() else {
+                    throw OfflineTranscriptionError.timeout
+                }
+                group.cancelAll()
+                return result
+            }
             NSLog("\(logPrefix) Diarization returned \(speakerSegments.count) speaker segments")
         } catch {
             NSLog("\(logPrefix) Diarization failed: \(error.localizedDescription) — preserving transcript without speaker labels")
