@@ -62,8 +62,9 @@ public actor LiveFluidAudioClientActor {
             let asrModels = try await AsrModels.downloadAndLoad(version: .v3)
             NSLog("[FluidAudio] ASR models downloaded, initializing...")
             let asrConfig = ASRConfig.default
-            asrManager = AsrManager(config: asrConfig)
-            try await asrManager?.initialize(models: asrModels)
+            let manager = AsrManager(config: asrConfig)
+            try await manager.initialize(models: asrModels)
+            asrManager = manager
             NSLog("[FluidAudio] ASR initialized")
 
             modelState = .ready
@@ -78,11 +79,12 @@ public actor LiveFluidAudioClientActor {
     /// Diarization models are initialized lazily via ensureDiarizerInitialized().
     /// @deprecated Use prepareModels() instead for async model preparation
     public func initializeASR() async throws {
-        // Initialize ASR only
+        // Initialize ASR only — don't set asrManager until fully initialized
         let asrModels = try await AsrModels.downloadAndLoad(version: .v3)
         let asrConfig = ASRConfig.default
-        asrManager = AsrManager(config: asrConfig)
-        try await asrManager?.initialize(models: asrModels)
+        let manager = AsrManager(config: asrConfig)
+        try await manager.initialize(models: asrModels)
+        asrManager = manager
 
         modelState = .ready
     }
@@ -101,13 +103,17 @@ public actor LiveFluidAudioClientActor {
 
     /// Initialize diarizer models lazily for offline/post-stop processing.
     /// This is separate from ASR so live transcription can start without waiting for diarizer.
+    /// Re-attempts initialization if the diarizer exists but is not available.
     public func ensureDiarizerInitialized() async throws {
-        guard diarizerManager == nil else { return }
+        if let existing = diarizerManager, existing.isAvailable {
+            return
+        }
         NSLog("[FluidAudio] Lazily initializing diarizer models...")
         let diarizerModels = try await DiarizerModels.downloadIfNeeded()
         let diarizerConfig = DiarizerConfig.default
-        diarizerManager = DiarizerManager(config: diarizerConfig)
-        diarizerManager?.initialize(models: diarizerModels)
+        let manager = DiarizerManager(config: diarizerConfig)
+        manager.initialize(models: diarizerModels)
+        diarizerManager = manager
         NSLog("[FluidAudio] Diarizer initialized (lazy)")
     }
 
