@@ -231,11 +231,13 @@ def run_fluid_audio_integration(env: dict[str, str], project_root: str) -> TestR
         else:
             result.success = True
 
-        # Detect platform-skipped tests (tests ran but all skipped due to platform gating)
+        # Detect platform-skipped tests: gated tests print "Skipping real-model test:"
+        # and return early (counting as passed). If we see the skip marker in output,
+        # report that platform gating was active.
         skipped = "Skipping real-model test:" in output
         status = "ok" if result.success else "FAILED"
-        if skipped and result.passed == 0 and result.failed == 0:
-            print(f"skipped (platform gated) [{status}]")
+        if skipped:
+            print(f"{result.passed} passed, {result.failed} failed (platform gated) [{status}]")
         else:
             print(f"{result.passed} passed, {result.failed} failed [{status}]")
         return result
