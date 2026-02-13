@@ -201,8 +201,10 @@ struct EndOnlyDiarizationTests {
             $0.audioSessionClient = makeMockAudioSession()
             $0.fluidAudioClient = fluidAudioClient
             $0.databaseClient = databaseClient
+            // audioOnly mode: skip offline transcription entirely so the test
+            // only verifies live segments (no 5-minute timeout waiting for offline path)
             $0.preferencesClient = PreferencesClient(
-                getAudioRetentionMode: { .both },
+                getAudioRetentionMode: { .audioOnly },
                 setAudioRetentionMode: { _ in }
             )
             $0.titleGeneratorClient = TitleGeneratorClient(generateTitle: { _ in nil }, isAvailable: { false })
@@ -234,8 +236,7 @@ struct EndOnlyDiarizationTests {
                     "I1 violated: live segment in DB has non-nil machineSpeakerId '\(segment.machineSpeakerId ?? "")'")
         }
 
-        // Discard to avoid waiting for offline transcription finalization
-        await processor.discardRecording()
+        await processor.stopRecording()
         collectTask.cancel()
     }
 
