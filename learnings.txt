@@ -222,6 +222,13 @@
 - `[weak self]` in Task closures with actors prevents retain cycles
 - AsyncStream.makeStream() for immediate continuation access within actors
 
+## End-only diarization test strategy
+- To inspect live segments before enrichment, check DB during recording then `discardRecording()` — avoids slow offline transcription finalization
+- Using `.hang` offline behavior blocks for 5 minutes (timeout); use `discardRecording()` instead of `stopRecording()` when you don't need finalization
+- Empty diarization (`.empty`) is a distinct case from failure (`.failure`) — both preserve transcript text but via different code paths
+- Test invariants explicitly: I1 (nil speakerId on live segments), I2 (enrichment populates speakers), I3 (failure preserves text)
+- DiarizeTracker actor pattern: wrap `diarizeFile` closure to count invocations and verify enrichment pipeline is actually called
+
 ## XCUITest with TCA and dependency injection
 - XcodeGen UI test targets use `type: bundle.ui-testing` (not `bundle.unit-test`)
 - Set `TEST_TARGET_NAME: Vapor` instead of `TEST_HOST` for UI tests (no bundle injection)
