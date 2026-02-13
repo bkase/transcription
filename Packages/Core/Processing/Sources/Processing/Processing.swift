@@ -997,20 +997,30 @@ public actor RecordingProcessor {
 
             // Start offline transcription if needed
             if canRunOfflineTranscription, let audioURL = audioFileURL {
-                NSLog("[Finalize] Starting offline transcription...")
-                await runOfflineTranscription(sessionId: sessionId, audioFileURL: audioURL)
-                NSLog("[Finalize] Offline transcription completed")
-
-                // transcriptOnly: delete audio AFTER offline transcription (success or failure)
+                // transcriptOnly: ensure audio cleanup runs even if offline transcription
+                // is interrupted (cancellation, crash recovery handles true process death)
                 if isTranscriptOnly {
-                    NSLog("[Finalize] transcriptOnly mode - deleting audio after offline transcription")
-                    try? FileManager.default.removeItem(at: audioURL)
+                    defer {
+                        NSLog("[Finalize] transcriptOnly mode - deleting audio after offline transcription")
+                        try? FileManager.default.removeItem(at: audioURL)
+                    }
+                    NSLog("[Finalize] Starting offline transcription (transcriptOnly)...")
+                    await runOfflineTranscription(sessionId: sessionId, audioFileURL: audioURL)
+                    NSLog("[Finalize] Offline transcription completed (transcriptOnly)")
+                } else {
+                    NSLog("[Finalize] Starting offline transcription...")
+                    await runOfflineTranscription(sessionId: sessionId, audioFileURL: audioURL)
+                    NSLog("[Finalize] Offline transcription completed")
+                }
+
+                // transcriptOnly: clear audioPath in DB after audio file is deleted
+                if isTranscriptOnly {
                     if var updatedSession = try? await databaseClient.fetchSession(sessionId) {
                         updatedSession.audioPath = nil
                         updatedSession.updatedAt = date.now
                         try? await databaseClient.updateSession(updatedSession)
                     }
-                    NSLog("[Finalize] Audio file deleted and audioPath cleared")
+                    NSLog("[Finalize] audioPath cleared in DB")
                 }
             } else {
                 NSLog("[Finalize] Skipping offline transcription (canRun=%d, hasAudio=%d)", canRunOfflineTranscription ? 1 : 0, audioFileURL != nil ? 1 : 0)
@@ -1476,6 +1486,10 @@ extension RecoveryRoutineClient: DependencyKey {
 
                 // Also recover sessions stuck in transcribing state
                 // Use 6 minutes (360 seconds) as cutoff to account for 5-minute transcription timeout plus buffer
+                // NOTE: transcriptOnly sessions recovered here may still have audio files on disk
+                // if the app was force-killed during offline transcription. Full cleanup requires
+                // per-session retention mode tracking (future work). The finalization path uses
+                // defer to handle non-crash interruptions.
                 let cutoffDate = date.now.addingTimeInterval(-360)
                 let transcriptionRecovered = try await databaseClient.recoverStuckTranscriptions(cutoffDate)
 
