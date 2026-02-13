@@ -7,7 +7,8 @@ import Models
 
 /// Tests for FluidAudioClient live integration
 /// Note: These tests verify the live client can be created and initialized,
-/// but actual transcription requires the ML models which are tested in test-slow.
+/// but actual transcription requires the ML models which are tested in `make test`
+/// (via the dedicated FluidAudioIntegration lane in run-tests.py).
 
 @Test func testLiveClientInitializes() async throws {
     // Create the live client using the factory method

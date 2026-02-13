@@ -1,4 +1,5 @@
-.PHONY: bootstrap gen test test-slow ci clean help screenshot-catalog
+.PHONY: bootstrap gen test test-slow ci clean help
+# test-slow is an optional local debug alias (see below)
 
 # Default target
 help:
@@ -9,11 +10,12 @@ help:
 	@echo "Targets:"
 	@echo "  bootstrap    - Install/build required tools (XcodeGen)"
 	@echo "  gen          - Generate Xcode project and tokens"
-	@echo "  test         - Run all tests with parallel execution (PR gate)"
-	@echo "  test-slow    - Run integration tests with real ML (nightly)"
+	@echo "  test         - Run all tests incl. real-model integration (PR gate)"
 	@echo "  ci           - Full CI pipeline (bootstrap -> gen -> test)"
-	@echo "  screenshot-catalog - Generate screenshot catalog"
 	@echo "  clean        - Remove generated files"
+	@echo ""
+	@echo "Optional:"
+	@echo "  test-slow    - Alias: run only FluidAudio integration lane (local debug)"
 	@echo ""
 	@echo "Before running tests, source your simulator config:"
 	@echo "  source ~/DerivedData/agent-N/sim-config.env && make test"
@@ -106,29 +108,13 @@ _test-speakerpicker:
 _test-profile:
 	@cd Packages/Features/ProfileFeature && swift test --quiet 2>&1 | tail -5
 
-# Generate screenshot catalog
-screenshot-catalog: gen
-	@echo "Running screenshot catalog..."
-	@mkdir -p docs/screenshot-catalog/screenshots
-	xcodebuild build-for-testing \
-		-project xcodegen/Vapor.xcodeproj \
-		-scheme ScreenshotCatalog \
-		-derivedDataPath $(AGENT_DERIVED_DATA) \
-		-destination "id=$(AGENT_SIM_UDID)" \
-		-skipMacroValidation -skipPackagePluginValidation -quiet
-	xcodebuild test-without-building \
-		-project xcodegen/Vapor.xcodeproj \
-		-scheme ScreenshotCatalog \
-		-derivedDataPath $(AGENT_DERIVED_DATA) \
-		-destination "id=$(AGENT_SIM_UDID)" \
-		-skipMacroValidation -skipPackagePluginValidation
-	@echo "Catalog: docs/screenshot-catalog/CATALOG.md"
-
-# Run slow integration tests (nightly)
+# Optional local debug alias: run only the FluidAudio integration lane.
+# The canonical path for all integration coverage is `make test`, which
+# includes real-model tests via run-tests.py's dedicated lane.
 test-slow: gen
-	@echo "Running slow integration tests with FluidAudio ML models..."
+	@echo "Running FluidAudio integration tests (debug alias)..."
 	RUN_SLOW_TESTS=1 swift test --filter FluidAudioIntegration
-	@echo "Slow tests complete."
+	@echo "Integration tests complete."
 
 # Full CI pipeline
 ci: bootstrap gen test

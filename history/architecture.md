@@ -53,7 +53,7 @@ Vapor is a **local-first conversation capture** app. It records real-world audio
 
 * Cloud sync, server accounts, sharing links.
 * Perfect speaker recognition across sessions (we’ll structure for it, but treat as future).
-* Long-running real ML inference inside UI tests (we’ll mock ML in `make test`).
+* Long-running real ML inference inside UI tests (UI tests use mocked ML; real-model integration runs in a separate parallel lane within `make test`).
 
 ---
 
@@ -159,9 +159,9 @@ Vapor/
   * Generates schema docs from migrations
   * Ensures SwiftPM resolution is present/updated (Package.resolved tracked)
 * `make test` *(PR gate)*
-  Runs **unit + snapshot + agentic E2E**, with **mocked ML** and **generated audio**.
-* `make test-slow` *(nightly)*
-  Optional integration suite with real ML on a small input, performance checks.
+  Runs **unit + snapshot + agentic E2E + real-model integration** (FluidAudio lane runs in parallel via `run-tests.py`).
+* `make test-slow` *(optional local debug alias)*
+  Runs only the FluidAudio integration lane directly. Not a separate workflow -- `make test` is the canonical command for all coverage.
 * `make ci`
   Exactly what CI runs locally (bootstrap → gen → fmt → test → docs-check).
 
@@ -420,11 +420,11 @@ Snapshot testing targets **these views** across key states.
    * ML mocked
    * Audio generated (no microphone)
 
-**`make test-slow` (nightly / pre-release)**
+**`make test-slow` (optional local debug alias)**
 
-* Optional integration tests against real FluidAudio on a tiny input
-* Longer UI end-to-end flows
-* Performance budget checks
+* Runs only the FluidAudio integration lane (same tests that `make test` runs via `run-tests.py`)
+* Useful for isolating integration failures without running the full suite
+* Not a separate workflow -- `make test` is the single canonical command
 
 ### 10.2 Unit tests (TCA TestStore)
 
@@ -550,7 +550,7 @@ Export outputs are golden-tested in unit tests (JSON structure snapshots).
 
 * FluidAudioClient live implementation (via SPM) ([GitHub][2])
 * Chunking/streaming policy tuned
-* Nightly `test-slow` integration suite
+* Real-model integration lane in `make test` (via `run-tests.py`)
 
 ### M5 — Search + Export
 
@@ -564,7 +564,7 @@ Export outputs are golden-tested in unit tests (JSON structure snapshots).
 
 * **Swift Package Manager is the standard dependency mechanism**; packages are declared via XcodeGen spec and pinned via `Package.resolved` for reproducibility. ([jessesquires.com][1])
 * **SQLite is the source of truth**; TCA state is UI intent and ephemeral control state.
-* **ML is mocked in `make test`**; audio is **generated** to exercise the recording shell deterministically.
+* **ML is mocked in UI/unit tests**; audio is **generated** to exercise the recording shell deterministically. Real-model integration runs in a dedicated lane within `make test`.
 * **Agentic E2E runs in `make test`**, but kept small and fast.
 * **Typed IDs + explicit state machines** eliminate whole categories of bugs.
 * **Time is injected**; no hidden sleeps; determinism everywhere.

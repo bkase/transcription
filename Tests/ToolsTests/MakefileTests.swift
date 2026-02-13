@@ -7,12 +7,11 @@ import Foundation
 
     let content = try String(contentsOf: makefilePath, encoding: .utf8)
 
-    // Required targets per the architecture
+    // Required targets per the architecture (test-slow is optional debug alias)
     let requiredTargets = [
         "bootstrap",
         "gen",
         "test",
-        "test-slow",
         "ci",
         "clean",
         "help"

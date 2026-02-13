@@ -13,10 +13,13 @@ import Models
 /// explicit reason. Deterministic fallback coverage is provided by dependency-injected
 /// tests in `Packages/Core/Processing`.
 ///
-/// The default `make test` wires up a dedicated lane for these tests via `scripts/run-tests.py`.
-/// When the env var is set, the lane runs in parallel with other test suites.
+/// The canonical command `make test` wires up a dedicated lane for these tests via
+/// `scripts/run-tests.py`, which sets `RUN_SLOW_TESTS=1` and runs them in parallel
+/// with other test suites. There is no separate nightly workflow -- `make test` is the
+/// single path for all integration coverage.
 ///
-/// To run directly: RUN_SLOW_TESTS=1 swift test --filter FluidAudioIntegration
+/// To run only this lane directly: RUN_SLOW_TESTS=1 swift test --filter FluidAudioIntegration
+/// Or use the optional Makefile alias: make test-slow
 
 /// Helper to check if slow tests should run
 private func shouldRunSlowTests() -> Bool {

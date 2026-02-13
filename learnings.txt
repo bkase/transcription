@@ -1397,3 +1397,9 @@
 - The `unsupportedPlatformReason()` pattern is better than a boolean gate because it provides clear diagnostic output in test logs
 - `testFixtureAudioFileExists()` does not need platform gating since it only checks file existence, not ML model behavior
 - `run-tests.py` can detect skipped tests by searching for the skip reason string in output to display "skipped (platform gated)" instead of "0 passed"
+
+## Downgrading test-slow workflow
+- When `run-tests.py` already includes a dedicated FluidAudioIntegration lane in `make test`, the standalone `test-slow` target is redundant as a primary workflow
+- Keep `test-slow` as an optional local debug alias rather than deleting it entirely -- useful for isolating integration lane failures without running the full suite
+- MakefileTests.swift has a `requiredTargets` array that validates Makefile targets; removing test-slow from it requires updating the test
+- history/architecture.md has multiple references to test-slow across different sections (Make targets, Test lanes, Milestones, Key choices) -- must update all of them consistently
