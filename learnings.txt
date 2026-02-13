@@ -1347,3 +1347,13 @@
 - When adding a new closure to @DependencyClient struct, must update all creation sites: liveValue, previewValue, testValue, and all mock factories
 - DiarizationBehavior enum parallels OfflineTranscriptionBehavior for controlling mock diarizeFile behavior in tests
 - OfflineDiarizerManager is a separate class from DiarizerManager - use it for file-level post-stop diarization
+
+## DiarizationMapping pure mapping core
+- Overlap-based speaker mapping: for each transcript interval, sum overlap with each speaker segment, pick speaker with max total overlap
+- Tie-breaking: when speakers have equal overlap, pick lexicographically smallest speaker ID for determinism
+- No-overlap fallback: assign `nil` speaker (callers decide policy)
+- Use generic `TranscriptInterval<ID>` so callers can use their own ID type (String, UUID, TranscriptSegmentID, etc.)
+- Display order assigned by first-appearance in assignment output, not by speaker ID sort
+- `findDominantSpeaker` was updated to use same lexicographic tie-breaking for consistency
+- `computeOverlap` is a public static helper useful on its own for interval arithmetic
+- Swift Testing `@Suite` nesting works well for grouping related test cases in a single file
