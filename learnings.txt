@@ -1389,3 +1389,11 @@
 - Integration tests gated by `shouldRunSlowTests()` pass cleanly when the env var is unset (guard-return counts as pass)
 - `run-tests.py` can run the integration lane in parallel with SPM tests using `ThreadPoolExecutor` - the integration lane sets `RUN_SLOW_TESTS=1` in its env copy
 - WAV fixture files (~96KB for 3s at 16kHz mono) are small enough to commit; generate with Python `wave` module
+
+## Platform gating for real-model integration tests
+- Use Swift conditional compilation `#if targetEnvironment(simulator)` / `#if !os(macOS)` / `#if !arch(arm64)` for compile-time platform gating
+- `TARGET_OS_SIMULATOR` is a C macro and not directly available in Swift scope; use `#if targetEnvironment(simulator)` instead
+- Return a skip reason string (or nil) from a helper function so each test can print an explicit skip message before returning
+- The `unsupportedPlatformReason()` pattern is better than a boolean gate because it provides clear diagnostic output in test logs
+- `testFixtureAudioFileExists()` does not need platform gating since it only checks file existence, not ML model behavior
+- `run-tests.py` can detect skipped tests by searching for the skip reason string in output to display "skipped (platform gated)" instead of "0 passed"

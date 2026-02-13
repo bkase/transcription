@@ -8,6 +8,11 @@ import Models
 /// Integration tests that use the real FluidAudio ML models.
 /// These tests are gated behind `RUN_SLOW_TESTS=1` because they require ML model download.
 ///
+/// **Platform gating**: Real-model tests are authoritative on Apple Silicon macOS hosts.
+/// On unsupported platforms (iOS simulators, Intel Macs, Linux) the tests skip with an
+/// explicit reason. Deterministic fallback coverage is provided by dependency-injected
+/// tests in `Packages/Core/Processing`.
+///
 /// The default `make test` wires up a dedicated lane for these tests via `scripts/run-tests.py`.
 /// When the env var is set, the lane runs in parallel with other test suites.
 ///
@@ -16,6 +21,25 @@ import Models
 /// Helper to check if slow tests should run
 private func shouldRunSlowTests() -> Bool {
     ProcessInfo.processInfo.environment["RUN_SLOW_TESTS"] == "1"
+}
+
+/// Check platform support and return a skip reason if unsupported, or nil if the
+/// current environment is authoritative (Apple Silicon macOS host).
+///
+/// Compile-time checks via conditional compilation:
+/// - `targetEnvironment(simulator)`: excludes iOS simulator processes
+/// - `os(macOS)`: excludes iOS, Linux, etc.
+/// - `arch(arm64)`: excludes Intel Macs where CoreML / FluidAudio models may behave differently
+private func unsupportedPlatformReason() -> String? {
+    #if targetEnvironment(simulator)
+    return "Skipping real-model test: running inside simulator environment"
+    #elseif !os(macOS)
+    return "Skipping real-model test: not running on macOS (current platform is iOS or other)"
+    #elseif !arch(arm64)
+    return "Skipping real-model test: not running on Apple Silicon (arch is not arm64)"
+    #else
+    return nil
+    #endif
 }
 
 /// Load the committed fixture WAV file from bundle resources.
@@ -30,6 +54,13 @@ private func fixtureURL(named filename: String) -> URL? {
 func testRealModelProcessesFixtureAudio() async throws {
     guard shouldRunSlowTests() else {
         // Skip test when not running slow tests
+        return
+    }
+
+    if let reason = unsupportedPlatformReason() {
+        // Unsupported environment: skip with explicit reason.
+        // Deterministic coverage is provided by Packages/Core/Processing tests.
+        print("[FluidAudioIntegration] \(reason)")
         return
     }
 
@@ -59,6 +90,11 @@ func testRealModelProcessesFixtureAudio() async throws {
 @Test
 func testRealModelProducesSegmentFromStream() async throws {
     guard shouldRunSlowTests() else {
+        return
+    }
+
+    if let reason = unsupportedPlatformReason() {
+        print("[FluidAudioIntegration] \(reason)")
         return
     }
 
@@ -132,6 +168,11 @@ func testRealModelProducesSegmentFromStream() async throws {
 @Test
 func testLiveClientModelInitialization() async throws {
     guard shouldRunSlowTests() else {
+        return
+    }
+
+    if let reason = unsupportedPlatformReason() {
+        print("[FluidAudioIntegration] \(reason)")
         return
     }
 

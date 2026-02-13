@@ -191,6 +191,10 @@ def run_fluid_audio_integration(env: dict[str, str], project_root: str) -> TestR
     Dedicated lane for FluidAudioIntegration tests with real ML models.
     Runs with RUN_SLOW_TESTS=1 so the shouldRunSlowTests() gate passes.
     This lane runs in parallel with other test suites to avoid extending the critical path.
+
+    Platform gating: Real-model tests gate themselves by platform at runtime.
+    On unsupported environments (simulators, Intel Macs) the tests skip with
+    explicit reasons. The lane still succeeds in that case (0 passed, 0 failed).
     """
     print("fluid-audio-integration...", end=" ", flush=True)
 
@@ -227,8 +231,13 @@ def run_fluid_audio_integration(env: dict[str, str], project_root: str) -> TestR
         else:
             result.success = True
 
+        # Detect platform-skipped tests (tests ran but all skipped due to platform gating)
+        skipped = "Skipping real-model test:" in output
         status = "ok" if result.success else "FAILED"
-        print(f"{result.passed} passed, {result.failed} failed [{status}]")
+        if skipped and result.passed == 0 and result.failed == 0:
+            print(f"skipped (platform gated) [{status}]")
+        else:
+            print(f"{result.passed} passed, {result.failed} failed [{status}]")
         return result
 
     except subprocess.TimeoutExpired:
