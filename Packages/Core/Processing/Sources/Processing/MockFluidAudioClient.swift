@@ -369,7 +369,7 @@ public struct MockFluidAudioClient {
                     return []
                 }
             },
-            diarizeFile: { _ in
+            diarizeFile: { _, _ in
                 let behavior = await actor.getDiarizationBehavior()
                 switch behavior {
                 case .success(let segments):
@@ -448,7 +448,7 @@ public struct MockFluidAudioClient {
             transcribeFile: { _ in
                 throw LiveFluidAudioClientError.notInitialized
             },
-            diarizeFile: { _ in
+            diarizeFile: { _, _ in
                 throw LiveFluidAudioClientError.notInitialized
             }
         )
@@ -487,7 +487,7 @@ public struct MockFluidAudioClient {
                 // Diarizer is not available, so offline transcription fails
                 throw LiveFluidAudioClientError.diarizationUnavailable
             },
-            diarizeFile: { _ in
+            diarizeFile: { _, _ in
                 throw LiveFluidAudioClientError.diarizationUnavailable
             }
         )

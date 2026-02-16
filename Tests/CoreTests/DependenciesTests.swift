@@ -70,12 +70,12 @@ import Dependencies
             stopTranscription: { },
             isTranscribing: { false },
             transcribeFile: { _ in [] },
-            diarizeFile: { _ in [] }
+            diarizeFile: { _, _ in [] }
         )
         deps.recordingProcessorClient = RecordingProcessorClient(
             startRecording: { _ in AsyncStream { _ in } },
             continueRecording: { _, _ in AsyncStream { _ in } },
-            stopRecording: { },
+            stopRecording: { _ in },
             discardRecording: { },
             pauseRecording: { },
             resumeRecording: { },

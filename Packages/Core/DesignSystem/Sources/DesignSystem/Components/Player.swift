@@ -176,15 +176,23 @@ public struct AudioPlayerPreview: View {
 // MARK: - Recording Header
 
 /// Recording header bar with status indicator and timer.
-/// Shows recording dot, "RECORDING" label, and elapsed time.
+/// Shows recording dot, "RECORDING" label, optional pause button, and elapsed time.
 public struct RecordingHeader: View {
     private let elapsedTime: String
+    private let isPaused: Bool
+    private let onPauseResume: (() -> Void)?
 
     /// Breathing animation for the recording dot - uses scale per brand guidelines
     @State private var dotScale: CGFloat = 0.98
 
-    public init(elapsedTime: String) {
+    public init(
+        elapsedTime: String,
+        isPaused: Bool = false,
+        onPauseResume: (() -> Void)? = nil
+    ) {
         self.elapsedTime = elapsedTime
+        self.isPaused = isPaused
+        self.onPauseResume = onPauseResume
     }
 
     public var body: some View {
@@ -192,27 +200,49 @@ public struct RecordingHeader: View {
             // Recording status
             HStack(spacing: 12) {
                 Circle()
-                    .fill(VaporColor.recording)
+                    .fill(isPaused ? VaporColor.sky : VaporColor.recording)
                     .frame(width: 8, height: 8)
                     .scaleEffect(dotScale)
                     .onAppear {
                         startBreathingAnimation()
                     }
 
-                Text("RECORDING")
+                Text(isPaused ? "PAUSED" : "RECORDING")
                     .font(.system(size: 14, weight: .light))
                     .tracking(2)
-                    .foregroundColor(VaporColor.recording)
+                    .foregroundColor(isPaused ? VaporColor.sky : VaporColor.recording)
             }
 
             Spacer()
 
-            // Timer
-            Text(elapsedTime)
-                .font(.system(size: 20, weight: .light))
-                .tracking(2)
-                .foregroundColor(VaporColor.textPrimary)
-                .opacity(0.8)
+            // Right group: pause button + timer
+            HStack(spacing: 12) {
+                if let onPauseResume = onPauseResume {
+                    Button(action: onPauseResume) {
+                        ZStack {
+                            Circle()
+                                .fill(VaporColor.haze)
+                                .frame(width: 32, height: 32)
+                                .overlay(
+                                    Circle()
+                                        .strokeBorder(VaporColor.fog, lineWidth: 1)
+                                )
+
+                            Image(systemName: isPaused ? "play.fill" : "pause")
+                                .font(.system(size: 14, weight: .regular))
+                                .foregroundColor(VaporColor.textSecondary)
+                        }
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .accessibilityIdentifier(isPaused ? "resumeButton" : "pauseButton")
+                }
+
+                Text(elapsedTime)
+                    .font(.system(size: 20, weight: .light))
+                    .tracking(2)
+                    .foregroundColor(VaporColor.textPrimary)
+                    .opacity(isPaused ? 0.5 : 0.8)
+            }
         }
         .padding(.vertical, 16)
         .padding(.horizontal, 24)
@@ -291,11 +321,18 @@ public struct RecordingHeaderPreview: View {
     private let elapsedTime: String
     private let dotScale: CGFloat
     private let status: RecordingHeaderStatus
+    private let showPauseButton: Bool
 
-    public init(elapsedTime: String, dotScale: CGFloat = 1.0, status: RecordingHeaderStatus = .recording) {
+    public init(
+        elapsedTime: String,
+        dotScale: CGFloat = 1.0,
+        status: RecordingHeaderStatus = .recording,
+        showPauseButton: Bool = true
+    ) {
         self.elapsedTime = elapsedTime
         self.dotScale = dotScale
         self.status = status
+        self.showPauseButton = showPauseButton
     }
 
     public var body: some View {
@@ -315,12 +352,30 @@ public struct RecordingHeaderPreview: View {
 
             Spacer()
 
-            // Timer
-            Text(elapsedTime)
-                .font(.system(size: 20, weight: .light))
-                .tracking(2)
-                .foregroundColor(VaporColor.textPrimary)
-                .opacity(status.timerOpacity)
+            // Right group: pause button + timer
+            HStack(spacing: 12) {
+                if showPauseButton {
+                    ZStack {
+                        Circle()
+                            .fill(VaporColor.haze)
+                            .frame(width: 32, height: 32)
+                            .overlay(
+                                Circle()
+                                    .strokeBorder(VaporColor.fog, lineWidth: 1)
+                            )
+
+                        Image(systemName: status == .paused ? "play.fill" : "pause")
+                            .font(.system(size: 14, weight: .regular))
+                            .foregroundColor(VaporColor.textSecondary)
+                    }
+                }
+
+                Text(elapsedTime)
+                    .font(.system(size: 20, weight: .light))
+                    .tracking(2)
+                    .foregroundColor(VaporColor.textPrimary)
+                    .opacity(status.timerOpacity)
+            }
         }
         .padding(.vertical, 16)
         .padding(.horizontal, 24)

@@ -68,7 +68,10 @@ public struct FluidAudioClient: Sendable {
     /// Diarize an entire audio file using the offline (VBx) pipeline.
     /// Returns speaker segments with timing info (no DB writes).
     /// This runs full-file diarization in a single pass for stable speaker identities.
-    public var diarizeFile: @Sendable (_ audioFileURL: URL) async throws -> [DiarizationMapping.SpeakerSegment] = { _ in [] }
+    /// - Parameters:
+    ///   - audioFileURL: URL to the audio file
+    ///   - speakerCount: Number of speakers (nil = auto-detect; 1-3 = exactly N; 4+ = at least N)
+    public var diarizeFile: @Sendable (_ audioFileURL: URL, _ speakerCount: Int?) async throws -> [DiarizationMapping.SpeakerSegment] = { _, _ in [] }
 }
 
 extension FluidAudioClient: DependencyKey {
@@ -82,7 +85,7 @@ extension FluidAudioClient: DependencyKey {
             stopTranscription: { },
             isTranscribing: { false },
             transcribeFile: { _ in [] },
-            diarizeFile: { _ in [] }
+            diarizeFile: { _, _ in [] }
         )
     }
 
@@ -172,7 +175,8 @@ public struct RecordingProcessorClient: Sendable {
     /// - Returns: Stream of recording processor events
     public var continueRecording: @Sendable (_ audioDirectory: URL, _ continuation: ContinuationConfig) async throws -> AsyncStream<RecordingProcessorEvent> = { _, _ in AsyncStream { $0.finish() } }
     /// Stop the current recording session
-    public var stopRecording: @Sendable () async -> Void
+    /// - Parameter speakerCount: Number of speakers selected by user (nil = no selection, use default)
+    public var stopRecording: @Sendable (_ speakerCount: Int?) async -> Void
     /// Discard the current recording session (delete session and audio file)
     public var discardRecording: @Sendable () async -> Void
     /// Pause the current recording session
@@ -203,8 +207,8 @@ extension RecordingProcessorClient: DependencyKey {
             continueRecording: { audioDirectory, continuation in
                 try await processor.continueRecording(audioDirectory: audioDirectory, continuation: continuation)
             },
-            stopRecording: {
-                await processor.stopRecording()
+            stopRecording: { speakerCount in
+                await processor.stopRecording(speakerCount: speakerCount)
             },
             discardRecording: {
                 await processor.discardRecording()
@@ -236,7 +240,7 @@ extension RecordingProcessorClient: DependencyKey {
         Self(
             startRecording: { _ in AsyncStream { $0.finish() } },
             continueRecording: { _, _ in AsyncStream { $0.finish() } },
-            stopRecording: { },
+            stopRecording: { _ in },
             discardRecording: { },
             pauseRecording: { },
             resumeRecording: { },
@@ -511,7 +515,8 @@ public actor RecordingProcessor {
     }
 
     /// Stop the current recording session
-    public func stopRecording() async {
+    /// - Parameter speakerCount: Number of speakers selected by user for offline diarization
+    public func stopRecording(speakerCount: Int? = nil) async {
         guard isRecording else { return }
 
         isRecording = false
@@ -535,7 +540,7 @@ public actor RecordingProcessor {
 
         // Finalize session
         if let sessionId = currentSessionID {
-            await finalizeSession(sessionId, audioFileURL: currentAudioFileURL)
+            await finalizeSession(sessionId, audioFileURL: currentAudioFileURL, speakerCount: speakerCount)
         }
 
         currentSessionID = nil
@@ -847,7 +852,7 @@ public actor RecordingProcessor {
         }
     }
 
-    private func finalizeSession(_ sessionId: SessionID, audioFileURL: URL?) async {
+    private func finalizeSession(_ sessionId: SessionID, audioFileURL: URL?, speakerCount: Int? = nil) async {
         let now = date.now
 
         // Fetch current session
@@ -995,32 +1000,36 @@ public actor RecordingProcessor {
                 )
             }
 
-            // Start offline transcription if needed
+            // Start offline transcription if needed.
+            // Spawn in an unstructured Task so it survives the parent TCA effect
+            // being cancelled when the RecordingFeature store tears down on didFinish.
             if canRunOfflineTranscription, let audioURL = audioFileURL {
-                // transcriptOnly: ensure audio cleanup runs even if offline transcription
-                // is interrupted (cancellation, crash recovery handles true process death)
-                if isTranscriptOnly {
-                    defer {
-                        NSLog("[Finalize] transcriptOnly mode - deleting audio after offline transcription")
-                        try? FileManager.default.removeItem(at: audioURL)
+                Task { [self, isTranscriptOnly, speakerCount] in
+                    // transcriptOnly: ensure audio cleanup runs even if offline transcription
+                    // is interrupted (cancellation, crash recovery handles true process death)
+                    if isTranscriptOnly {
+                        defer {
+                            NSLog("[Finalize] transcriptOnly mode - deleting audio after offline transcription")
+                            try? FileManager.default.removeItem(at: audioURL)
+                        }
+                        NSLog("[Finalize] Starting offline transcription (transcriptOnly)...")
+                        await runOfflineTranscription(sessionId: sessionId, audioFileURL: audioURL, speakerCount: speakerCount)
+                        NSLog("[Finalize] Offline transcription completed (transcriptOnly)")
+                    } else {
+                        NSLog("[Finalize] Starting offline transcription...")
+                        await runOfflineTranscription(sessionId: sessionId, audioFileURL: audioURL, speakerCount: speakerCount)
+                        NSLog("[Finalize] Offline transcription completed")
                     }
-                    NSLog("[Finalize] Starting offline transcription (transcriptOnly)...")
-                    await runOfflineTranscription(sessionId: sessionId, audioFileURL: audioURL)
-                    NSLog("[Finalize] Offline transcription completed (transcriptOnly)")
-                } else {
-                    NSLog("[Finalize] Starting offline transcription...")
-                    await runOfflineTranscription(sessionId: sessionId, audioFileURL: audioURL)
-                    NSLog("[Finalize] Offline transcription completed")
-                }
 
-                // transcriptOnly: clear audioPath in DB after audio file is deleted
-                if isTranscriptOnly {
-                    if var updatedSession = try? await databaseClient.fetchSession(sessionId) {
-                        updatedSession.audioPath = nil
-                        updatedSession.updatedAt = date.now
-                        try? await databaseClient.updateSession(updatedSession)
+                    // transcriptOnly: clear audioPath in DB after audio file is deleted
+                    if isTranscriptOnly {
+                        if var updatedSession = try? await databaseClient.fetchSession(sessionId) {
+                            updatedSession.audioPath = nil
+                            updatedSession.updatedAt = date.now
+                            try? await databaseClient.updateSession(updatedSession)
+                        }
+                        NSLog("[Finalize] audioPath cleared in DB")
                     }
-                    NSLog("[Finalize] audioPath cleared in DB")
                 }
             } else {
                 NSLog("[Finalize] Skipping offline transcription (canRun=%d, hasAudio=%d)", canRunOfflineTranscription ? 1 : 0, audioFileURL != nil ? 1 : 0)
@@ -1039,7 +1048,7 @@ public actor RecordingProcessor {
 
     /// Run offline transcription on the saved audio file
     /// This provides a higher quality full-pass transcription after recording stops
-    private func runOfflineTranscription(sessionId: SessionID, audioFileURL: URL) async {
+    private func runOfflineTranscription(sessionId: SessionID, audioFileURL: URL, speakerCount: Int? = nil) async {
         NSLog("[OfflineTranscription] Starting for session \(sessionId.rawValue)")
         NSLog("[OfflineTranscription] Audio file URL: \(audioFileURL.path)")
 
@@ -1106,6 +1115,7 @@ public actor RecordingProcessor {
             let enrichedSegments = await enrichSegmentsWithDiarization(
                 segments: segments,
                 audioFileURL: audioFileURL,
+                speakerCount: speakerCount,
                 logPrefix: "[OfflineTranscription]"
             )
 
@@ -1186,6 +1196,7 @@ public actor RecordingProcessor {
     private func enrichSegmentsWithDiarization(
         segments: [TranscriptSegment],
         audioFileURL: URL,
+        speakerCount: Int? = nil,
         logPrefix: String
     ) async -> [TranscriptSegment] {
         NSLog("\(logPrefix) Starting post-stop speaker enrichment via full-file diarization...")
@@ -1195,7 +1206,7 @@ public actor RecordingProcessor {
         do {
             speakerSegments = try await withThrowingTaskGroup(of: [DiarizationMapping.SpeakerSegment].self) { group in
                 group.addTask { [fluidAudioClient] in
-                    try await fluidAudioClient.diarizeFile(audioFileURL)
+                    try await fluidAudioClient.diarizeFile(audioFileURL, speakerCount)
                 }
                 group.addTask {
                     try await Task.sleep(for: .seconds(Self.diarizationTimeout))

@@ -127,6 +127,13 @@ public struct RecordingFeature {
         /// Speaker picker modal state
         @Presents public var speakerPicker: SpeakerPickerFeature.State?
 
+        // MARK: - Speaker Setup
+
+        /// Whether the speaker setup accordion is expanded
+        public var speakerSetupExpanded: Bool = false
+        /// Selected speaker count for offline diarization (nil = not yet selected; 1/2/3/4)
+        public var selectedSpeakerCount: Int? = nil
+
         // MARK: - Continuation Mode
 
         /// If set, this recording is a continuation of an existing session
@@ -162,6 +169,8 @@ public struct RecordingFeature {
             transcriptionUnavailableMessage: String? = nil,
             userProfile: UserProfile = .empty,
             speakerPicker: SpeakerPickerFeature.State? = nil,
+            speakerSetupExpanded: Bool = false,
+            selectedSpeakerCount: Int? = nil,
             continuationSessionID: SessionID? = nil,
             timestampOffsetMs: Int = 0
         ) {
@@ -182,6 +191,8 @@ public struct RecordingFeature {
             self.transcriptionUnavailableMessage = transcriptionUnavailableMessage
             self.userProfile = userProfile
             self.speakerPicker = speakerPicker
+            self.speakerSetupExpanded = speakerSetupExpanded
+            self.selectedSpeakerCount = selectedSpeakerCount
             self.continuationSessionID = continuationSessionID
             self.timestampOffsetMs = timestampOffsetMs
         }
@@ -238,6 +249,12 @@ public struct RecordingFeature {
         case speakerLabelTapped(segmentId: TranscriptSegmentID, machineSpeakerId: String?)
         /// Speaker picker modal actions
         case speakerPicker(PresentationAction<SpeakerPickerFeature.Action>)
+        /// Toggle the speaker setup accordion open/closed
+        case toggleSpeakerSetup
+        /// User selected a speaker count (1, 2, 3, or 4)
+        case selectSpeakerCount(Int)
+        /// User tapped Stop & Save (requires selectedSpeakerCount != nil)
+        case stopAndSave
     }
 
     public var body: some ReducerOf<Self> {
@@ -394,7 +411,7 @@ public struct RecordingFeature {
                 return .merge(
                     .cancel(id: CancelID.timer),
                     .run { _ in
-                        await recordingProcessorClient.stopRecording()
+                        await recordingProcessorClient.stopRecording(nil)
                     }
                 )
 
@@ -489,6 +506,8 @@ public struct RecordingFeature {
                     state.sessionID = nil
                     state.liveSegments = []
                     state.speakerTracks = []
+                    state.speakerSetupExpanded = false
+                    state.selectedSpeakerCount = nil
                     state.continuationSessionID = nil
                     state.timestampOffsetMs = 0
                     // Keep elapsedSeconds for display until view navigates away
@@ -509,6 +528,8 @@ public struct RecordingFeature {
                     state.liveSegments = []
                     state.speakerTracks = []
                     state.elapsedSeconds = 0
+                    state.speakerSetupExpanded = false
+                    state.selectedSpeakerCount = nil
                     state.continuationSessionID = nil
                     state.timestampOffsetMs = 0
                     return .merge(
@@ -649,6 +670,29 @@ public struct RecordingFeature {
                 return .run { [preferencesClient] _ in
                     preferencesClient.setAudioRetentionMode(mode)
                 }
+
+            case .toggleSpeakerSetup:
+                state.speakerSetupExpanded.toggle()
+                return .none
+
+            case let .selectSpeakerCount(count):
+                state.selectedSpeakerCount = count
+                return .none
+
+            case .stopAndSave:
+                guard state.isRecording, state.selectedSpeakerCount != nil else { return .none }
+                let speakerCount = state.selectedSpeakerCount
+
+                // Reset setup state
+                state.speakerSetupExpanded = false
+                state.selectedSpeakerCount = nil
+
+                return .merge(
+                    .cancel(id: CancelID.timer),
+                    .run { _ in
+                        await recordingProcessorClient.stopRecording(speakerCount)
+                    }
+                )
 
             case let .speakerLabelTapped(_, machineSpeakerId):
                 // Find the speaker track for this segment

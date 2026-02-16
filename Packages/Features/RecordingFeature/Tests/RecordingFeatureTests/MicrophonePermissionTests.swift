@@ -65,7 +65,7 @@ struct MicrophonePermissionTests {
             $0.recordingProcessorClient.startRecording = { _ in
                 return eventStream
             }
-            $0.recordingProcessorClient.stopRecording = { }
+            $0.recordingProcessorClient.stopRecording = { _ in }
             $0.feedbackClient.playStartSound = { }
             $0.feedbackClient.triggerStartHaptic = { }
         }
@@ -129,7 +129,7 @@ struct MicrophonePermissionTests {
             $0.recordingProcessorClient.startRecording = { _ in
                 return eventStream
             }
-            $0.recordingProcessorClient.stopRecording = { }
+            $0.recordingProcessorClient.stopRecording = { _ in }
             $0.feedbackClient.playStartSound = { }
             $0.feedbackClient.triggerStartHaptic = { }
         }

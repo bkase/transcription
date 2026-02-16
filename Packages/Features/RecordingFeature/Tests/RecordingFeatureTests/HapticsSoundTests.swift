@@ -59,7 +59,7 @@ struct HapticsSoundTests {
             $0.continuousClock = clock
             $0.microphonePermissionClient.getStatus = { .authorized }
             $0.recordingProcessorClient.startRecording = { _ in eventStream }
-            $0.recordingProcessorClient.stopRecording = { }
+            $0.recordingProcessorClient.stopRecording = { _ in }
             $0.feedbackClient.playStartSound = {
                 await tracker.recordStartSound()
             }
@@ -138,7 +138,7 @@ struct HapticsSoundTests {
             $0.continuousClock = clock
             $0.microphonePermissionClient.getStatus = { .authorized }
             $0.recordingProcessorClient.startRecording = { _ in eventStream }
-            $0.recordingProcessorClient.stopRecording = { }
+            $0.recordingProcessorClient.stopRecording = { _ in }
             $0.recordingProcessorClient.discardRecording = { }
             $0.feedbackClient.playStartSound = {
                 await tracker.recordStartSound()

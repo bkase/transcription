@@ -22,7 +22,7 @@ struct DiarizeFileTests {
         )
 
         let dummyURL = URL(fileURLWithPath: "/tmp/test-audio.caf")
-        let result = try await client.diarizeFile(dummyURL)
+        let result = try await client.diarizeFile(dummyURL, nil)
 
         #expect(result.count == 3)
         #expect(result[0].speakerId == "spk_0")
@@ -37,7 +37,7 @@ struct DiarizeFileTests {
         let client = MockFluidAudioClient.twoSpeakerConversation
 
         let dummyURL = URL(fileURLWithPath: "/tmp/test-audio.caf")
-        let result = try await client.diarizeFile(dummyURL)
+        let result = try await client.diarizeFile(dummyURL, nil)
 
         #expect(result.count == 3)
         let speakerIds = Set(result.map(\.speakerId))
@@ -52,7 +52,7 @@ struct DiarizeFileTests {
         let client = MockFluidAudioClient.diarizationEmpty()
 
         let dummyURL = URL(fileURLWithPath: "/tmp/test-audio.caf")
-        let result = try await client.diarizeFile(dummyURL)
+        let result = try await client.diarizeFile(dummyURL, nil)
 
         #expect(result.isEmpty, "Should return empty array when no speakers detected")
     }
@@ -66,7 +66,7 @@ struct DiarizeFileTests {
         let dummyURL = URL(fileURLWithPath: "/tmp/test-audio.caf")
 
         do {
-            _ = try await client.diarizeFile(dummyURL)
+            _ = try await client.diarizeFile(dummyURL, nil)
             Issue.record("Expected diarizeFile to throw on failure")
         } catch let error as MockOfflineTranscriptionError {
             #expect(error.message == errorMessage)
@@ -81,7 +81,7 @@ struct DiarizeFileTests {
         let dummyURL = URL(fileURLWithPath: "/tmp/test-audio.caf")
 
         do {
-            _ = try await client.diarizeFile(dummyURL)
+            _ = try await client.diarizeFile(dummyURL, nil)
             Issue.record("Expected diarizeFile to throw when diarizer is unavailable")
         } catch let error as LiveFluidAudioClientError {
             #expect(error == .diarizationUnavailable)
@@ -96,7 +96,7 @@ struct DiarizeFileTests {
         let dummyURL = URL(fileURLWithPath: "/tmp/test-audio.caf")
 
         do {
-            _ = try await client.diarizeFile(dummyURL)
+            _ = try await client.diarizeFile(dummyURL, nil)
             Issue.record("Expected diarizeFile to throw when not initialized")
         } catch let error as LiveFluidAudioClientError {
             #expect(error == .notInitialized)
@@ -113,7 +113,7 @@ struct DiarizeFileTests {
 
         // Run diarization with a short timeout to test cancellation
         let diarizeTask = Task {
-            try await client.diarizeFile(dummyURL)
+            try await client.diarizeFile(dummyURL, nil)
         }
 
         // Wait briefly then cancel
@@ -142,7 +142,7 @@ struct DiarizeFileTests {
         do {
             _ = try await withThrowingTaskGroup(of: [DiarizationMapping.SpeakerSegment].self) { group in
                 group.addTask {
-                    try await client.diarizeFile(dummyURL)
+                    try await client.diarizeFile(dummyURL, nil)
                 }
                 group.addTask {
                     try await Task.sleep(for: .seconds(timeoutSeconds))
@@ -177,7 +177,7 @@ struct DiarizeFileTests {
         )
 
         let dummyURL = URL(fileURLWithPath: "/tmp/test-audio.caf")
-        let result = try await client.diarizeFile(dummyURL)
+        let result = try await client.diarizeFile(dummyURL, nil)
 
         // Verify the output is the same data-oriented struct type
         #expect(result.count == 2)
@@ -194,6 +194,33 @@ struct DiarizeFileTests {
 
     // MARK: - Integration with Dependency System
 
+    @Test func testDiarizeFileReceivesSpeakerCount() async throws {
+        var capturedSpeakerCount: Int?
+
+        let client = FluidAudioClient(
+            prepareModels: { },
+            modelStatus: { .ready },
+            startTranscription: { _ in AsyncStream { $0.finish() } },
+            stopTranscription: { },
+            isTranscribing: { false },
+            transcribeFile: { _ in [] },
+            diarizeFile: { _, speakerCount in
+                capturedSpeakerCount = speakerCount
+                return []
+            }
+        )
+
+        let dummyURL = URL(fileURLWithPath: "/tmp/test.caf")
+
+        // Call with non-nil speakerCount
+        _ = try await client.diarizeFile(dummyURL, 3)
+        #expect(capturedSpeakerCount == 3, "diarizeFile should receive the speakerCount parameter")
+
+        // Call with nil speakerCount
+        _ = try await client.diarizeFile(dummyURL, nil)
+        #expect(capturedSpeakerCount == nil, "diarizeFile should receive nil when no speaker count specified")
+    }
+
     @Test func testDiarizeFileThroughDependencyInjection() async throws {
         let expectedSegments: [DiarizationMapping.SpeakerSegment] = [
             .init(speakerId: "speaker-A", startTimeSeconds: 0.0, endTimeSeconds: 5.0),
@@ -206,7 +233,7 @@ struct DiarizeFileTests {
         } operation: {
             @Dependency(\.fluidAudioClient) var fluidAudioClient
             let dummyURL = URL(fileURLWithPath: "/tmp/test.caf")
-            return try await fluidAudioClient.diarizeFile(dummyURL)
+            return try await fluidAudioClient.diarizeFile(dummyURL, nil)
         }
 
         #expect(result.count == 1)

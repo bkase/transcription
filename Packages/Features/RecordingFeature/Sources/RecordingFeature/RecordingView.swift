@@ -33,9 +33,19 @@ public struct RecordingView: View {
     private var mainContent: some View {
         VStack(spacing: 0) {
             navHeader
-            RecordingHeader(elapsedTime: formatElapsedTime(store.elapsedSeconds))
+            RecordingHeader(
+                elapsedTime: formatElapsedTime(store.elapsedSeconds),
+                isPaused: store.isPaused,
+                onPauseResume: {
+                    if store.isPaused {
+                        store.send(.resumeRecording)
+                    } else {
+                        store.send(.pauseRecording)
+                    }
+                }
+            )
             contentArea
-            controlsBar
+            speakerSetupCard
         }
         .background(VaporColor.mist)
         .onAppear {
@@ -95,6 +105,17 @@ public struct RecordingView: View {
         HStack {
             NavButton(label: "Back", action: onBack)
             Spacer()
+            if store.isRecording {
+                Button {
+                    store.send(.moreButtonTapped)
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(VaporColor.textSecondary)
+                        .frame(width: 32, height: 32)
+                }
+                .accessibilityIdentifier("moreButton")
+            }
             avatarView
         }
         .padding(.top, 56)
@@ -302,41 +323,234 @@ public struct RecordingView: View {
         return String(format: "%02d:%02d", minutes, seconds)
     }
 
-    // MARK: - Controls Bar
+    // MARK: - Speaker Setup Card
 
-    private var controlsBar: some View {
-        HStack {
-            // Pause/Resume button (left)
-            IconButton(
-                systemName: store.isPaused ? "play.fill" : "pause",
-                style: .transparent,
-                iconColor: VaporColor.sky
-            ) {
-                if store.isPaused {
-                    store.send(.resumeRecording)
-                } else {
-                    store.send(.pauseRecording)
+    private var speakerSetupCard: some View {
+        VStack(spacing: 0) {
+            if store.speakerSetupExpanded {
+                speakerSetupExpanded
+            } else {
+                speakerSetupCollapsed
+            }
+        }
+    }
+
+    private var speakerSetupCollapsed: some View {
+        VStack(spacing: 12) {
+            // "Assign speakers & finish" bar row
+            Button {
+                store.send(.toggleSpeakerSetup)
+            } label: {
+                HStack {
+                    HStack(spacing: 8) {
+                        Image(systemName: "person.2")
+                            .font(.system(size: 16))
+                            .foregroundColor(VaporColor.textSecondary)
+                        Text("Assign speakers & finish")
+                            .font(.system(size: 15, weight: .regular))
+                            .foregroundColor(VaporColor.textPrimary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.up")
+                        .font(.system(size: 14))
+                        .foregroundColor(VaporColor.textTertiary)
                 }
             }
-            .accessibilityIdentifier(store.isPaused ? "resumeButton" : "pauseButton")
+            .buttonStyle(PlainButtonStyle())
+            .accessibilityIdentifier("speakerSetupToggle")
 
-            Spacer()
-
-            // Stop button (center)
-            RecordButton(isRecording: store.isRecording, size: .large) {
-                store.send(.stopRecording)
-            }
-
-            Spacer()
-
-            // More actions button (right)
-            IconButton(systemName: "ellipsis", style: .transparent, iconColor: VaporColor.textSecondary) {
-                store.send(.moreButtonTapped)
-            }
-            .accessibilityIdentifier("moreButton")
+            // Disabled Stop & Save button
+            stopAndSaveButton(enabled: false)
         }
-        .padding(.horizontal, VaporSpacing.xl)
-        .padding(.bottom, VaporSpacing.xl)
+        .padding(.top, 16)
+        .padding(.horizontal, 24)
+        .padding(.bottom, 24)
+        .background(
+            speakerSetupCardBackground
+        )
+    }
+
+    private var speakerSetupExpanded: some View {
+        VStack(spacing: 16) {
+            // "Who's speaking?" title row with chevron-down
+            Button {
+                store.send(.toggleSpeakerSetup)
+            } label: {
+                HStack {
+                    Text("Who's speaking?")
+                        .font(.system(size: 18, weight: .regular))
+                        .foregroundColor(VaporColor.textPrimary)
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 14))
+                        .foregroundColor(VaporColor.textTertiary)
+                }
+            }
+            .buttonStyle(PlainButtonStyle())
+            .accessibilityIdentifier("speakerSetupToggle")
+
+            // Description
+            Text("Pick a count, then tap to name them.")
+                .font(.system(size: 13, weight: .light))
+                .foregroundColor(VaporColor.textSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            // Pill row: [1] [2] [3] [4+]
+            speakerCountPillRow
+
+            // Speaker names section (only when count is selected)
+            if let count = store.selectedSpeakerCount {
+                // Divider
+                Rectangle()
+                    .fill(VaporColor.fog)
+                    .frame(height: 1)
+
+                // Speaker rows
+                speakerNamesSection(count: count)
+            }
+
+            // Stop & Save button
+            stopAndSaveButton(enabled: store.selectedSpeakerCount != nil)
+        }
+        .padding(24)
+        .background(
+            speakerSetupCardBackground
+        )
+    }
+
+    private var speakerCountPillRow: some View {
+        HStack(spacing: 8) {
+            ForEach([1, 2, 3, 4], id: \.self) { count in
+                speakerCountPill(count: count)
+            }
+        }
+    }
+
+    private func speakerCountPill(count: Int) -> some View {
+        let isSelected = store.selectedSpeakerCount == count
+        let label = count == 4 ? "4+" : "\(count)"
+
+        return Button {
+            store.send(.selectSpeakerCount(count))
+        } label: {
+            Text(label)
+                .font(.system(size: 15, weight: isSelected ? .medium : .regular))
+                .foregroundColor(isSelected ? VaporColor.cloud : VaporColor.textSecondary)
+                .frame(maxWidth: .infinity)
+                .frame(height: 40)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(isSelected ? VaporColor.sky : VaporColor.haze)
+                )
+                .overlay(
+                    isSelected ? nil :
+                    RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder(VaporColor.fog, lineWidth: 1)
+                )
+        }
+        .buttonStyle(PlainButtonStyle())
+        .accessibilityIdentifier("speakerCount\(count)")
+    }
+
+    private func speakerNamesSection(count: Int) -> some View {
+        VStack(spacing: 10) {
+            Text("Speakers")
+                .font(.system(size: 12, weight: .regular))
+                .foregroundColor(VaporColor.textSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            ForEach(0..<count, id: \.self) { index in
+                speakerNameRow(index: index)
+            }
+        }
+    }
+
+    private func speakerNameRow(index: Int) -> some View {
+        let color = SpeakerColor.forIndex(index).color
+        let trackForIndex = store.speakerTracks.first { $0.displayOrder == index + 1 }
+        let displayName = trackForIndex?.personName ?? "Speaker \(index + 1)"
+
+        return Button {
+            if let track = trackForIndex,
+               let sessionId = store.sessionID {
+                store.send(.speakerLabelTapped(
+                    segmentId: TranscriptSegmentID("speaker-setup-\(index)"),
+                    machineSpeakerId: track.machineSpeakerId
+                ))
+            }
+        } label: {
+            HStack {
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(color)
+                        .frame(width: 8, height: 8)
+                    Text(displayName)
+                        .font(.system(size: 13, weight: .light))
+                        .foregroundColor(VaporColor.textTertiary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12))
+                    .foregroundColor(VaporColor.textTertiary)
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 38)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(VaporColor.haze)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(VaporColor.fog, lineWidth: 1)
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+        .accessibilityIdentifier("speakerRow\(index)")
+    }
+
+    private func stopAndSaveButton(enabled: Bool) -> some View {
+        Button {
+            store.send(.stopAndSave)
+        } label: {
+            HStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(enabled ? VaporColor.cloud : VaporColor.textTertiary)
+                    .frame(width: 12, height: 12)
+                Text("Stop & Save")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(enabled ? VaporColor.cloud : VaporColor.textTertiary)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 44)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(enabled ? VaporColor.recording : VaporColor.fog)
+            )
+            .opacity(enabled ? 1.0 : 0.5)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .disabled(!enabled)
+        .accessibilityIdentifier("stopAndSaveButton")
+    }
+
+    private var speakerSetupCardBackground: some View {
+        UnevenRoundedRectangle(
+            topLeadingRadius: 16,
+            bottomLeadingRadius: 0,
+            bottomTrailingRadius: 0,
+            topTrailingRadius: 16
+        )
+        .fill(VaporColor.cloud)
+        .overlay(
+            UnevenRoundedRectangle(
+                topLeadingRadius: 16,
+                bottomLeadingRadius: 0,
+                bottomTrailingRadius: 0,
+                topTrailingRadius: 16
+            )
+            .strokeBorder(VaporColor.fog, lineWidth: 1)
+        )
+        .shadow(color: Color(hex: "#2D3748").opacity(0.063), radius: 16, x: 0, y: -4)
     }
 
     // MARK: - Helpers
@@ -369,6 +583,16 @@ public struct LiveSegmentData: Equatable {
     }
 }
 
+/// Speaker setup card state for previews
+public enum SpeakerSetupState: Equatable {
+    /// Accordion collapsed
+    case closed
+    /// Accordion open, no count selected
+    case openUnselected
+    /// Accordion open, count selected
+    case openSelected(Int)
+}
+
 /// Non-interactive preview variant for snapshot testing.
 /// Uses static data instead of Store for deterministic snapshots.
 public struct RecordingViewPreview: View {
@@ -388,19 +612,22 @@ public struct RecordingViewPreview: View {
     private let isPaused: Bool
     private let contentState: ContentState
     private let headerStatus: RecordingHeaderStatus?
+    private let speakerSetup: SpeakerSetupState
 
     public init(
         elapsedTime: String = "00:00",
         isRecording: Bool = true,
         isPaused: Bool = false,
         contentState: ContentState = .listening,
-        headerStatus: RecordingHeaderStatus? = nil
+        headerStatus: RecordingHeaderStatus? = nil,
+        speakerSetup: SpeakerSetupState = .closed
     ) {
         self.elapsedTime = elapsedTime
         self.isRecording = isRecording
         self.isPaused = isPaused
         self.contentState = contentState
         self.headerStatus = headerStatus
+        self.speakerSetup = speakerSetup
     }
 
     private var effectiveHeaderStatus: RecordingHeaderStatus {
@@ -578,70 +805,176 @@ public struct RecordingViewPreview: View {
                 }
             }
 
-            // Controls bar (non-interactive)
-            HStack {
-                // Pause/Resume button
-                ZStack {
-                    Circle()
-                        .fill(Color.clear)
-                        .frame(width: 40, height: 40)
-
-                    Image(systemName: isPaused ? "play.fill" : "pause")
-                        .font(.system(size: 24, weight: .light))
-                        .foregroundColor(VaporColor.sky)
-                }
-
-                Spacer()
-
-                // Stop button (static, no animation)
-                ZStack {
-                    Circle()
-                        .fill(VaporColor.cloud)
-                        .frame(width: 112, height: 112)
-                        .overlay(
-                            Circle()
-                                .strokeBorder(
-                                    isRecording ? Color(hex: "#FFF5F5") : VaporColor.fog,
-                                    lineWidth: 1
-                                )
-                        )
-                        .shadow(
-                            color: isRecording
-                                ? VaporColor.recording.opacity(0.2)
-                                : Color.black.opacity(0.06),
-                            radius: isRecording ? 24 : 16,
-                            x: 0,
-                            y: 4
-                        )
-
-                    if isRecording {
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(VaporColor.recording.opacity(0.8))
-                            .frame(width: 32, height: 32)
-                    } else {
-                        Circle()
-                            .fill(VaporColor.recording.opacity(0.6))
-                            .frame(width: 16, height: 16)
-                    }
-                }
-
-                Spacer()
-
-                // More actions button
-                ZStack {
-                    Circle()
-                        .fill(Color.clear)
-                        .frame(width: 40, height: 40)
-
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 24, weight: .light))
-                        .foregroundColor(VaporColor.textSecondary)
-                }
-            }
-            .padding(.horizontal, VaporSpacing.xl)
-            .padding(.bottom, VaporSpacing.xl)
+            // Speaker setup card (non-interactive)
+            speakerSetupCardPreview
         }
         .background(VaporColor.mist)
+    }
+
+    @ViewBuilder
+    private var speakerSetupCardPreview: some View {
+        let cardBg = UnevenRoundedRectangle(
+            topLeadingRadius: 16,
+            bottomLeadingRadius: 0,
+            bottomTrailingRadius: 0,
+            topTrailingRadius: 16
+        )
+
+        switch speakerSetup {
+        case .closed:
+            VStack(spacing: 12) {
+                HStack {
+                    HStack(spacing: 8) {
+                        Image(systemName: "person.2")
+                            .font(.system(size: 16))
+                            .foregroundColor(VaporColor.textSecondary)
+                        Text("Assign speakers & finish")
+                            .font(.system(size: 15, weight: .regular))
+                            .foregroundColor(VaporColor.textPrimary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.up")
+                        .font(.system(size: 14))
+                        .foregroundColor(VaporColor.textTertiary)
+                }
+                previewStopButton(enabled: false)
+            }
+            .padding(.top, 16)
+            .padding(.horizontal, 24)
+            .padding(.bottom, 24)
+            .background(
+                cardBg.fill(VaporColor.cloud)
+                    .overlay(cardBg.strokeBorder(VaporColor.fog, lineWidth: 1))
+                    .shadow(color: Color(hex: "#2D3748").opacity(0.063), radius: 16, x: 0, y: -4)
+            )
+
+        case .openUnselected:
+            VStack(spacing: 16) {
+                HStack {
+                    Text("Who's speaking?")
+                        .font(.system(size: 18, weight: .regular))
+                        .foregroundColor(VaporColor.textPrimary)
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 14))
+                        .foregroundColor(VaporColor.textTertiary)
+                }
+                Text("Pick a count, then tap to name them.")
+                    .font(.system(size: 13, weight: .light))
+                    .foregroundColor(VaporColor.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                previewPillRow(selected: nil)
+                previewStopButton(enabled: false)
+            }
+            .padding(24)
+            .background(
+                cardBg.fill(VaporColor.cloud)
+                    .overlay(cardBg.strokeBorder(VaporColor.fog, lineWidth: 1))
+                    .shadow(color: Color(hex: "#2D3748").opacity(0.063), radius: 16, x: 0, y: -4)
+            )
+
+        case .openSelected(let count):
+            VStack(spacing: 16) {
+                HStack {
+                    Text("Who's speaking?")
+                        .font(.system(size: 18, weight: .regular))
+                        .foregroundColor(VaporColor.textPrimary)
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 14))
+                        .foregroundColor(VaporColor.textTertiary)
+                }
+                Text("Pick a count, then tap to name them.")
+                    .font(.system(size: 13, weight: .light))
+                    .foregroundColor(VaporColor.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                previewPillRow(selected: count)
+                Rectangle().fill(VaporColor.fog).frame(height: 1)
+                previewSpeakerNames(count: count)
+                previewStopButton(enabled: true)
+            }
+            .padding(24)
+            .background(
+                cardBg.fill(VaporColor.cloud)
+                    .overlay(cardBg.strokeBorder(VaporColor.fog, lineWidth: 1))
+                    .shadow(color: Color(hex: "#2D3748").opacity(0.063), radius: 16, x: 0, y: -4)
+            )
+        }
+    }
+
+    private func previewPillRow(selected: Int?) -> some View {
+        HStack(spacing: 8) {
+            ForEach([1, 2, 3, 4], id: \.self) { count in
+                let isSelected = selected == count
+                let label = count == 4 ? "4+" : "\(count)"
+                Text(label)
+                    .font(.system(size: 15, weight: isSelected ? .medium : .regular))
+                    .foregroundColor(isSelected ? VaporColor.cloud : VaporColor.textSecondary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 40)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(isSelected ? VaporColor.sky : VaporColor.haze)
+                    )
+                    .overlay(
+                        isSelected ? nil :
+                        RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(VaporColor.fog, lineWidth: 1)
+                    )
+            }
+        }
+    }
+
+    private func previewSpeakerNames(count: Int) -> some View {
+        VStack(spacing: 10) {
+            Text("Speakers")
+                .font(.system(size: 12, weight: .regular))
+                .foregroundColor(VaporColor.textSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            ForEach(0..<count, id: \.self) { index in
+                let color = SpeakerColor.forIndex(index).color
+                HStack {
+                    HStack(spacing: 8) {
+                        Circle().fill(color).frame(width: 8, height: 8)
+                        Text("Speaker \(index + 1)")
+                            .font(.system(size: 13, weight: .light))
+                            .foregroundColor(VaporColor.textTertiary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12))
+                        .foregroundColor(VaporColor.textTertiary)
+                }
+                .padding(.horizontal, 12)
+                .frame(height: 38)
+                .background(
+                    RoundedRectangle(cornerRadius: 10).fill(VaporColor.haze)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(VaporColor.fog, lineWidth: 1)
+                )
+            }
+        }
+    }
+
+    private func previewStopButton(enabled: Bool) -> some View {
+        HStack(spacing: 8) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(enabled ? VaporColor.cloud : VaporColor.textTertiary)
+                .frame(width: 12, height: 12)
+            Text("Stop & Save")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(enabled ? VaporColor.cloud : VaporColor.textTertiary)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 44)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(enabled ? VaporColor.recording : VaporColor.fog)
+        )
+        .opacity(enabled ? 1.0 : 0.5)
     }
 }
 

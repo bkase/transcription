@@ -33,7 +33,7 @@ struct RecordingControlsTests {
             $0.recordingProcessorClient.startRecording = { _ in
                 return eventStream
             }
-            $0.recordingProcessorClient.stopRecording = { }
+            $0.recordingProcessorClient.stopRecording = { _ in }
             $0.recordingProcessorClient.pauseRecording = { }
             $0.recordingProcessorClient.resumeRecording = { }
             $0.feedbackClient.playStartSound = { }
@@ -173,7 +173,7 @@ struct RecordingControlsTests {
             $0.continuousClock = clock
             $0.microphonePermissionClient.getStatus = { .authorized }
             $0.recordingProcessorClient.startRecording = { _ in eventStream }
-            $0.recordingProcessorClient.stopRecording = { }
+            $0.recordingProcessorClient.stopRecording = { _ in }
             $0.recordingProcessorClient.pauseRecording = { }
             $0.feedbackClient.playStartSound = { }
             $0.feedbackClient.playStopSound = { }
@@ -225,5 +225,127 @@ struct RecordingControlsTests {
         }
 
         eventContinuation?.finish()
+    }
+
+    // MARK: - Speaker Setup Tests
+
+    @Test
+    func testSpeakerSetupToggle() async {
+        let store = TestStore(
+            initialState: RecordingFeature.State(isRecording: true)
+        ) {
+            RecordingFeature()
+        }
+
+        #expect(store.state.speakerSetupExpanded == false)
+
+        await store.send(.toggleSpeakerSetup) {
+            $0.speakerSetupExpanded = true
+        }
+
+        await store.send(.toggleSpeakerSetup) {
+            $0.speakerSetupExpanded = false
+        }
+    }
+
+    @Test
+    func testSelectSpeakerCount() async {
+        let store = TestStore(
+            initialState: RecordingFeature.State(isRecording: true)
+        ) {
+            RecordingFeature()
+        }
+
+        #expect(store.state.selectedSpeakerCount == nil)
+
+        await store.send(.selectSpeakerCount(2)) {
+            $0.selectedSpeakerCount = 2
+        }
+
+        // Changing selection replaces previous
+        await store.send(.selectSpeakerCount(3)) {
+            $0.selectedSpeakerCount = 3
+        }
+    }
+
+    @Test
+    func testStopAndSavePassesSpeakerCount() async {
+        let audioDirectory = FileManager.default.temporaryDirectory
+        let mockSessionID = SessionID("test-session-stop-save")
+
+        var eventContinuation: AsyncStream<RecordingProcessorEvent>.Continuation?
+        let eventStream = AsyncStream<RecordingProcessorEvent> { continuation in
+            eventContinuation = continuation
+        }
+
+        let clock = TestClock()
+        var capturedSpeakerCount: Int?
+
+        let store = TestStore(initialState: RecordingFeature.State()) {
+            RecordingFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+            $0.microphonePermissionClient.getStatus = { .authorized }
+            $0.recordingProcessorClient.startRecording = { _ in eventStream }
+            $0.recordingProcessorClient.stopRecording = { count in
+                capturedSpeakerCount = count
+            }
+            $0.feedbackClient.playStartSound = { }
+            $0.feedbackClient.playStopSound = { }
+            $0.feedbackClient.triggerStartHaptic = { }
+            $0.feedbackClient.triggerStopHaptic = { }
+        }
+
+        // Start recording
+        await store.send(.startRecording(audioDirectory: audioDirectory))
+        await store.receive(\.permissionGranted) {
+            $0.isRecording = true
+            $0.audioDirectory = audioDirectory
+        }
+
+        eventContinuation?.yield(.didStart(mockSessionID))
+        await store.receive(\.processorEvent) {
+            $0.sessionID = mockSessionID
+        }
+
+        // Select speaker count and expand setup
+        await store.send(.selectSpeakerCount(2)) {
+            $0.selectedSpeakerCount = 2
+        }
+        await store.send(.toggleSpeakerSetup) {
+            $0.speakerSetupExpanded = true
+        }
+
+        // Stop and save
+        await store.send(.stopAndSave) {
+            $0.speakerSetupExpanded = false
+            $0.selectedSpeakerCount = nil
+        }
+
+        // Verify speaker count was passed through
+        #expect(capturedSpeakerCount == 2)
+
+        // Emit didFinish to clean up
+        eventContinuation?.yield(.didFinish(mockSessionID))
+        await store.receive(\.processorEvent) {
+            $0.isRecording = false
+            $0.isPaused = false
+            $0.isListening = false
+            $0.sessionID = nil
+        }
+
+        eventContinuation?.finish()
+    }
+
+    @Test
+    func testStopAndSaveWithoutSelectionIsIgnored() async {
+        let store = TestStore(
+            initialState: RecordingFeature.State(isRecording: true, selectedSpeakerCount: nil)
+        ) {
+            RecordingFeature()
+        }
+
+        // stopAndSave without a speaker count selection should do nothing
+        await store.send(.stopAndSave)
     }
 }

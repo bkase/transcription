@@ -140,7 +140,7 @@ struct EndOnlyDiarizationTests {
                 let segments = await actor.getScriptSegments()
                 return segments.map { $0.toTranscriptSegment() }
             },
-            diarizeFile: { _ in
+            diarizeFile: { _, _ in
                 let behavior = await actor.getDiarizationBehavior()
                 switch behavior {
                 case .success(let segments): return segments
@@ -593,9 +593,9 @@ struct EndOnlyDiarizationTests {
             stopTranscription: baseClient.stopTranscription,
             isTranscribing: baseClient.isTranscribing,
             transcribeFile: baseClient.transcribeFile,
-            diarizeFile: { url in
+            diarizeFile: { url, speakerCount in
                 await diarizeTracker.increment()
-                return try await baseClient.diarizeFile(url)
+                return try await baseClient.diarizeFile(url, speakerCount)
             }
         )
 
@@ -679,9 +679,9 @@ struct EndOnlyDiarizationTests {
             stopTranscription: baseClient.stopTranscription,
             isTranscribing: baseClient.isTranscribing,
             transcribeFile: baseClient.transcribeFile,
-            diarizeFile: { url in
+            diarizeFile: { url, speakerCount in
                 await diarizeTracker.increment()
-                return try await baseClient.diarizeFile(url)
+                return try await baseClient.diarizeFile(url, speakerCount)
             }
         )
 
@@ -859,9 +859,9 @@ struct EndOnlyDiarizationTests {
             stopTranscription: baseClient.stopTranscription,
             isTranscribing: baseClient.isTranscribing,
             transcribeFile: baseClient.transcribeFile,
-            diarizeFile: { url in
+            diarizeFile: { url, speakerCount in
                 await diarizeTracker.increment()
-                return try await baseClient.diarizeFile(url)
+                return try await baseClient.diarizeFile(url, speakerCount)
             }
         )
 

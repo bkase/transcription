@@ -72,7 +72,7 @@ import Persistence
             return started && !stopped
         },
         transcribeFile: { _ in [] },
-        diarizeFile: { _ in [] }
+        diarizeFile: { _, _ in [] }
     )
 
     // Create database client
@@ -155,7 +155,7 @@ import Persistence
     #expect(transcriptionStarted, "Transcription should have started")
 
     // Stop recording
-    await client.stopRecording()
+    await client.stopRecording(nil)
 
     // Wait for stop to complete
     try await waitUntil("recording stops") {
@@ -252,7 +252,7 @@ import Persistence
     #expect(await client.currentSessionID() != nil)
 
     // Stop recording
-    await client.stopRecording()
+    await client.stopRecording(nil)
 
     // No longer recording
     #expect(await client.isRecording() == false)
@@ -323,7 +323,7 @@ import Persistence
     }
 
     // Clean up
-    await client.stopRecording()
+    await client.stopRecording(nil)
 }
 
 // MARK: - Test Helper

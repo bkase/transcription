@@ -13,8 +13,7 @@ public actor LiveFluidAudioClientActor {
 
     private var asrManager: AsrManager?
     private var diarizerManager: DiarizerManager?
-    private var offlineDiarizerManager: OfflineDiarizerManager?
-    private var isOfflineDiarizerInitializing: Bool = false
+    // offlineDiarizerManager removed: now created per-call in diarizeFile with dynamic speaker config
     private var isDiarizerInitializing: Bool = false
     private var isTranscribing: Bool = false
     private var continuation: AsyncStream<TranscriptSegment>.Continuation?
@@ -127,43 +126,49 @@ public actor LiveFluidAudioClientActor {
         NSLog("[FluidAudio] Diarizer initialized (lazy)")
     }
 
-    /// Initialize offline diarizer models lazily for full-file post-stop diarization.
-    /// Uses OfflineDiarizerManager with VBx clustering for higher quality results.
-    /// Guards against actor reentrancy: only one initialization runs at a time.
-    private func ensureOfflineDiarizerInitialized() async throws {
-        if offlineDiarizerManager != nil {
-            return
-        }
-        guard !isOfflineDiarizerInitializing else { return }
-        isOfflineDiarizerInitializing = true
-        defer { isOfflineDiarizerInitializing = false }
-        NSLog("[FluidAudio] Lazily initializing offline diarizer models...")
-        let manager = OfflineDiarizerManager(config: .default)
-        try await manager.prepareModels()
-        offlineDiarizerManager = manager
-        NSLog("[FluidAudio] Offline diarizer initialized (lazy)")
-    }
-
     /// Diarize a complete audio file in a single pass using the offline (VBx) pipeline.
-    /// Returns an array of speaker segments with timing info, suitable for mapping onto transcript segments.
+    /// Creates a fresh OfflineDiarizerManager per call with the appropriate speaker config.
     /// This is data-oriented: no DB writes occur here.
-    /// - Parameter audioFileURL: URL to the audio file (any format supported by OfflineDiarizerManager)
+    /// - Parameters:
+    ///   - audioFileURL: URL to the audio file (any format supported by OfflineDiarizerManager)
+    ///   - speakerCount: Number of speakers (nil = auto-detect; 1-3 = exactly N; 4+ = at least N)
     /// - Returns: Array of speaker segments from the full-file diarization
     /// - Throws: `LiveFluidAudioClientError.diarizationUnavailable` if offline diarizer fails to initialize,
     ///           or rethrows errors from the diarization pipeline.
-    public func diarizeFile(audioFileURL: URL) async throws -> [DiarizationMapping.SpeakerSegment] {
-        NSLog("[FluidAudio] diarizeFile called for: \(audioFileURL.lastPathComponent)")
+    public func diarizeFile(audioFileURL: URL, speakerCount: Int?) async throws -> [DiarizationMapping.SpeakerSegment] {
+        NSLog("[FluidAudio] diarizeFile called for: \(audioFileURL.lastPathComponent), speakerCount: \(String(describing: speakerCount))")
 
-        try await ensureOfflineDiarizerInitialized()
+        // Build config based on speaker count
+        let config: OfflineDiarizerConfig
+        if let count = speakerCount, count <= 3 {
+            config = OfflineDiarizerConfig.default.withSpeakers(exactly: count)
+            NSLog("[FluidAudio] Using exact speaker count: \(count)")
+        } else if let count = speakerCount {
+            config = OfflineDiarizerConfig.default.withSpeakers(min: count)
+            NSLog("[FluidAudio] Using min speaker count: \(count)")
+        } else {
+            config = .default
+            NSLog("[FluidAudio] Using default speaker config (auto-detect)")
+        }
 
-        guard let offlineDiarizerManager = offlineDiarizerManager else {
-            NSLog("[FluidAudio] ERROR: Offline diarizer manager not available after lazy init")
+        // Create fresh manager per call with the appropriate config
+        let manager = OfflineDiarizerManager(config: config)
+        do {
+            try await manager.prepareModels()
+        } catch {
+            NSLog("[FluidAudio] ERROR: Failed to prepare offline diarizer models: \(error)")
             throw LiveFluidAudioClientError.diarizationUnavailable
         }
 
         NSLog("[FluidAudio] diarizeFile: running offline diarization on full file...")
-        let result = try await offlineDiarizerManager.process(audioFileURL)
+        let result = try await manager.process(audioFileURL)
         NSLog("[FluidAudio] diarizeFile: diarization complete, \(result.segments.count) segments")
+
+        // Log per-speaker distribution for diagnostics
+        let speakerCounts = result.segments.reduce(into: [String: Int]()) { counts, seg in
+            counts[seg.speakerId, default: 0] += 1
+        }
+        NSLog("[FluidAudio] diarizeFile: speaker distribution: \(speakerCounts)")
 
         // Convert FluidAudio TimedSpeakerSegments to our data-oriented SpeakerSegment type
         let segments = result.segments.map { segment in
@@ -237,7 +242,6 @@ public actor LiveFluidAudioClientActor {
         asrManager?.cleanup()
         asrManager = nil
         diarizerManager = nil
-        offlineDiarizerManager = nil
     }
 
     /// Transcribe an entire audio file (offline processing)
@@ -583,9 +587,9 @@ public struct LiveFluidAudioClient {
                 NSLog("[FluidAudio] Client.transcribeFile: got \(result.count) segments")
                 return result
             },
-            diarizeFile: { audioFileURL in
-                NSLog("[FluidAudio] Client.diarizeFile called for: \(audioFileURL.lastPathComponent)")
-                let result = try await actor.diarizeFile(audioFileURL: audioFileURL)
+            diarizeFile: { audioFileURL, speakerCount in
+                NSLog("[FluidAudio] Client.diarizeFile called for: \(audioFileURL.lastPathComponent), speakerCount: \(String(describing: speakerCount))")
+                let result = try await actor.diarizeFile(audioFileURL: audioFileURL, speakerCount: speakerCount)
                 NSLog("[FluidAudio] Client.diarizeFile: got \(result.count) speaker segments")
                 return result
             }
