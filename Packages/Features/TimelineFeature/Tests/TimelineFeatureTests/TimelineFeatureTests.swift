@@ -418,7 +418,7 @@ struct TimelineFeatureTests {
             title: "Session 1",
             previewText: "First session",
             durationMs: 60000,
-            audioPath: "/audio/session-1.caf",
+            audioPath: "/audio/session-1.m4a",
             processingState: .processed,
             speakerCount: 1,
             updatedAt: mockDate
@@ -452,7 +452,7 @@ struct TimelineFeatureTests {
                 deletedSessionId = id
             }
             $0.fileClient.exists = { url in
-                return url.path == "/audio/session-1.caf"
+                return url.path == "/audio/session-1.m4a"
             }
             $0.fileClient.delete = { _ in }
         }

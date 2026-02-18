@@ -909,7 +909,7 @@ public enum VttWriter {
 public enum ExportBundleWriter {
     /// Standard filenames used in export bundles
     public enum BundleFile {
-        public static let audio = "audio.caf"
+        public static let audio = "audio.m4a"
         public static let transcript = "transcript.json"
         public static let markdown = "transcript.md"
         public static let vtt = "transcript.vtt"

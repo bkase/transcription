@@ -819,7 +819,7 @@ import Persistence
     let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("offline-failure-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
     let expectedSessionId = "00000000-0000-0000-0000-000000000000"
-    let expectedAudioPath = tempDir.appendingPathComponent("\(expectedSessionId).caf")
+    let expectedAudioPath = tempDir.appendingPathComponent("\(expectedSessionId).m4a")
 
     // Create dummy audio file so offline transcription is triggered
     FileManager.default.createFile(atPath: expectedAudioPath.path, contents: Data(repeating: 0, count: 1024), attributes: nil)
@@ -936,7 +936,7 @@ import Persistence
 
     // Create a session in failed state with an audio file
     let tempDir = FileManager.default.temporaryDirectory
-    let audioPath = tempDir.appendingPathComponent("retry-test.caf").path
+    let audioPath = tempDir.appendingPathComponent("retry-test.m4a").path
 
     // Create a dummy audio file
     FileManager.default.createFile(atPath: audioPath, contents: Data(repeating: 0, count: 1024), attributes: nil)
@@ -1065,7 +1065,7 @@ import Persistence
     let databaseClient = DatabaseClient.live(dbQueue: dbQueue)
 
     let tempDir = FileManager.default.temporaryDirectory
-    let audioPath = tempDir.appendingPathComponent("processed-test.caf").path
+    let audioPath = tempDir.appendingPathComponent("processed-test.m4a").path
     FileManager.default.createFile(atPath: audioPath, contents: Data(repeating: 0, count: 1024), attributes: nil)
 
     // Create a session that's already processed
@@ -1110,7 +1110,7 @@ import Persistence
         id: "failed-session",
         startedAt: Date(timeIntervalSince1970: 1000),
         endedAt: Date(timeIntervalSince1970: 1100),
-        audioPath: "/tmp/test.caf",
+        audioPath: "/tmp/test.m4a",
         processingState: .failed,
         speakerCount: 0,
         updatedAt: Date(timeIntervalSince1970: 1100)
@@ -1182,7 +1182,7 @@ import Persistence
     let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("offline-success-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
     let expectedSessionId = "00000000-0000-0000-0000-000000000000"
-    let expectedAudioPath = tempDir.appendingPathComponent("\(expectedSessionId).caf")
+    let expectedAudioPath = tempDir.appendingPathComponent("\(expectedSessionId).m4a")
 
     // Create dummy audio file so offline transcription is triggered
     FileManager.default.createFile(atPath: expectedAudioPath.path, contents: Data(repeating: 0, count: 1024), attributes: nil)
@@ -1374,7 +1374,7 @@ import Persistence
         id: "stuck-transcribing-session",
         startedAt: stuckTime,
         endedAt: stuckTime.addingTimeInterval(60),
-        audioPath: "/tmp/stuck.caf",
+        audioPath: "/tmp/stuck.m4a",
         processingState: .transcribing,
         speakerCount: 0,
         updatedAt: stuckTime // Key: updatedAt is old
@@ -1387,7 +1387,7 @@ import Persistence
         id: "recent-transcribing-session",
         startedAt: recentTime,
         endedAt: nil,
-        audioPath: "/tmp/recent.caf",
+        audioPath: "/tmp/recent.m4a",
         processingState: .transcribing,
         speakerCount: 0,
         updatedAt: recentTime // Key: updatedAt is recent

@@ -20,7 +20,7 @@ struct ExportSchemaTests {
         title: "Test Meeting",
         previewText: "Hello, how are you?",
         durationMs: 600000,
-        audioPath: "audio.caf",
+        audioPath: "audio.m4a",
         processingState: .processed,
         speakerCount: 2,
         updatedAt: testDate
@@ -97,7 +97,7 @@ struct ExportSchemaTests {
             segments: Self.testSegmentRecords,
             speakerTracks: Self.testSpeakerTrackRecords,
             people: Self.testPersonRecords,
-            audioPath: "audio.caf"
+            audioPath: "audio.m4a"
         )
 
         // Encode to JSON
@@ -154,7 +154,7 @@ struct ExportSchemaTests {
 
     @Test("ExportSession initializes from SessionRecord correctly")
     func testExportSessionFromRecord() {
-        let exportSession = ExportSession(from: Self.testSessionRecord, audioPath: "custom/audio.caf")
+        let exportSession = ExportSession(from: Self.testSessionRecord, audioPath: "custom/audio.m4a")
 
         #expect(exportSession.id == "session-123")
         #expect(exportSession.startedAt == Self.testDate)
@@ -162,7 +162,7 @@ struct ExportSchemaTests {
         #expect(exportSession.title == "Test Meeting")
         #expect(exportSession.durationMs == 600000)
         #expect(exportSession.speakerCount == 2)
-        #expect(exportSession.audioPath == "custom/audio.caf")
+        #expect(exportSession.audioPath == "custom/audio.m4a")
     }
 
     @Test("ExportSegment initializes from TranscriptSegmentRecord correctly")

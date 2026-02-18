@@ -165,7 +165,7 @@ public let completedSessionRecordGen: Gen<SessionRecord> = zip(
         title: "Meeting \(meetingNum)",
         previewText: previewText,
         durationMs: durationMs,
-        audioPath: "/audio/\(sessionId.rawValue).caf",
+        audioPath: "/audio/\(sessionId.rawValue).m4a",
         processingState: .processed,
         speakerCount: speakerCount,
         updatedAt: endedAt

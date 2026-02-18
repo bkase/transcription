@@ -5,12 +5,12 @@ import Testing
 
 // MARK: - AudioFileWriter Tests
 
-@Test func testWritesAudioFileCAF() async throws {
+@Test func testWritesAudioFileM4A() async throws {
     let writer = LiveAudioFileWriter()
 
     // Create temp file URL
     let tempDir = FileManager.default.temporaryDirectory
-    let fileURL = tempDir.appendingPathComponent("test_\(UUID().uuidString).caf")
+    let fileURL = tempDir.appendingPathComponent("test_\(UUID().uuidString).m4a")
 
     // Cleanup on exit
     defer {
@@ -104,8 +104,8 @@ import Testing
     let writer = LiveAudioFileWriter()
 
     let tempDir = FileManager.default.temporaryDirectory
-    let fileURL1 = tempDir.appendingPathComponent("test1_\(UUID().uuidString).caf")
-    let fileURL2 = tempDir.appendingPathComponent("test2_\(UUID().uuidString).caf")
+    let fileURL1 = tempDir.appendingPathComponent("test1_\(UUID().uuidString).m4a")
+    let fileURL2 = tempDir.appendingPathComponent("test2_\(UUID().uuidString).m4a")
 
     defer {
         try? FileManager.default.removeItem(at: fileURL1)
@@ -187,7 +187,7 @@ import Testing
         }
     )
 
-    let testURL = URL(fileURLWithPath: "/tmp/test.caf")
+    let testURL = URL(fileURLWithPath: "/tmp/test.m4a")
     let format = AudioFormatConfig.recording
 
     // Test start
@@ -213,7 +213,7 @@ import Testing
     let writer = LiveAudioFileWriter()
 
     let tempDir = FileManager.default.temporaryDirectory
-    let fileURL = tempDir.appendingPathComponent("test_stereo_\(UUID().uuidString).caf")
+    let fileURL = tempDir.appendingPathComponent("test_stereo_\(UUID().uuidString).m4a")
 
     defer {
         try? FileManager.default.removeItem(at: fileURL)

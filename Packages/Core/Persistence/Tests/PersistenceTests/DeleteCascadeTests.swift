@@ -25,7 +25,7 @@ import Models
         title: "Cascade Test Session",
         previewText: "Testing cascade delete",
         durationMs: 600000,
-        audioPath: "/audio/cascade-test.caf",
+        audioPath: "/audio/cascade-test.m4a",
         processingState: .processed,
         speakerCount: 3,
         updatedAt: now

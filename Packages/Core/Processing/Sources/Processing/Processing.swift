@@ -328,7 +328,7 @@ public actor RecordingProcessor {
         let inputFormat = audioCaptureClient.getInputFormat()
 
         // Start audio file writing with the actual microphone format
-        let audioPath = audioDirectory.appendingPathComponent("\(sessionId.rawValue).caf")
+        let audioPath = audioDirectory.appendingPathComponent("\(sessionId.rawValue).m4a")
         self.currentAudioFileURL = audioPath
         try await audioFileWriterClient.startWriting(audioPath, inputFormat)
 
@@ -445,7 +445,7 @@ public actor RecordingProcessor {
         // Start audio file writing to a continuation file
         // Use a unique suffix to avoid overwriting the original audio
         let continuationSuffix = "_cont_\(Int(date.now.timeIntervalSince1970))"
-        let audioPath = audioDirectory.appendingPathComponent("\(sessionId.rawValue)\(continuationSuffix).caf")
+        let audioPath = audioDirectory.appendingPathComponent("\(sessionId.rawValue)\(continuationSuffix).m4a")
         self.currentAudioFileURL = audioPath
         try await audioFileWriterClient.startWriting(audioPath, inputFormat)
 

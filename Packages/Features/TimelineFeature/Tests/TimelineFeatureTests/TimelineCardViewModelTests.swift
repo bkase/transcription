@@ -19,7 +19,7 @@ struct TimelineCardViewModelTests {
             title: "Architecture Review",
             previewText: "So we're looking at the Vapor direction...",
             durationMs: 2530000, // 42:10
-            audioPath: "/audio/session-1.caf",
+            audioPath: "/audio/session-1.m4a",
             processingState: .processed,
             speakerCount: 2,
             updatedAt: mockDate

@@ -40,7 +40,7 @@ struct SessionDetailFeatureTests {
             title: "Team Meeting",
             previewText: "Let's discuss the project",
             durationMs: 300000,
-            audioPath: "/audio/session-123.caf",
+            audioPath: "/audio/session-123.m4a",
             processingState: .processed,
             speakerCount: 2,
             updatedAt: mockDate
@@ -193,7 +193,7 @@ struct SessionDetailFeatureTests {
             $0.speakerTracks = expectedTracks
             // Audio player initialized from session's audioPath and durationMs
             $0.audioPlayer = AudioPlayerFeature.State(
-                audioURL: URL(fileURLWithPath: "/audio/session-123.caf"),
+                audioURL: URL(fileURLWithPath: "/audio/session-123.m4a"),
                 duration: 300.0  // 300000ms = 300s
             )
         }
@@ -357,7 +357,7 @@ struct SessionDetailFeatureTests {
             title: "Failed Recording",
             previewText: nil,
             durationMs: 300000,
-            audioPath: "/audio/session-123.caf",
+            audioPath: "/audio/session-123.m4a",
             processingState: .failed,
             speakerCount: 0,
             updatedAt: mockDate
@@ -370,7 +370,7 @@ struct SessionDetailFeatureTests {
             title: "Failed Recording",
             previewText: "Now transcribed",
             durationMs: 300000,
-            audioPath: "/audio/session-123.caf",
+            audioPath: "/audio/session-123.m4a",
             processingState: .processed,
             speakerCount: 1,
             updatedAt: mockDate
@@ -442,7 +442,7 @@ struct SessionDetailFeatureTests {
             ]
             $0.speakerTracks = []
             $0.audioPlayer = AudioPlayerFeature.State(
-                audioURL: URL(fileURLWithPath: "/audio/session-123.caf"),
+                audioURL: URL(fileURLWithPath: "/audio/session-123.m4a"),
                 duration: 300.0
             )
         }
@@ -464,7 +464,7 @@ struct SessionDetailFeatureTests {
             title: "Failed Recording",
             previewText: nil,
             durationMs: 300000,
-            audioPath: "/audio/session-123.caf",
+            audioPath: "/audio/session-123.m4a",
             processingState: .failed,
             speakerCount: 0,
             updatedAt: mockDate
@@ -512,7 +512,7 @@ struct SessionDetailFeatureTests {
             title: "Processed Recording",
             previewText: "Already transcribed",
             durationMs: 300000,
-            audioPath: "/audio/session-123.caf",
+            audioPath: "/audio/session-123.m4a",
             processingState: .processed,
             speakerCount: 1,
             updatedAt: mockDate
@@ -550,7 +550,7 @@ struct SessionDetailFeatureTests {
             title: "Failed Recording",
             previewText: nil,
             durationMs: 300000,
-            audioPath: "/audio/session-123.caf",
+            audioPath: "/audio/session-123.m4a",
             processingState: .failed,
             speakerCount: 0,
             updatedAt: mockDate

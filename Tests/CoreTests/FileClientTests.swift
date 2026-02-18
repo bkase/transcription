@@ -106,7 +106,7 @@ import Dependencies
 
         // Write files in subdirectory
         let file1 = subdir.appendingPathComponent("transcript.json")
-        let file2 = subdir.appendingPathComponent("audio.caf")
+        let file2 = subdir.appendingPathComponent("audio.m4a")
 
         try await client.write(Data("{}".utf8), file1)
         try await client.write(Data([0x00]), file2)

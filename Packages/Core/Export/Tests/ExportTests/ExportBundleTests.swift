@@ -21,7 +21,7 @@ struct ExportBundleTests {
         title: "Test Meeting",
         durationMs: 600000,
         speakerCount: 2,
-        audioPath: "audio.caf"
+        audioPath: "audio.m4a"
     )
 
     private static let testSegments: [ExportSegment] = [
@@ -127,7 +127,7 @@ struct ExportBundleTests {
         }
 
         // Create a mock audio file
-        let audioSourceURL = tempDir.appendingPathComponent("source-audio.caf")
+        let audioSourceURL = tempDir.appendingPathComponent("source-audio.m4a")
         let mockAudioData = Data("mock audio content".utf8)
         try mockAudioData.write(to: audioSourceURL)
 

@@ -18,7 +18,7 @@ struct DeleteSessionTests {
     func testDeleteRemovesSession() async {
         let mockDate = Date(timeIntervalSince1970: 1000000)
         let sessionID = SessionID("session-123")
-        let audioPath = "/audio/session-123.caf"
+        let audioPath = "/audio/session-123.m4a"
 
         let mockSession = SessionRecord(
             id: sessionID.rawValue,

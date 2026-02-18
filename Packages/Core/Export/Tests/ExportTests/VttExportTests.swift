@@ -19,7 +19,7 @@ struct VttExportTests {
         title: "Test Meeting",
         previewText: "Hello, how are you?",
         durationMs: 600000,
-        audioPath: "audio.caf",
+        audioPath: "audio.m4a",
         processingState: .processed,
         speakerCount: 2,
         updatedAt: testDate
@@ -89,7 +89,7 @@ struct VttExportTests {
             segments: Self.testSegmentRecords,
             speakerTracks: Self.testSpeakerTrackRecords,
             people: Self.testPersonRecords,
-            audioPath: "audio.caf"
+            audioPath: "audio.m4a"
         )
 
         // Generate VTT

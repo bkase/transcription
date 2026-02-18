@@ -67,39 +67,98 @@ public actor LiveAudioFileWriter {
             throw AudioFileWriterError.alreadyWriting
         }
 
-        // Create audio format description
-        var asbd = AudioStreamBasicDescription(
-            mSampleRate: format.sampleRate,
-            mFormatID: kAudioFormatLinearPCM,
-            mFormatFlags: kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked,
-            mBytesPerPacket: UInt32(MemoryLayout<Float>.size) * format.channels,
-            mFramesPerPacket: 1,
-            mBytesPerFrame: UInt32(MemoryLayout<Float>.size) * format.channels,
-            mChannelsPerFrame: format.channels,
-            mBitsPerChannel: UInt32(MemoryLayout<Float>.size * 8),
-            mReserved: 0
-        )
+        let ext = url.pathExtension.lowercased()
+        let isAAC = ext == "m4a" || ext == "aac"
 
-        // Create ExtAudioFile for writing
         var extAudioFile: ExtAudioFileRef?
-        let fileType: AudioFileTypeID = url.pathExtension.lowercased() == "caf"
-            ? kAudioFileCAFType
-            : kAudioFileWAVEType
 
-        let status = ExtAudioFileCreateWithURL(
-            url as CFURL,
-            fileType,
-            &asbd,
-            nil,
-            AudioFileFlags.eraseFile.rawValue,
-            &extAudioFile
-        )
+        if isAAC {
+            // Output format: AAC — let the encoder fill in packet details
+            var outputASBD = AudioStreamBasicDescription(
+                mSampleRate: format.sampleRate,
+                mFormatID: kAudioFormatMPEG4AAC,
+                mFormatFlags: 0,
+                mBytesPerPacket: 0,
+                mFramesPerPacket: 1024,
+                mBytesPerFrame: 0,
+                mChannelsPerFrame: format.channels,
+                mBitsPerChannel: 0,
+                mReserved: 0
+            )
 
-        guard status == noErr, let file = extAudioFile else {
-            throw AudioFileWriterError.failedToCreateFile(status)
+            let createStatus = ExtAudioFileCreateWithURL(
+                url as CFURL,
+                kAudioFileM4AType,
+                &outputASBD,
+                nil,
+                AudioFileFlags.eraseFile.rawValue,
+                &extAudioFile
+            )
+
+            guard createStatus == noErr, let file = extAudioFile else {
+                throw AudioFileWriterError.failedToCreateFile(createStatus)
+            }
+
+            // Client format: Float32 PCM (what we feed in)
+            var clientASBD = AudioStreamBasicDescription(
+                mSampleRate: format.sampleRate,
+                mFormatID: kAudioFormatLinearPCM,
+                mFormatFlags: kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked,
+                mBytesPerPacket: UInt32(MemoryLayout<Float>.size) * format.channels,
+                mFramesPerPacket: 1,
+                mBytesPerFrame: UInt32(MemoryLayout<Float>.size) * format.channels,
+                mChannelsPerFrame: format.channels,
+                mBitsPerChannel: UInt32(MemoryLayout<Float>.size * 8),
+                mReserved: 0
+            )
+
+            let clientStatus = ExtAudioFileSetProperty(
+                file,
+                kExtAudioFileProperty_ClientDataFormat,
+                UInt32(MemoryLayout<AudioStreamBasicDescription>.size),
+                &clientASBD
+            )
+
+            guard clientStatus == noErr else {
+                ExtAudioFileDispose(file)
+                throw AudioFileWriterError.failedToCreateFile(clientStatus)
+            }
+
+            self.audioFile = ExtendedAudioFile(ref: file)
+        } else {
+            // Uncompressed PCM path (CAF / WAV)
+            var asbd = AudioStreamBasicDescription(
+                mSampleRate: format.sampleRate,
+                mFormatID: kAudioFormatLinearPCM,
+                mFormatFlags: kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked,
+                mBytesPerPacket: UInt32(MemoryLayout<Float>.size) * format.channels,
+                mFramesPerPacket: 1,
+                mBytesPerFrame: UInt32(MemoryLayout<Float>.size) * format.channels,
+                mChannelsPerFrame: format.channels,
+                mBitsPerChannel: UInt32(MemoryLayout<Float>.size * 8),
+                mReserved: 0
+            )
+
+            let fileType: AudioFileTypeID = ext == "caf"
+                ? kAudioFileCAFType
+                : kAudioFileWAVEType
+
+            let createStatus = ExtAudioFileCreateWithURL(
+                url as CFURL,
+                fileType,
+                &asbd,
+                nil,
+                AudioFileFlags.eraseFile.rawValue,
+                &extAudioFile
+            )
+
+            guard createStatus == noErr, let file = extAudioFile else {
+                throw AudioFileWriterError.failedToCreateFile(createStatus)
+            }
+
+            self.audioFile = ExtendedAudioFile(ref: file)
         }
 
-        self.audioFile = ExtendedAudioFile(ref: file)
         self.currentFileURL = url
         self.format = format
         self.totalBytesWritten = 0

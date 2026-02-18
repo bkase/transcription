@@ -53,7 +53,7 @@ struct AudioPlayerProgressTests {
 
     @Test
     func testProgressTicks() async {
-        let testURL = URL(fileURLWithPath: "/test/audio.caf")
+        let testURL = URL(fileURLWithPath: "/test/audio.m4a")
         let testClock = TestClock()
         let duration: TimeInterval = 120
 
@@ -114,7 +114,7 @@ struct AudioPlayerProgressTests {
 
     @Test
     func testProgressTicksStopWhenNotPlaying() async {
-        let testURL = URL(fileURLWithPath: "/test/audio.caf")
+        let testURL = URL(fileURLWithPath: "/test/audio.m4a")
         let testClock = TestClock()
 
         let playbackState = PlaybackState(isPlaying: true, currentTime: 55)
@@ -187,28 +187,28 @@ struct AudioPlayerProgressTests {
     func testProgressAtVariousPositions() {
         // Test progress calculation at different points
         let state0 = AudioPlayerFeature.State(
-            audioURL: URL(fileURLWithPath: "/test.caf"),
+            audioURL: URL(fileURLWithPath: "/test.m4a"),
             currentTime: 0,
             duration: 100
         )
         #expect(state0.progress == 0.0)
 
         let state25 = AudioPlayerFeature.State(
-            audioURL: URL(fileURLWithPath: "/test.caf"),
+            audioURL: URL(fileURLWithPath: "/test.m4a"),
             currentTime: 25,
             duration: 100
         )
         #expect(state25.progress == 0.25)
 
         let state50 = AudioPlayerFeature.State(
-            audioURL: URL(fileURLWithPath: "/test.caf"),
+            audioURL: URL(fileURLWithPath: "/test.m4a"),
             currentTime: 50,
             duration: 100
         )
         #expect(state50.progress == 0.5)
 
         let state100 = AudioPlayerFeature.State(
-            audioURL: URL(fileURLWithPath: "/test.caf"),
+            audioURL: URL(fileURLWithPath: "/test.m4a"),
             currentTime: 100,
             duration: 100
         )
@@ -219,7 +219,7 @@ struct AudioPlayerProgressTests {
     func testProgressClampedToOne() {
         // If currentTime somehow exceeds duration, progress should be clamped to 1.0
         let state = AudioPlayerFeature.State(
-            audioURL: URL(fileURLWithPath: "/test.caf"),
+            audioURL: URL(fileURLWithPath: "/test.m4a"),
             currentTime: 150,
             duration: 100
         )

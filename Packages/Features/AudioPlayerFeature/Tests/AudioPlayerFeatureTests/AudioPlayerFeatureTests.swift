@@ -11,7 +11,7 @@ struct AudioPlayerReducerTests {
 
     @Test
     func testPlayPause() async {
-        let testURL = URL(fileURLWithPath: "/test/audio.caf")
+        let testURL = URL(fileURLWithPath: "/test/audio.m4a")
         var playCallCount = 0
         var stopCallCount = 0
         var currentTimeValue: TimeInterval = 10
@@ -60,7 +60,7 @@ struct AudioPlayerReducerTests {
 
     @Test
     func testPlayThenPause() async {
-        let testURL = URL(fileURLWithPath: "/test/audio.caf")
+        let testURL = URL(fileURLWithPath: "/test/audio.m4a")
         var pauseCalled = false
 
         let store = TestStore(
@@ -90,7 +90,7 @@ struct AudioPlayerReducerTests {
     @Test
     func testProgressCalculation() async {
         let state = AudioPlayerFeature.State(
-            audioURL: URL(fileURLWithPath: "/test.caf"),
+            audioURL: URL(fileURLWithPath: "/test.m4a"),
             currentTime: 30,
             duration: 120
         )
@@ -101,7 +101,7 @@ struct AudioPlayerReducerTests {
     @Test
     func testProgressWithZeroDuration() async {
         let state = AudioPlayerFeature.State(
-            audioURL: URL(fileURLWithPath: "/test.caf"),
+            audioURL: URL(fileURLWithPath: "/test.m4a"),
             currentTime: 30,
             duration: 0
         )
@@ -111,7 +111,7 @@ struct AudioPlayerReducerTests {
 
     @Test
     func testSeek() async {
-        let testURL = URL(fileURLWithPath: "/test/audio.caf")
+        let testURL = URL(fileURLWithPath: "/test/audio.m4a")
         var seekedToTime: TimeInterval?
 
         let store = TestStore(
@@ -165,7 +165,7 @@ struct AudioPlayerReducerTests {
 
     @Test
     func testStop() async {
-        let testURL = URL(fileURLWithPath: "/test/audio.caf")
+        let testURL = URL(fileURLWithPath: "/test/audio.m4a")
         var stopCalled = false
 
         let store = TestStore(
