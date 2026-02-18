@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import Models
 import Audio
@@ -193,6 +194,12 @@ public struct RecordingProcessorClient: Sendable {
     /// - Parameter sessionId: The session ID to retry transcription for
     /// - Returns: true if retry succeeded, false otherwise
     public var retryOfflineTranscription: @Sendable (_ sessionId: SessionID) async throws -> Bool = { _ in false }
+    /// Start file playback mode: feed audio from a file through the live transcription pipeline
+    /// - Parameter audioFileURL: URL to the audio file to play back
+    /// - Returns: Stream of recording processor events
+    public var startFilePlayback: @Sendable (_ audioFileURL: URL) async throws -> AsyncStream<RecordingProcessorEvent> = { _ in AsyncStream { $0.finish() } }
+    /// Set playback speed for file playback mode (1.0 = real-time, 2.0 = 2x, etc.)
+    public var setPlaybackSpeed: @Sendable (_ speed: Double) async -> Void = { _ in }
 }
 
 extension RecordingProcessorClient: DependencyKey {
@@ -230,6 +237,12 @@ extension RecordingProcessorClient: DependencyKey {
             },
             retryOfflineTranscription: { sessionId in
                 try await processor.retryOfflineTranscription(sessionId: sessionId)
+            },
+            startFilePlayback: { audioFileURL in
+                try await processor.startFilePlayback(audioFileURL: audioFileURL)
+            },
+            setPlaybackSpeed: { speed in
+                await processor.setPlaybackSpeed(speed)
             }
         )
     }
@@ -247,7 +260,9 @@ extension RecordingProcessorClient: DependencyKey {
             isRecording: { false },
             isPaused: { false },
             currentSessionID: { nil },
-            retryOfflineTranscription: { _ in false }
+            retryOfflineTranscription: { _ in false },
+            startFilePlayback: { _ in AsyncStream { $0.finish() } },
+            setPlaybackSpeed: { _ in }
         )
     }
 
@@ -287,6 +302,10 @@ public actor RecordingProcessor {
     // Continuation mode state
     private var isContinuation: Bool = false
     private var timestampOffsetMs: Int = 0
+
+    // File playback mode state
+    private var isFilePlayback: Bool = false
+    private var playbackSpeed: Double = 1.0
 
     // Title generation state
     private var accumulatedTranscriptText: String = ""
@@ -519,28 +538,34 @@ public actor RecordingProcessor {
     public func stopRecording(speakerCount: Int? = nil) async {
         guard isRecording else { return }
 
+        let wasFilePlayback = isFilePlayback
         isRecording = false
         isPaused = false
         isInterrupted = false
+        isFilePlayback = false
 
-        // Stop audio session observation
-        audioSessionTask?.cancel()
-        audioSessionTask = nil
-        await audioSessionClient.stopObserving()
+        if !wasFilePlayback {
+            // Stop audio session observation
+            audioSessionTask?.cancel()
+            audioSessionTask = nil
+            await audioSessionClient.stopObserving()
 
-        // Stop capture and transcription
-        await audioCaptureClient.stopCapture()
+            // Stop capture and transcription
+            await audioCaptureClient.stopCapture()
+        }
         await fluidAudioClient.stopTranscription()
 
-        // Finish writing audio file
-        _ = try? await audioFileWriterClient.finishWriting()
+        if !wasFilePlayback {
+            // Finish writing audio file
+            _ = try? await audioFileWriterClient.finishWriting()
+        }
 
         // Emit listening changed
         eventContinuation?.yield(.listeningChanged(false))
 
         // Finalize session
         if let sessionId = currentSessionID {
-            await finalizeSession(sessionId, audioFileURL: currentAudioFileURL, speakerCount: speakerCount)
+            await finalizeSession(sessionId, audioFileURL: currentAudioFileURL, speakerCount: speakerCount, isFilePlayback: wasFilePlayback)
         }
 
         currentSessionID = nil
@@ -554,21 +579,27 @@ public actor RecordingProcessor {
         guard isRecording else { return }
         guard let sessionId = currentSessionID else { return }
 
+        let wasFilePlayback = isFilePlayback
         isRecording = false
         isPaused = false
         isInterrupted = false
+        isFilePlayback = false
 
-        // Stop audio session observation
-        audioSessionTask?.cancel()
-        audioSessionTask = nil
-        await audioSessionClient.stopObserving()
+        if !wasFilePlayback {
+            // Stop audio session observation
+            audioSessionTask?.cancel()
+            audioSessionTask = nil
+            await audioSessionClient.stopObserving()
 
-        // Stop capture and transcription
-        await audioCaptureClient.stopCapture()
+            // Stop capture and transcription
+            await audioCaptureClient.stopCapture()
+        }
         await fluidAudioClient.stopTranscription()
 
-        // Cancel writing (don't finalize the file)
-        await audioFileWriterClient.cancelWriting()
+        if !wasFilePlayback {
+            // Cancel writing (don't finalize the file)
+            await audioFileWriterClient.cancelWriting()
+        }
 
         // Emit listening changed
         eventContinuation?.yield(.listeningChanged(false))
@@ -633,6 +664,132 @@ public actor RecordingProcessor {
     /// Check if currently interrupted
     public func getIsInterrupted() -> Bool {
         isInterrupted
+    }
+
+    /// Set playback speed for file playback mode
+    public func setPlaybackSpeed(_ speed: Double) {
+        playbackSpeed = speed
+    }
+
+    /// Start file playback: read audio from a file and feed it through the live transcription pipeline
+    public func startFilePlayback(audioFileURL: URL) async throws -> AsyncStream<RecordingProcessorEvent> {
+        guard !isRecording else {
+            throw RecordingProcessorError.alreadyRecording
+        }
+
+        isRecording = true
+        isFilePlayback = true
+        seenSpeakers = []
+        accumulatedTranscriptText = ""
+        titleGenerationTriggered = false
+        isContinuation = false
+        timestampOffsetMs = 0
+
+        // Create event stream
+        let (stream, continuation) = AsyncStream.makeStream(of: RecordingProcessorEvent.self)
+        self.eventContinuation = continuation
+
+        // Generate session ID and create session record
+        let sessionId = SessionID(rawValue: uuid().uuidString)
+        self.currentSessionID = sessionId
+        let now = date.now
+
+        let sessionRecord = SessionRecord(
+            id: sessionId.rawValue,
+            startedAt: now,
+            processingState: .recording,
+            updatedAt: now
+        )
+        try await databaseClient.createSession(sessionRecord)
+
+        // Emit didStart event
+        continuation.yield(.didStart(sessionId))
+
+        // No audio session config, no mic capture, no file writing — just read from file
+
+        // Read audio file and create a stream of AudioFrames
+        let audioFile = try AVAudioFile(forReading: audioFileURL)
+        let sampleRate = audioFile.processingFormat.sampleRate
+        let totalFrames = AVAudioFrameCount(audioFile.length)
+        let chunkSize: AVAudioFrameCount = 4096
+
+        let (audioStream, audioContinuation) = AsyncStream.makeStream(of: AudioFrame.self)
+
+        // Emit listening changed
+        continuation.yield(.listeningChanged(true))
+
+        // Start ML transcription in background
+        Task { [weak self, fluidAudioClient] in
+            guard let self = self else { return }
+            do {
+                NSLog("[RecordingProcessor] Starting file playback transcription...")
+                let segmentStream = try await fluidAudioClient.startTranscription(audioStream)
+                NSLog("[RecordingProcessor] File playback transcription started, emitting event")
+                await self.emitTranscriptionStarted()
+                var segmentCount = 0
+                for await segment in segmentStream {
+                    guard await self.getIsRecording() else {
+                        NSLog("[RecordingProcessor] Recording stopped, breaking segment loop")
+                        break
+                    }
+                    segmentCount += 1
+                    NSLog("[RecordingProcessor] Received file playback segment \(segmentCount): '\(segment.text)'")
+                    await self.handleSegment(segment, sessionId: sessionId)
+                }
+                NSLog("[RecordingProcessor] File playback segment stream ended after \(segmentCount) segments")
+            } catch {
+                let errorMessage = "Live transcription unavailable: \(error.localizedDescription)"
+                NSLog("[RecordingProcessor] File playback transcription error: \(errorMessage)")
+                await self.emitTranscriptionUnavailable(errorMessage)
+            }
+        }
+
+        // Feed audio frames from file in a background task
+        Task { [weak self] in
+            guard let self = self else { return }
+            var framesRead: AVAudioFrameCount = 0
+
+            while framesRead < totalFrames {
+                guard await self.getIsRecording() else { break }
+
+                let framesToRead = min(chunkSize, totalFrames - framesRead)
+                guard let buffer = AVAudioPCMBuffer(
+                    pcmFormat: audioFile.processingFormat,
+                    frameCapacity: framesToRead
+                ) else { break }
+
+                do {
+                    try audioFile.read(into: buffer, frameCount: framesToRead)
+                } catch {
+                    NSLog("[RecordingProcessor] Error reading audio file: \(error)")
+                    break
+                }
+
+                // Convert to Float32 Data
+                guard let floatData = buffer.floatChannelData else { break }
+                let frameCount = Int(buffer.frameLength)
+
+                // If multi-channel, take first channel only
+                let rawData = Data(bytes: floatData[0], count: frameCount * MemoryLayout<Float>.size)
+
+                let timestampNs = UInt64(Double(framesRead) / sampleRate * 1_000_000_000)
+                let frame = AudioFrame(data: rawData, timestamp: timestampNs)
+                audioContinuation.yield(frame)
+
+                framesRead += AVAudioFrameCount(frameCount)
+
+                // Sleep to simulate real-time pace, adjusted by playback speed
+                let chunkDuration = Double(frameCount) / sampleRate
+                let currentSpeed = await self.playbackSpeed
+                let sleepDuration = chunkDuration / currentSpeed
+                try? await Task.sleep(for: .seconds(sleepDuration))
+            }
+
+            audioContinuation.finish()
+            NSLog("[RecordingProcessor] File playback finished feeding \(framesRead) frames")
+        }
+
+        return stream
     }
 
     // MARK: - Private Helpers
@@ -852,7 +1009,21 @@ public actor RecordingProcessor {
         }
     }
 
-    private func finalizeSession(_ sessionId: SessionID, audioFileURL: URL?, speakerCount: Int? = nil) async {
+    private func finalizeSession(_ sessionId: SessionID, audioFileURL: URL?, speakerCount: Int? = nil, isFilePlayback: Bool = false) async {
+        // Short-circuit for file playback — no offline transcription, no audio path
+        if isFilePlayback {
+            guard var session = try? await databaseClient.fetchSession(sessionId) else {
+                eventContinuation?.yield(.didFail("Failed to fetch session for finalization"))
+                return
+            }
+            session.processingState = .processed
+            session.audioPath = nil
+            session.updatedAt = date.now
+            try? await databaseClient.updateSession(session)
+            eventContinuation?.yield(.didFinish(sessionId))
+            return
+        }
+
         let now = date.now
 
         // Fetch current session

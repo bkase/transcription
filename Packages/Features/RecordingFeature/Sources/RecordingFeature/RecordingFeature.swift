@@ -134,6 +134,13 @@ public struct RecordingFeature {
         /// Selected speaker count for offline diarization (nil = not yet selected; 1/2/3/4)
         public var selectedSpeakerCount: Int? = nil
 
+        // MARK: - File Playback Mode
+
+        /// Whether this is a file playback session (debug mode)
+        public var isFilePlayback: Bool = false
+        /// Playback speed for file playback mode (1.0 = real-time)
+        public var playbackSpeed: Double = 1.0
+
         // MARK: - Continuation Mode
 
         /// If set, this recording is a continuation of an existing session
@@ -255,6 +262,10 @@ public struct RecordingFeature {
         case selectSpeakerCount(Int)
         /// User tapped Stop & Save (requires selectedSpeakerCount != nil)
         case stopAndSave
+        /// Start file playback mode (debug)
+        case startFilePlayback(audioFileURL: URL)
+        /// Set playback speed for file playback mode
+        case setPlaybackSpeed(Double)
     }
 
     public var body: some ReducerOf<Self> {
@@ -431,7 +442,7 @@ public struct RecordingFeature {
 
             case .timerTicked:
                 guard state.isRecording, !state.isPaused else { return .none }
-                state.elapsedSeconds += 1
+                state.elapsedSeconds += state.isFilePlayback ? Int(state.playbackSpeed) : 1
                 return .none
 
             case let .processorEvent(event):
@@ -510,6 +521,8 @@ public struct RecordingFeature {
                     state.selectedSpeakerCount = nil
                     state.continuationSessionID = nil
                     state.timestampOffsetMs = 0
+                    state.isFilePlayback = false
+                    state.playbackSpeed = 1.0
                     // Keep elapsedSeconds for display until view navigates away
                     return .merge(
                         .cancel(id: CancelID.timer),
@@ -532,6 +545,8 @@ public struct RecordingFeature {
                     state.selectedSpeakerCount = nil
                     state.continuationSessionID = nil
                     state.timestampOffsetMs = 0
+                    state.isFilePlayback = false
+                    state.playbackSpeed = 1.0
                     return .merge(
                         .cancel(id: CancelID.timer),
                         .cancel(id: CancelID.processorEvents),
@@ -693,6 +708,34 @@ public struct RecordingFeature {
                         await recordingProcessorClient.stopRecording(speakerCount)
                     }
                 )
+
+            case let .startFilePlayback(audioFileURL):
+                guard !state.isRecording else { return .none }
+
+                // No permission check needed — no mic
+                state.isRecording = true
+                state.isFilePlayback = true
+                state.elapsedSeconds = 0
+                state.error = nil
+                state.isPermissionDenied = false
+
+                return .run { [recordingProcessorClient] send in
+                    do {
+                        let eventStream = try await recordingProcessorClient.startFilePlayback(audioFileURL)
+                        for await event in eventStream {
+                            await send(.processorEvent(event))
+                        }
+                    } catch {
+                        await send(.recordingFailed(error.localizedDescription))
+                    }
+                }
+                .cancellable(id: CancelID.processorEvents, cancelInFlight: true)
+
+            case let .setPlaybackSpeed(speed):
+                state.playbackSpeed = speed
+                return .run { [recordingProcessorClient] _ in
+                    await recordingProcessorClient.setPlaybackSpeed(speed)
+                }
 
             case let .speakerLabelTapped(_, machineSpeakerId):
                 // Find the speaker track for this segment

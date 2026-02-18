@@ -45,25 +45,23 @@ public enum SpeakerType: Sendable, Equatable {
 /// A single segment of transcript with speaker label, timestamp, and text.
 /// Used in session detail view to display transcript in script format.
 public struct TranscriptSegment: View {
-    private let speaker: SpeakerType
+    private let speaker: SpeakerType?
     private let timestamp: String
     private let text: String
     private let isActive: Bool
     private let animateTextReveal: Bool
     private let onSpeakerTap: (() -> Void)?
 
-    @State private var breatheScale: CGFloat = 0.98
-
     /// Create a transcript segment.
     /// - Parameters:
-    ///   - speaker: The speaker type (user, guest, or custom)
+    ///   - speaker: The speaker type, or nil to hide the speaker label entirely
     ///   - timestamp: Timestamp string (e.g., "00:12")
     ///   - text: The transcript text content
-    ///   - isActive: Whether this segment is the currently active/speaking segment (applies breathing animation)
+    ///   - isActive: Whether this segment is the currently active/speaking segment
     ///   - animateTextReveal: Whether to animate the text reveal with staggered word blur effect (default false)
     ///   - onSpeakerTap: Optional callback when speaker label is tapped
     public init(
-        speaker: SpeakerType,
+        speaker: SpeakerType? = nil,
         timestamp: String,
         text: String,
         isActive: Bool = false,
@@ -82,7 +80,9 @@ public struct TranscriptSegment: View {
         VStack(alignment: .leading, spacing: 4) {
             // Header: speaker label on left, timestamp on right
             HStack(spacing: 12) {
-                speakerLabel
+                if let speaker {
+                    speakerLabel(speaker)
+                }
 
                 Spacer()
 
@@ -108,47 +108,24 @@ public struct TranscriptSegment: View {
                     .foregroundColor(VaporColor.textPrimary)
             }
         }
-        .scaleEffect(isActive ? breatheScale : 1.0)
         .accessibilityIdentifier("transcriptSegment")
-        .onAppear {
-            if isActive {
-                startBreathingAnimation()
-            }
-        }
-        .onChange(of: isActive) { _, newValue in
-            if newValue {
-                startBreathingAnimation()
-            } else {
-                breatheScale = 1.0
-            }
-        }
-    }
-
-    private func startBreathingAnimation() {
-        breatheScale = 0.98
-        withAnimation(
-            VaporAnimation.breatheCurve.animation(duration: VaporAnimation.breatheDuration)
-                .repeatForever(autoreverses: true)
-        ) {
-            breatheScale = 1.02
-        }
     }
 
     @ViewBuilder
-    private var speakerLabel: some View {
+    private func speakerLabel(_ speaker: SpeakerType) -> some View {
         if let onTap = onSpeakerTap {
             Button(action: onTap) {
-                speakerLabelContent
+                speakerLabelContent(speaker)
             }
             .buttonStyle(SpeakerLabelButtonStyle())
             .accessibilityIdentifier(speaker.isUnassigned ? "speakerUnassignedChip" : "speakerLabel")
         } else {
-            speakerLabelContent
+            speakerLabelContent(speaker)
         }
     }
 
     @ViewBuilder
-    private var speakerLabelContent: some View {
+    private func speakerLabelContent(_ speaker: SpeakerType) -> some View {
         switch speaker {
         case .unassigned(_, let color):
             // Bordered chip with icon for unassigned speakers

@@ -188,6 +188,9 @@ public struct ProfileView: View {
 
             // Data section
             dataSection
+
+            // Debug test processing section
+            debugSection
         }
         .padding(.horizontal, VaporSpacing.lg)
     }
@@ -404,6 +407,158 @@ public struct ProfileView: View {
             } message: {
                 Text("This will permanently delete all your conversations and people. Downloaded ML models will be kept. This action cannot be undone.")
             }
+        }
+    }
+
+    // MARK: - Debug Section
+
+    private var debugSection: some View {
+        VStack(alignment: .leading, spacing: VaporSpacing.sm) {
+            Text("Debug")
+                .font(.system(size: 16, weight: .medium))
+                .tracking(0.16)
+                .foregroundColor(VaporColor.textPrimary)
+
+            // Run test transcription button
+            Button {
+                store.send(.runTestTranscription)
+            } label: {
+                HStack {
+                    HStack(spacing: VaporSpacing.sm) {
+                        if store.isTestProcessing {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                                .tint(VaporColor.textSecondary)
+                        } else {
+                            Image(systemName: "waveform")
+                                .font(.system(size: 20))
+                                .foregroundColor(VaporColor.deep)
+                        }
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(store.isTestProcessing ? "Processing..." : "Test Diarization (2 speakers)")
+                                .font(.system(size: 16, weight: .light))
+                                .foregroundColor(VaporColor.textPrimary)
+
+                            if let status = store.testProcessingStatus {
+                                Text(status)
+                                    .font(.system(size: 11, weight: .light))
+                                    .foregroundColor(VaporColor.textTertiary)
+                                    .lineLimit(2)
+                            }
+                        }
+                    }
+
+                    Spacer()
+
+                    if !store.isTestProcessing {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 18))
+                            .foregroundColor(VaporColor.textTertiary)
+                    }
+                }
+                .padding(VaporSpacing.md)
+                .background(
+                    RoundedRectangle(cornerRadius: VaporRadius.sm)
+                        .fill(VaporColor.cloud)
+                        .shadow(color: Color.black.opacity(0.03), radius: 8, x: 0, y: 2)
+                )
+            }
+            .buttonStyle(PlainButtonStyle())
+            .disabled(store.isTestProcessing)
+
+            // View result button (shown after processing completes)
+            if store.testProcessingSessionID != nil && !store.isTestProcessing {
+                Button {
+                    store.send(.viewTestSession)
+                } label: {
+                    HStack {
+                        HStack(spacing: VaporSpacing.sm) {
+                            Image(systemName: "doc.text.magnifyingglass")
+                                .font(.system(size: 20))
+                                .foregroundColor(VaporColor.sky)
+
+                            Text("View Test Result")
+                                .font(.system(size: 16, weight: .light))
+                                .foregroundColor(VaporColor.textPrimary)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 18))
+                            .foregroundColor(VaporColor.textTertiary)
+                    }
+                    .padding(VaporSpacing.md)
+                    .background(
+                        RoundedRectangle(cornerRadius: VaporRadius.sm)
+                            .fill(VaporColor.cloud)
+                            .shadow(color: Color.black.opacity(0.03), radius: 8, x: 0, y: 2)
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+
+            // Live file playback (Recording View)
+            Button {
+                store.send(.runFilePlayback)
+            } label: {
+                HStack {
+                    HStack(spacing: VaporSpacing.sm) {
+                        Image(systemName: "play.circle")
+                            .font(.system(size: 20))
+                            .foregroundColor(VaporColor.deep)
+
+                        Text("Live Playback (Recording View)")
+                            .font(.system(size: 16, weight: .light))
+                            .foregroundColor(VaporColor.textPrimary)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 18))
+                        .foregroundColor(VaporColor.textTertiary)
+                }
+                .padding(VaporSpacing.md)
+                .background(
+                    RoundedRectangle(cornerRadius: VaporRadius.sm)
+                        .fill(VaporColor.cloud)
+                        .shadow(color: Color.black.opacity(0.03), radius: 8, x: 0, y: 2)
+                )
+            }
+            .buttonStyle(PlainButtonStyle())
+
+            // Load AssemblyAI ground truth transcription
+            Button {
+                store.send(.loadAssemblyAITranscription)
+            } label: {
+                HStack {
+                    HStack(spacing: VaporSpacing.sm) {
+                        Image(systemName: "text.bubble")
+                            .font(.system(size: 20))
+                            .foregroundColor(VaporColor.deep)
+
+                        Text("Load AssemblyAI Transcription")
+                            .font(.system(size: 16, weight: .light))
+                            .foregroundColor(VaporColor.textPrimary)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 18))
+                        .foregroundColor(VaporColor.textTertiary)
+                }
+                .padding(VaporSpacing.md)
+                .background(
+                    RoundedRectangle(cornerRadius: VaporRadius.sm)
+                        .fill(VaporColor.cloud)
+                        .shadow(color: Color.black.opacity(0.03), radius: 8, x: 0, y: 2)
+                )
+            }
+            .buttonStyle(PlainButtonStyle())
+            .disabled(store.isTestProcessing)
         }
     }
 

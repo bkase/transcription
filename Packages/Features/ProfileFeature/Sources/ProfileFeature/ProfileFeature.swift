@@ -44,6 +44,11 @@ public struct ProfileFeature {
         // Delete all data state
         public var isDeletingAllData: Bool
 
+        // Debug test processing state
+        public var isTestProcessing: Bool
+        public var testProcessingStatus: String?
+        public var testProcessingSessionID: SessionID?
+
         /// Convenience computed properties for backward compatibility with views
         public var isShowingMockPhotoPicker: Bool {
             destination == .mockPhotoPicker
@@ -62,7 +67,10 @@ public struct ProfileFeature {
             destination: Destination? = nil,
             isExporting: Bool = false,
             shareURL: URL? = nil,
-            isDeletingAllData: Bool = false
+            isDeletingAllData: Bool = false,
+            isTestProcessing: Bool = false,
+            testProcessingStatus: String? = nil,
+            testProcessingSessionID: SessionID? = nil
         ) {
             self.profile = profile
             self.isLoading = isLoading
@@ -74,6 +82,9 @@ public struct ProfileFeature {
             self.isExporting = isExporting
             self.shareURL = shareURL
             self.isDeletingAllData = isDeletingAllData
+            self.isTestProcessing = isTestProcessing
+            self.testProcessingStatus = testProcessingStatus
+            self.testProcessingSessionID = testProcessingSessionID
         }
 
         /// Compute initials from the profile name for avatar display
@@ -122,6 +133,15 @@ public struct ProfileFeature {
         case deleteAllDataCompleted
         case deleteAllDataFailed(String)
 
+        // Debug test processing
+        case runTestTranscription
+        case testProcessingUpdate(String)
+        case testProcessingCompleted(SessionID)
+        case testProcessingFailed(String)
+        case viewTestSession
+        case loadAssemblyAITranscription
+        case runFilePlayback
+
         // Delegate to parent
         case delegate(Delegate)
 
@@ -129,6 +149,10 @@ public struct ProfileFeature {
         public enum Delegate: Equatable, Sendable {
             case didSaveProfile(UserProfile)
             case didDeleteAllData
+            case runTestTranscription
+            case loadAssemblyAITranscription
+            case navigateToSession(SessionID)
+            case runFilePlayback
         }
     }
 
@@ -273,6 +297,41 @@ public struct ProfileFeature {
                 state.isSaving = false
                 state.error = errorMessage
                 return .none
+
+            // MARK: - Debug Test Processing
+
+            case .runTestTranscription:
+                guard !state.isTestProcessing else { return .none }
+                state.isTestProcessing = true
+                state.testProcessingStatus = "Starting..."
+                return .send(.delegate(.runTestTranscription))
+
+            case let .testProcessingUpdate(status):
+                state.testProcessingStatus = status
+                return .none
+
+            case let .testProcessingCompleted(sessionID):
+                state.isTestProcessing = false
+                state.testProcessingSessionID = sessionID
+                return .none
+
+            case let .testProcessingFailed(errorMessage):
+                state.isTestProcessing = false
+                state.testProcessingStatus = "Failed: \(errorMessage)"
+                return .none
+
+            case .viewTestSession:
+                guard let sessionID = state.testProcessingSessionID else { return .none }
+                return .send(.delegate(.navigateToSession(sessionID)))
+
+            case .runFilePlayback:
+                return .send(.delegate(.runFilePlayback))
+
+            case .loadAssemblyAITranscription:
+                guard !state.isTestProcessing else { return .none }
+                state.isTestProcessing = true
+                state.testProcessingStatus = "Loading AssemblyAI transcription..."
+                return .send(.delegate(.loadAssemblyAITranscription))
 
             case .delegate:
                 // Handled by parent

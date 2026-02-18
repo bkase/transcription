@@ -67,6 +67,9 @@ public struct AppFeature {
     @Dependency(\.databaseClient) var databaseClient
     @Dependency(\.fileClient) var fileClient
     @Dependency(\.continuousClock) var clock
+    @Dependency(\.fluidAudioClient) var fluidAudioClient
+    @Dependency(\.uuid) var uuid
+    @Dependency(\.date) var date
 
     public var body: some ReducerOf<Self> {
         Scope(state: \.timeline, action: \.timeline) {
@@ -145,6 +148,257 @@ public struct AppFeature {
                 // Pop to root and reload timeline
                 state.path.removeAll()
                 return .send(.timeline(.loadSessions))
+
+            case let .path(.element(id: _, action: .profile(.delegate(.navigateToSession(sessionID))))):
+                // Navigate to session detail from profile (e.g., after test processing)
+                state.path.append(.sessionDetail(SessionDetailFeature.State(sessionID: sessionID)))
+                return .none
+
+            case .path(.element(id: _, action: .profile(.delegate(.runFilePlayback)))):
+                // Present RecordingView in file playback mode
+                state.recording = RecordingFeature.State(userProfile: state.userProfile)
+                guard let audioURL = Bundle.main.url(forResource: "test-diarization-audio", withExtension: "caf") else {
+                    NSLog("[AppFeature] test-diarization-audio.caf not found in bundle")
+                    return .none
+                }
+                return .send(.recording(.presented(.startFilePlayback(audioFileURL: audioURL))))
+
+            case let .path(.element(id: id, action: .profile(.delegate(.runTestTranscription)))):
+                // Run test processing from profile debug section
+                return .run { [databaseClient, fluidAudioClient, uuid, date] send in
+                    func updateProfile(_ action: ProfileFeature.Action) async {
+                        await send(.path(.element(id: id, action: .profile(action))))
+                    }
+
+                    guard let audioURL = Bundle.main.url(forResource: "test-diarization-audio", withExtension: "caf") else {
+                        await updateProfile(.testProcessingFailed("Test audio file not found in app bundle"))
+                        return
+                    }
+                    let audioPath = audioURL.path
+
+                    // 1. Create a session record
+                    let sessionId = uuid().uuidString
+                    let now = date.now
+                    let session = SessionRecord(
+                        id: sessionId,
+                        startedAt: now,
+                        endedAt: now,
+                        title: "Test Diarization (2 speakers)",
+                        audioPath: audioPath,
+                        processingState: .transcribing,
+                        updatedAt: now
+                    )
+                    try await databaseClient.createSession(session)
+                    await updateProfile(.testProcessingUpdate("Session created. Transcribing file..."))
+
+                    // 2. Transcribe the file
+                    let segments: [TranscriptSegment]
+                    do {
+                        segments = try await fluidAudioClient.transcribeFile(audioURL)
+                    } catch {
+                        await updateProfile(.testProcessingFailed("Transcription failed: \(error.localizedDescription)"))
+                        return
+                    }
+                    await updateProfile(.testProcessingUpdate("Got \(segments.count) segments. Diarizing (2 speakers)..."))
+
+                    guard !segments.isEmpty else {
+                        var s = session
+                        s.processingState = .failed
+                        s.processingError = "No segments from transcription"
+                        try? await databaseClient.updateSession(s)
+                        await updateProfile(.testProcessingFailed("Transcription returned no segments"))
+                        return
+                    }
+
+                    // 3. Diarize with exactly 2 speakers
+                    let speakerSegments: [DiarizationMapping.SpeakerSegment]
+                    do {
+                        speakerSegments = try await fluidAudioClient.diarizeFile(audioURL, 2)
+                    } catch {
+                        await updateProfile(.testProcessingUpdate("Diarization failed: \(error.localizedDescription). Saving without speakers."))
+                        // Save segments without speaker IDs
+                        for segment in segments {
+                            let record = TranscriptSegmentRecord(
+                                id: segment.id.rawValue,
+                                sessionId: sessionId,
+                                startMs: Int(segment.startMs),
+                                endMs: Int(segment.endMs),
+                                text: segment.text,
+                                isFinal: segment.isFinal,
+                                createdAt: now,
+                                updatedAt: now
+                            )
+                            try? await databaseClient.createTranscriptSegment(record)
+                        }
+                        var s = session
+                        s.processingState = .processed
+                        s.previewText = segments.prefix(3).map(\.text).joined(separator: " ").prefix(200).description
+                        s.updatedAt = date.now
+                        try? await databaseClient.updateSession(s)
+                        await updateProfile(.testProcessingCompleted(SessionID(sessionId)))
+                        return
+                    }
+                    await updateProfile(.testProcessingUpdate("Got \(speakerSegments.count) speaker segments. Mapping..."))
+
+                    // 4. Map speakers onto transcript segments
+                    let intervals = segments.map { seg in
+                        DiarizationMapping.TranscriptInterval(
+                            id: seg.id,
+                            startTimeSeconds: Float(seg.startMs) / 1000.0,
+                            endTimeSeconds: Float(seg.endMs) / 1000.0
+                        )
+                    }
+                    let mappingResult = DiarizationMapping.mapSpeakers(
+                        intervals: intervals,
+                        speakerSegments: speakerSegments
+                    )
+
+                    var speakerByIntervalId: [TranscriptSegmentID: String] = [:]
+                    for assignment in mappingResult.assignments {
+                        if let speakerId = assignment.speakerId {
+                            speakerByIntervalId[assignment.intervalId] = speakerId
+                        }
+                    }
+
+                    let enrichedSegments = segments.map { seg in
+                        TranscriptSegment(
+                            id: seg.id,
+                            text: seg.text,
+                            startMs: seg.startMs,
+                            endMs: seg.endMs,
+                            speakerId: speakerByIntervalId[seg.id],
+                            isFinal: seg.isFinal
+                        )
+                    }
+
+                    // 5. Persist segments and speaker tracks
+                    var seenSpeakers: Set<String> = []
+                    for segment in enrichedSegments {
+                        if let speakerId = segment.speakerId, !seenSpeakers.contains(speakerId) {
+                            seenSpeakers.insert(speakerId)
+                            let track = SpeakerTrackRecord(
+                                id: uuid().uuidString,
+                                sessionId: sessionId,
+                                machineSpeakerId: speakerId,
+                                displayOrder: seenSpeakers.count
+                            )
+                            try? await databaseClient.createSpeakerTrack(track)
+                        }
+
+                        let record = TranscriptSegmentRecord(
+                            id: segment.id.rawValue,
+                            sessionId: sessionId,
+                            startMs: Int(segment.startMs),
+                            endMs: Int(segment.endMs),
+                            machineSpeakerId: segment.speakerId,
+                            text: segment.text,
+                            isFinal: segment.isFinal,
+                            createdAt: now,
+                            updatedAt: now
+                        )
+                        try? await databaseClient.createTranscriptSegment(record)
+                    }
+
+                    // 6. Update session to processed
+                    let assignedCount = enrichedSegments.filter { $0.speakerId != nil }.count
+                    let previewText = enrichedSegments
+                        .filter { $0.isFinal }
+                        .prefix(3)
+                        .map(\.text)
+                        .joined(separator: " ")
+
+                    var finalSession = session
+                    finalSession.previewText = previewText.isEmpty ? nil : String(previewText.prefix(200))
+                    finalSession.speakerCount = seenSpeakers.count
+                    finalSession.processingState = .processed
+                    finalSession.updatedAt = date.now
+                    try? await databaseClient.updateSession(finalSession)
+
+                    await updateProfile(.testProcessingUpdate("Done! \(segments.count) segments, \(seenSpeakers.count) speakers, \(assignedCount) assigned."))
+                    await updateProfile(.testProcessingCompleted(SessionID(sessionId)))
+                } catch: { error, send in
+                    await send(.path(.element(id: id, action: .profile(.testProcessingFailed(error.localizedDescription)))))
+                }
+
+            case let .path(.element(id: id, action: .profile(.delegate(.loadAssemblyAITranscription)))):
+                // Load pre-fetched AssemblyAI ground truth transcription from bundle
+                return .run { [databaseClient, uuid, date] send in
+                    func updateProfile(_ action: ProfileFeature.Action) async {
+                        await send(.path(.element(id: id, action: .profile(action))))
+                    }
+
+                    guard let jsonURL = Bundle.main.url(forResource: "assemblyai-ground-truth", withExtension: "json") else {
+                        await updateProfile(.testProcessingFailed("AssemblyAI JSON not found in app bundle"))
+                        return
+                    }
+
+                    let data = try Data(contentsOf: jsonURL)
+                    let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+                    let utterances = json["utterances"] as! [[String: Any]]
+
+                    let sessionId = uuid().uuidString
+                    let now = date.now
+
+                    // Create session
+                    let session = SessionRecord(
+                        id: sessionId,
+                        startedAt: now,
+                        endedAt: now,
+                        title: "AssemblyAI Ground Truth (2 speakers)",
+                        audioPath: nil,
+                        processingState: .processed,
+                        updatedAt: now
+                    )
+                    try await databaseClient.createSession(session)
+
+                    // Create speaker tracks for A and B
+                    var speakerTracks: [String: String] = [:]  // "A" -> trackId
+                    for (i, speaker) in ["A", "B"].enumerated() {
+                        let trackId = uuid().uuidString
+                        let track = SpeakerTrackRecord(
+                            id: trackId,
+                            sessionId: sessionId,
+                            machineSpeakerId: speaker,
+                            displayOrder: i + 1
+                        )
+                        try await databaseClient.createSpeakerTrack(track)
+                        speakerTracks[speaker] = speaker
+                    }
+
+                    // Create transcript segments from utterances
+                    for utterance in utterances {
+                        let speaker = utterance["speaker"] as? String
+                        let text = utterance["text"] as? String ?? ""
+                        let startMs = utterance["start"] as? Int ?? 0
+                        let endMs = utterance["end"] as? Int ?? 0
+
+                        let segment = TranscriptSegmentRecord(
+                            id: uuid().uuidString,
+                            sessionId: sessionId,
+                            startMs: startMs,
+                            endMs: endMs,
+                            machineSpeakerId: speaker,
+                            text: text,
+                            isFinal: true,
+                            createdAt: now,
+                            updatedAt: now
+                        )
+                        try await databaseClient.createTranscriptSegment(segment)
+                    }
+
+                    // Update session with preview text and speaker count
+                    let previewText = utterances.prefix(3).compactMap { $0["text"] as? String }.joined(separator: " ")
+                    var finalSession = session
+                    finalSession.previewText = String(previewText.prefix(200))
+                    finalSession.speakerCount = 2
+                    finalSession.updatedAt = date.now
+                    try await databaseClient.updateSession(finalSession)
+
+                    await updateProfile(.testProcessingUpdate("Loaded \(utterances.count) utterances from AssemblyAI"))
+                    await updateProfile(.testProcessingCompleted(SessionID(sessionId)))
+                } catch: { error, send in
+                    await send(.path(.element(id: id, action: .profile(.testProcessingFailed(error.localizedDescription)))))
+                }
 
             case .path(.element(id: _, action: .sessionDetail(.deleteCompleted))):
                 // Pop the navigation stack and reload timeline when session is deleted

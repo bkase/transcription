@@ -15,6 +15,7 @@ import UIKit
 /// Matches the Recording - Listening screen from app.pen design.
 public struct RecordingView: View {
     @Bindable var store: StoreOf<RecordingFeature>
+    @State private var userScrolledUp = false
     private let onBack: () -> Void
 
     public init(store: StoreOf<RecordingFeature>, onBack: @escaping () -> Void) {
@@ -36,7 +37,7 @@ public struct RecordingView: View {
             RecordingHeader(
                 elapsedTime: formatElapsedTime(store.elapsedSeconds),
                 isPaused: store.isPaused,
-                onPauseResume: {
+                onPauseResume: store.isFilePlayback ? nil : {
                     if store.isPaused {
                         store.send(.resumeRecording)
                     } else {
@@ -105,7 +106,19 @@ public struct RecordingView: View {
         HStack {
             NavButton(label: "Back", action: onBack)
             Spacer()
-            if store.isRecording {
+            if store.isFilePlayback {
+                Button {
+                    store.send(.setPlaybackSpeed(nextPlaybackSpeed(store.playbackSpeed)))
+                } label: {
+                    Text("\(Int(store.playbackSpeed))x")
+                        .font(.system(size: 14, weight: .medium).monospacedDigit())
+                        .foregroundColor(VaporColor.cloud)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(VaporColor.deep))
+                }
+            }
+            if store.isRecording && !store.isFilePlayback {
                 Button {
                     store.send(.moreButtonTapped)
                 } label: {
@@ -121,6 +134,16 @@ public struct RecordingView: View {
         .padding(.top, 56)
         .padding(.horizontal, VaporSpacing.lg)
         .padding(.bottom, VaporSpacing.md)
+    }
+
+    private func nextPlaybackSpeed(_ current: Double) -> Double {
+        switch current {
+        case ..<2: return 2
+        case ..<4: return 4
+        case ..<8: return 8
+        case ..<16: return 16
+        default: return 1
+        }
     }
 
     @ViewBuilder
@@ -257,11 +280,28 @@ public struct RecordingView: View {
     }
 
     private func liveTranscriptScrollView(proxy: ScrollViewProxy) -> some View {
-        ScrollView {
-            liveTranscriptContent
-        }
-        .onChange(of: store.liveSegments.count) { _, _ in
-            scrollToLastSegment(proxy: proxy)
+        GeometryReader { geo in
+            ScrollView {
+                liveTranscriptContent
+                    .padding(.bottom, geo.size.height * 0.2)
+            }
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 10)
+                    .onChanged { value in
+                        if value.translation.height > 10 {
+                            // Finger down = scrolling up through content
+                            userScrolledUp = true
+                        } else if value.translation.height < -10 {
+                            // Finger up = scrolling back toward bottom
+                            userScrolledUp = false
+                        }
+                    }
+            )
+            .onChange(of: store.liveSegments) { _, _ in
+                if !userScrolledUp {
+                    scrollToLastSegment(proxy: proxy)
+                }
+            }
         }
     }
 
@@ -281,17 +321,10 @@ public struct RecordingView: View {
     }
 
     private func liveSegmentRow(index: Int, segment: LiveSegment) -> some View {
-        let isLastSegment = index == store.liveSegments.count - 1
-        return TranscriptSegment(
-            speaker: speakerType(for: segment),
+        TranscriptSegment(
             timestamp: formatTimestamp(segment.startMs),
-            text: segment.text,
-            isActive: isLastSegment && store.isListening,
-            onSpeakerTap: {
-                store.send(.speakerLabelTapped(segmentId: segment.id, machineSpeakerId: segment.machineSpeakerId))
-            }
+            text: segment.text
         )
-        .vaporAppear(index: index)
         .id(segment.id)
     }
 
@@ -299,15 +332,18 @@ public struct RecordingView: View {
     private var liveIndicatorIfListening: some View {
         if store.isListening {
             TranscriptLiveIndicator()
-                .vaporAppear()
                 .id("live-indicator")
         }
     }
 
     private func scrollToLastSegment(proxy: ScrollViewProxy) {
-        if let lastSegment = store.liveSegments.last {
+        if store.isListening {
             withAnimation(VaporAnimation.driftCurve.animation(duration: VaporAnimation.normalDuration)) {
-                proxy.scrollTo(lastSegment.id, anchor: .bottom)
+                proxy.scrollTo("live-indicator", anchor: UnitPoint(x: 0.5, y: 0.95))
+            }
+        } else if let lastSegment = store.liveSegments.last {
+            withAnimation(VaporAnimation.driftCurve.animation(duration: VaporAnimation.normalDuration)) {
+                proxy.scrollTo(lastSegment.id, anchor: UnitPoint(x: 0.5, y: 0.95))
             }
         }
     }
@@ -325,15 +361,24 @@ public struct RecordingView: View {
 
     // MARK: - Speaker Setup Card
 
+    @ViewBuilder
     private var speakerSetupCard: some View {
         VStack(spacing: 0) {
+            Rectangle()
+                .fill(VaporColor.fog)
+                .frame(height: 1)
+
             if store.speakerSetupExpanded {
                 speakerSetupExpanded
             } else {
                 speakerSetupCollapsed
             }
         }
+        .background(VaporColor.cloud)
+        .animation(.easeInOut(duration: 0.25), value: store.speakerSetupExpanded)
+        .animation(.easeInOut(duration: 0.25), value: store.selectedSpeakerCount)
     }
+
 
     private var speakerSetupCollapsed: some View {
         VStack(spacing: 12) {
@@ -365,9 +410,6 @@ public struct RecordingView: View {
         .padding(.top, 16)
         .padding(.horizontal, 24)
         .padding(.bottom, 24)
-        .background(
-            speakerSetupCardBackground
-        )
     }
 
     private var speakerSetupExpanded: some View {
@@ -413,9 +455,6 @@ public struct RecordingView: View {
             stopAndSaveButton(enabled: store.selectedSpeakerCount != nil)
         }
         .padding(24)
-        .background(
-            speakerSetupCardBackground
-        )
     }
 
     private var speakerCountPillRow: some View {
@@ -533,25 +572,6 @@ public struct RecordingView: View {
         .accessibilityIdentifier("stopAndSaveButton")
     }
 
-    private var speakerSetupCardBackground: some View {
-        UnevenRoundedRectangle(
-            topLeadingRadius: 16,
-            bottomLeadingRadius: 0,
-            bottomTrailingRadius: 0,
-            topTrailingRadius: 16
-        )
-        .fill(VaporColor.cloud)
-        .overlay(
-            UnevenRoundedRectangle(
-                topLeadingRadius: 16,
-                bottomLeadingRadius: 0,
-                bottomTrailingRadius: 0,
-                topTrailingRadius: 16
-            )
-            .strokeBorder(VaporColor.fog, lineWidth: 1)
-        )
-        .shadow(color: Color(hex: "#2D3748").opacity(0.063), radius: 16, x: 0, y: -4)
-    }
 
     // MARK: - Helpers
 
