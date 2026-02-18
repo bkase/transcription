@@ -26,7 +26,7 @@
     }
   ],
   "session" : {
-    "audioPath" : "audio.caf",
+    "audioPath" : "audio.m4a",
     "durationMs" : 600000,
     "endedAt" : "2024-01-25T00:10:00Z",
     "id" : "session-123",
