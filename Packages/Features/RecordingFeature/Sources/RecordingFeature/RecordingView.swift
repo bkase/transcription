@@ -376,7 +376,6 @@ public struct RecordingView: View {
         }
         .background(VaporColor.cloud)
         .animation(.easeInOut(duration: 0.25), value: store.speakerSetupExpanded)
-        .animation(.easeInOut(duration: 0.25), value: store.selectedSpeakerCount)
     }
 
 
@@ -470,7 +469,11 @@ public struct RecordingView: View {
         let label = count == 4 ? "4+" : "\(count)"
 
         return Button {
-            store.send(.selectSpeakerCount(count))
+            var transaction = Transaction()
+            transaction.animation = nil
+            withTransaction(transaction) {
+                store.send(.selectSpeakerCount(count))
+            }
         } label: {
             Text(label)
                 .font(.system(size: 15, weight: isSelected ? .medium : .regular))
@@ -488,6 +491,7 @@ public struct RecordingView: View {
                 )
         }
         .buttonStyle(PlainButtonStyle())
+        .transaction { $0.animation = nil }
         .accessibilityIdentifier("speakerCount\(count)")
     }
 

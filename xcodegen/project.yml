@@ -84,6 +84,8 @@ targets:
     platform: iOS
     sources:
       - path: ../App/Sources
+      - path: ../App/Resources
+        buildPhase: resources
     settings:
       base:
         DEVELOPMENT_TEAM: Y4U5GF9JQQ

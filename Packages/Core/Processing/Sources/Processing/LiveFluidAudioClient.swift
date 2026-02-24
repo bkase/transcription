@@ -138,16 +138,22 @@ public actor LiveFluidAudioClientActor {
     public func diarizeFile(audioFileURL: URL, speakerCount: Int?) async throws -> [DiarizationMapping.SpeakerSegment] {
         NSLog("[FluidAudio] diarizeFile called for: \(audioFileURL.lastPathComponent), speakerCount: \(String(describing: speakerCount))")
 
-        // Build config based on speaker count
-        let config: OfflineDiarizerConfig
+        // Config tuned via parameter sweep against AssemblyAI ground truth (75.7% accuracy)
+        var config = OfflineDiarizerConfig.default
+        // stepRatio 0.3 is the sweet spot — better than 0.2 (default) and 0.5 (previous)
+        config.segmentationStepRatio = 0.3
+        // Include overlapping speech in embeddings for better conversational diarization
+        config.embeddingExcludeOverlap = false
+        // 1.0s min segment ensures high-quality embeddings
+        config.minSegmentDuration = 1.0
+
         if let count = speakerCount, count <= 3 {
-            config = OfflineDiarizerConfig.default.withSpeakers(exactly: count)
+            config = config.withSpeakers(exactly: count)
             NSLog("[FluidAudio] Using exact speaker count: \(count)")
         } else if let count = speakerCount {
-            config = OfflineDiarizerConfig.default.withSpeakers(min: count)
+            config = config.withSpeakers(min: count)
             NSLog("[FluidAudio] Using min speaker count: \(count)")
         } else {
-            config = .default
             NSLog("[FluidAudio] Using default speaker config (auto-detect)")
         }
 

@@ -26,3 +26,9 @@ DerivedData/
 xcuserdata/
 *.xcworkspace
 !*.xcworkspace/contents.xcworkspacedata
+
+# API keys
+ASSEMBLYAI_API_KEY.txt
+
+# Large test audio files
+*.caf

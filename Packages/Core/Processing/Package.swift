@@ -37,6 +37,7 @@ let package = Package(
                 "Persistence",
                 "Observability",
                 .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "FluidAudio", package: "FluidAudio"),
             ]
         ),
     ]
