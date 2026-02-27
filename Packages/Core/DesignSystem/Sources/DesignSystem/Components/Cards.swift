@@ -47,7 +47,7 @@ public struct SessionCard: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: showMetadata ? 12 : 8) {
             // Header: title + status + speaker avatars + time
-            HStack(spacing: VaporSpacing.sm) {
+            HStack(alignment: .top, spacing: VaporSpacing.sm) {
                 Text(title)
                     .font(.system(size: 18, weight: .light))
                     .tracking(-0.2)

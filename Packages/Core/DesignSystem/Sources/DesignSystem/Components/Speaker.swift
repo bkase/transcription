@@ -311,7 +311,7 @@ public struct PersonCard: View {
             avatarView
 
             // Info
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(name)
                     .font(.system(size: 16, weight: .light))
                     .foregroundColor(VaporColor.textPrimary)
