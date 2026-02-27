@@ -1,7 +1,8 @@
 import XCTest
 
 /// E2E tests for the speaker assignment feature.
-/// Validates assigning a speaker and seeing it persist.
+/// Validates assigning a speaker during recording and seeing it persist
+/// in the session detail after Stop & Save triggers offline diarization.
 final class SpeakerAssignmentE2ETests: XCTestCase {
     var app: XCUIApplication!
 
@@ -18,13 +19,17 @@ final class SpeakerAssignmentE2ETests: XCTestCase {
         super.tearDown()
     }
 
-    /// Test that assigning a speaker persists when viewing the session.
-    /// Flow: Timeline -> Record -> Stop -> Open session -> Tap speaker chip -> Assign person -> Verify label changed
-    func testAssignSpeakerPersists() throws {
-        // Skip: Session card doesn't appear in timeline after recording stops
-        // TODO: Investigate why recorded session doesn't appear in timeline
-        throw XCTSkip("Session card not appearing in timeline after recording - needs investigation")
-
+    /// Test that assigning a speaker during recording persists after Stop & Save.
+    ///
+    /// Flow:
+    /// 1. Start recording
+    /// 2. Expand speaker setup → select 2 speakers
+    /// 3. Tap Speaker 1 row → sheet opens
+    /// 4. Create a new person "Alice" → confirm
+    /// 5. Verify "Alice" appears in speaker setup card
+    /// 6. Tap "Stop & Save"
+    /// 7. Wait for session detail → verify "Alice" appears in transcript
+    func testAssignSpeakerDuringRecordingPersists() throws {
         // 1. Launch the app
         app.launch()
 
@@ -32,107 +37,86 @@ final class SpeakerAssignmentE2ETests: XCTestCase {
         let settingsButton = app.buttons["settingsButton"]
         XCTAssertTrue(settingsButton.waitForExistence(timeout: 5), "Settings button should exist")
 
-        // 3. Start a recording to create a session with transcript segments
+        // 3. Start recording
         let startRecordingButton = app.buttons["startRecordingButton"]
         XCTAssertTrue(startRecordingButton.waitForExistence(timeout: 5), "Start recording button should exist")
         startRecordingButton.tap()
 
-        // 4. Wait for recording screen and some segments to appear
-        let stopRecordingButton = app.buttons["stopRecordingButton"]
-        XCTAssertTrue(stopRecordingButton.waitForExistence(timeout: 5), "Stop recording button should appear")
+        // 4. Wait for recording screen - look for the speaker setup toggle
+        let speakerSetupToggle = app.buttons["speakerSetupToggle"]
+        XCTAssertTrue(speakerSetupToggle.waitForExistence(timeout: 5), "Speaker setup toggle should appear on recording screen")
 
-        // Wait for at least one transcript segment to appear
-        let transcriptSegmentPredicate = NSPredicate(format: "identifier == 'transcriptSegment'")
-        let transcriptSegments = app.descendants(matching: .any).matching(transcriptSegmentPredicate)
-        XCTAssertTrue(transcriptSegments.firstMatch.waitForExistence(timeout: 10), "Transcript segment should appear during recording")
+        // 5. Expand speaker setup
+        speakerSetupToggle.tap()
 
-        // 5. Stop the recording
-        stopRecordingButton.tap()
+        // 6. Select speaker count 2
+        let speakerCount2 = app.buttons["speakerCount2"]
+        XCTAssertTrue(speakerCount2.waitForExistence(timeout: 3), "Speaker count 2 pill should appear")
+        speakerCount2.tap()
 
-        // 6. Wait for timeline to show with the new session
-        XCTAssertTrue(settingsButton.waitForExistence(timeout: 10), "Should return to timeline")
+        // 7. Wait for speaker rows to appear then tap Speaker 1 row
+        let speakerRow0 = app.buttons["speakerRow0"]
+        XCTAssertTrue(speakerRow0.waitForExistence(timeout: 5), "Speaker row 0 should appear after selecting count")
+        speakerRow0.tap()
 
-        // 7. Find and tap the session card
-        let sessionCardPredicate = NSPredicate(format: "identifier == 'sessionCard'")
-        let sessionCards = app.descendants(matching: .any).matching(sessionCardPredicate)
-        let sessionCardExists = sessionCards.firstMatch.waitForExistence(timeout: 10)
-        XCTAssertTrue(sessionCardExists, "Session card should appear in timeline")
-        sessionCards.firstMatch.tap()
-
-        // 8. Verify session detail screen appears
-        let backButton = app.buttons["backButton"]
-        XCTAssertTrue(backButton.waitForExistence(timeout: 5), "Back button should appear on session detail screen")
-
-        // Wait for transcript segments to load in session detail
-        let sessionDetailSegmentPredicate = NSPredicate(format: "identifier == 'transcriptSegment'")
-        let sessionDetailSegments = app.descendants(matching: .any).matching(sessionDetailSegmentPredicate)
-        XCTAssertTrue(sessionDetailSegments.firstMatch.waitForExistence(timeout: 10), "Transcript segments should appear in session detail")
-
-        // 9. Tap the unassigned speaker chip to open the speaker picker
-        let speakerChipPredicate = NSPredicate(format: "identifier == 'speakerUnassignedChip'")
-        let speakerChips = app.descendants(matching: .any).matching(speakerChipPredicate)
-        XCTAssertTrue(speakerChips.firstMatch.waitForExistence(timeout: 5), "Unassigned speaker chip should exist")
-        speakerChips.firstMatch.tap()
-
-        // 10. Verify speaker picker modal appears
+        // 8. Wait for the speaker picker sheet to appear
         let addNewPersonOption = app.buttons["addNewPersonOption"]
-        XCTAssertTrue(addNewPersonOption.waitForExistence(timeout: 5), "Add new person option should appear in speaker picker")
+        XCTAssertTrue(addNewPersonOption.waitForExistence(timeout: 5), "Add new person option should appear in speaker picker sheet")
 
-        // 11. Tap "Add new person" to create a new person
+        // 9. Tap "Add new person" to open the create form
         addNewPersonOption.tap()
 
-        // 12. Enter a name for the new person
-        let nameInput = app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'newPersonNameInput'")).firstMatch
-        XCTAssertTrue(nameInput.waitForExistence(timeout: 5), "Name input should appear")
-
-        // Find the text field inside the name input and type
-        let textField = nameInput.textFields.firstMatch
-        if textField.exists {
-            textField.tap()
-            textField.typeText("Alice")
+        // 10. Find the name text field and type "Alice"
+        // SwiftUI TextField with placeholder "Name" - try multiple selectors
+        let nameTextField = app.textFields["Name"]
+        if nameTextField.waitForExistence(timeout: 5) {
+            nameTextField.tap()
+            nameTextField.typeText("Alice")
         } else {
-            // Try finding any text field in the modal
+            // Fallback: tap the newPersonNameInput container to focus the field
+            let nameInput = app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'newPersonNameInput'")).firstMatch
+            XCTAssertTrue(nameInput.waitForExistence(timeout: 3), "Name input container should appear")
+            nameInput.tap()
+            // After tapping the container, try finding any text field
             let anyTextField = app.textFields.firstMatch
-            if anyTextField.waitForExistence(timeout: 2) {
-                anyTextField.tap()
-                anyTextField.typeText("Alice")
-            }
+            XCTAssertTrue(anyTextField.waitForExistence(timeout: 3), "Text field should be focusable")
+            anyTextField.typeText("Alice")
         }
 
-        // 13. Save the new person
-        let saveButton = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Save'")).firstMatch
+        // 11. Tap "Save" to create the person
+        // Use exact match to avoid hitting "Stop & Save"
+        let saveButton = app.buttons.matching(NSPredicate(format: "label ==[c] 'Save'")).firstMatch
         XCTAssertTrue(saveButton.waitForExistence(timeout: 5), "Save button should appear")
         saveButton.tap()
 
-        // 14. Wait for person to be created and shown in picker list
-        // After saving, the new person is selected and we can confirm
+        // 12. Wait for Confirm button and tap it
         let confirmButton = app.buttons["confirmSelectionButton"]
-        XCTAssertTrue(confirmButton.waitForExistence(timeout: 5), "Confirm button should appear after selecting a person")
+        XCTAssertTrue(confirmButton.waitForExistence(timeout: 5), "Confirm button should appear after person is created and selected")
         confirmButton.tap()
 
-        // 15. Wait for modal to dismiss
-        // First wait for the modal to dismiss (back button should be visible again without obstruction)
-        XCTAssertTrue(backButton.waitForExistence(timeout: 5), "Modal should dismiss")
+        // 13. Wait for sheet to dismiss - speaker setup card should be visible again
+        XCTAssertTrue(speakerRow0.waitForExistence(timeout: 5), "Speaker row should be visible after sheet dismisses")
 
-        // 16. Navigate back to timeline and re-open the session to verify persistence
-        // This forces a full reload of the session data
-        backButton.tap()
-        XCTAssertTrue(settingsButton.waitForExistence(timeout: 5), "Should return to timeline")
+        // 14. Verify "Alice" now appears in the speaker setup card
+        let aliceInSetup = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] 'Alice'")).firstMatch
+        XCTAssertTrue(aliceInSetup.waitForExistence(timeout: 5), "Alice should appear as speaker name in setup card")
 
-        // Tap the session again
-        XCTAssertTrue(sessionCards.firstMatch.waitForExistence(timeout: 5), "Session card should still exist")
-        sessionCards.firstMatch.tap()
+        // 15. Tap "Stop & Save" to stop recording with speaker count
+        let stopAndSaveButton = app.buttons["stopAndSaveButton"]
+        XCTAssertTrue(stopAndSaveButton.waitForExistence(timeout: 3), "Stop & Save button should be enabled")
+        stopAndSaveButton.tap()
 
-        // 17. Verify the speaker assignment persisted
-        XCTAssertTrue(backButton.waitForExistence(timeout: 5), "Back button should appear again")
+        // 16. Wait for session detail view to appear
+        let sessionTitle = app.staticTexts["sessionTitle"]
+        XCTAssertTrue(sessionTitle.waitForExistence(timeout: 10), "Should navigate to session detail after Stop & Save")
 
-        // Wait for segments to load
-        XCTAssertTrue(sessionDetailSegments.firstMatch.waitForExistence(timeout: 10), "Segments should load")
-
-        // Now check that "ALICE" appears (speaker label should show the assigned name)
-        // Since the speaker label is inside a Button, we need to search all descendants
-        let aliceTextPredicate = NSPredicate(format: "label CONTAINS[c] 'ALICE'")
-        let aliceElements = app.descendants(matching: .any).matching(aliceTextPredicate)
-        XCTAssertTrue(aliceElements.firstMatch.waitForExistence(timeout: 5), "Speaker label should show 'ALICE' after re-opening session")
+        // 17. Wait for offline transcription to complete
+        // The session detail view polls for processing state changes.
+        // With mock dependencies, offline transcription is nearly instant.
+        // Wait for transcript segments to appear with speaker information.
+        let aliceInDetail = app.descendants(matching: .any).matching(
+            NSPredicate(format: "label CONTAINS[c] 'Alice'")
+        ).firstMatch
+        XCTAssertTrue(aliceInDetail.waitForExistence(timeout: 15), "Alice should appear as speaker label in session detail after offline transcription")
     }
 }

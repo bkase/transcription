@@ -57,6 +57,8 @@ struct VaporApp: App {
                 $0.userProfileClient = .inMemory(storage: profileStorage)
                 // Use passthrough image client (no actual image processing in tests)
                 $0.profileImageClient = .passthrough
+                // Use no-op feedback client (AVAudioEngine crashes on headless simulator)
+                $0.feedbackClient = .previewValue
             } operation: {
                 Store(initialState: AppFeature.State()) {
                     AppFeature()

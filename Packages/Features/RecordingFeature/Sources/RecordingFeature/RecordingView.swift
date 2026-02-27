@@ -1071,10 +1071,11 @@ private extension View {
         store: Bindable<StoreOf<RecordingFeature>>,
         @ViewBuilder sheetContent: @escaping (StoreOf<SpeakerPickerFeature>) -> Content
     ) -> some View {
-        self.fullScreenCover(
+        self.sheet(
             item: store.scope(state: \.speakerPicker, action: \.speakerPicker)
         ) { speakerPickerStore in
             sheetContent(speakerPickerStore)
+                .presentationDetents([.medium, .large])
         }
     }
     #else
