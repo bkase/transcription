@@ -47,7 +47,8 @@ struct DiarizationTuningTests {
         let fluidSpeakers = Set(segments.map(\.speakerId))
         let gtSpeakers = Set(groundTruth.map(\.speaker))
 
-        guard fluidSpeakers.count >= 2, gtSpeakers.count >= 2 else {
+        // Only supports exactly 2 speakers per group (identity + swap covers all permutations)
+        guard fluidSpeakers.count == 2, gtSpeakers.count == 2 else {
             return (0, 0, 0)
         }
 
@@ -58,7 +59,6 @@ struct DiarizationTuningTests {
         var bestCorrect = 0
         var bestTotal = 0
 
-        // Generate all permutations of fluid speakers mapped to GT speakers
         let mappings: [[(String, String)]] = [
             Array(zip(gtList, fluidList)),
             Array(zip(gtList, fluidList.reversed())),
@@ -76,7 +76,6 @@ struct DiarizationTuningTests {
             )
 
             for windowStart in stride(from: 0, to: totalDurationMs, by: 100) {
-                let windowEnd = windowStart + 100
                 let windowMidS = Float(windowStart + 50) / 1000.0
 
                 // Find GT speaker at this time

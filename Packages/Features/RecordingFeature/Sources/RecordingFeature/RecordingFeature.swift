@@ -692,7 +692,35 @@ public struct RecordingFeature {
 
             case let .selectSpeakerCount(count):
                 state.selectedSpeakerCount = count
-                return .none
+
+                // If we're recording, create placeholder tracks in the DB so the user can name them
+                guard let sessionID = state.sessionID, state.isRecording else {
+                    return .none
+                }
+
+                return .run { [sessionID, count, databaseClient, uuid] send in
+                    // Fetch existing tracks
+                    let existingTracks = try await databaseClient.fetchSpeakerTracks(sessionID)
+
+                    // If we have fewer tracks than the count, create placeholders for the missing ones
+                    if existingTracks.count < count {
+                        for i in (existingTracks.count + 1)...count {
+                            // Only create if displayOrder i doesn't exist yet
+                            if !existingTracks.contains(where: { $0.displayOrder == i }) {
+                                let track = SpeakerTrackRecord(
+                                    id: uuid().uuidString,
+                                    sessionId: sessionID.rawValue,
+                                    machineSpeakerId: "placeholder-\(i)",
+                                    displayOrder: i
+                                )
+                                try await databaseClient.createSpeakerTrack(track)
+                            }
+                        }
+                    }
+
+                    // Trigger a reload of segments and tracks to update the UI
+                    await send(.processorEvent(.didAppendSegment(TranscriptSegmentID("trigger-reload"))))
+                }
 
             case .stopAndSave:
                 guard state.isRecording, state.selectedSpeakerCount != nil else { return .none }

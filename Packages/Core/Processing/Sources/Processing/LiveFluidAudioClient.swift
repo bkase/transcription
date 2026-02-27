@@ -486,7 +486,15 @@ public actor LiveFluidAudioClientActor {
         let maxOverlap = min(existingWords.count, windowWords.count)
 
         for overlapLen in stride(from: maxOverlap, through: 1, by: -1) {
-            if Array(existingWords.suffix(overlapLen)) == Array(windowWords.prefix(overlapLen)) {
+            let suffix = existingWords.suffix(overlapLen)
+            let prefix = windowWords.prefix(overlapLen)
+            
+            // Case-insensitive comparison of word sequences
+            let isMatch = zip(suffix, prefix).allSatisfy { s, p in
+                s.localizedCaseInsensitiveCompare(p) == .orderedSame
+            }
+
+            if isMatch {
                 let newWords = windowWords.dropFirst(overlapLen)
                 if newWords.isEmpty { return existing }
                 return existing + " " + newWords.joined(separator: " ")

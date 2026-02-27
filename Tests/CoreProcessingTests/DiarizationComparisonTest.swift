@@ -15,6 +15,15 @@ struct DiarizationComparisonTest {
         .appendingPathComponent("Library/Application Support/FluidAudio/Models")
 
     @Test func exactSpeakers2Transcript() async throws {
+        guard FileManager.default.fileExists(atPath: Self.audioURL.path) else {
+            print("⚠️ Test audio not found at \(Self.audioURL.path), skipping")
+            return
+        }
+        guard FileManager.default.fileExists(atPath: Self.transcriptURL.path) else {
+            print("⚠️ Transcript not found at \(Self.transcriptURL.path), skipping")
+            return
+        }
+
         let config = OfflineDiarizerConfig.default.withSpeakers(exactly: 2)
         let manager = OfflineDiarizerManager(config: config)
         try await manager.prepareModels(directory: Self.modelsDir)

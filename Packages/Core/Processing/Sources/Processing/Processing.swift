@@ -1294,13 +1294,17 @@ public actor RecordingProcessor {
             try await databaseClient.deleteTranscriptSegmentsForSession(sessionId)
             NSLog("[OfflineTranscription] Deleted existing transcript segments")
 
+            // Fetch existing speaker tracks before deleting them to preserve person assignments
+            let existingTracks = (try? await databaseClient.fetchSpeakerTracks(sessionId)) ?? []
+
             // Delete existing speaker tracks and recreate them based on enriched results
             try await databaseClient.deleteSpeakerTracksForSession(sessionId)
 
-            // Persist enriched segments and build speaker tracks
+            // Persist enriched segments and build speaker tracks, preserving assignments
             let speakerCount = try await persistEnrichedSegments(
                 enrichedSegments,
                 sessionId: sessionId,
+                existingTracks: existingTracks,
                 logPrefix: "[OfflineTranscription]"
             )
 
@@ -1472,10 +1476,18 @@ public actor RecordingProcessor {
     private func persistEnrichedSegments(
         _ segments: [TranscriptSegment],
         sessionId: SessionID,
+        existingTracks: [SpeakerTrackRecord] = [],
         logPrefix: String
     ) async throws -> Int {
         var seenSpeakers: Set<String> = []
         let now = date.now
+
+        // Create a lookup for person assignments by display order from existing tracks.
+        // This allows us to preserve speaker names assigned during live recording
+        // (even placeholders) when we recreate tracks after offline diarization.
+        let personAssignments = Dictionary(uniqueKeysWithValues: existingTracks.compactMap { track in
+            track.personId.map { (track.displayOrder, $0) }
+        })
 
         for segment in segments {
             // Create speaker track if this is a new speaker
@@ -1488,7 +1500,8 @@ public actor RecordingProcessor {
                     id: trackId,
                     sessionId: sessionId.rawValue,
                     machineSpeakerId: speakerId,
-                    displayOrder: displayOrder
+                    displayOrder: displayOrder,
+                    personId: personAssignments[displayOrder]
                 )
                 try await databaseClient.createSpeakerTrack(speakerTrack)
             }
@@ -1629,13 +1642,17 @@ public actor RecordingProcessor {
             try await databaseClient.deleteTranscriptSegmentsForSession(sessionId)
             NSLog("[RetryOfflineTranscription] Deleted existing transcript segments")
 
+            // Fetch existing speaker tracks before deleting them to preserve person assignments
+            let existingTracks = (try? await databaseClient.fetchSpeakerTracks(sessionId)) ?? []
+
             // Delete existing speaker tracks and recreate them based on enriched results
             try await databaseClient.deleteSpeakerTracksForSession(sessionId)
 
-            // Persist enriched segments and build speaker tracks
+            // Persist enriched segments and build speaker tracks, preserving assignments
             let speakerCount = try await persistEnrichedSegments(
                 enrichedSegments,
                 sessionId: sessionId,
+                existingTracks: existingTracks,
                 logPrefix: "[RetryOfflineTranscription]"
             )
 
