@@ -706,6 +706,8 @@ public actor RecordingProcessor {
         continuation.yield(.didStart(sessionId))
 
         // No audio session config, no mic capture, no file writing — just read from file
+        // Store audio file URL so offline transcription can use it after playback
+        self.currentAudioFileURL = audioFileURL
 
         // Read audio file and create a stream of AudioFrames
         let audioFile = try AVAudioFile(forReading: audioFileURL)
@@ -1010,20 +1012,6 @@ public actor RecordingProcessor {
     }
 
     private func finalizeSession(_ sessionId: SessionID, audioFileURL: URL?, speakerCount: Int? = nil, isFilePlayback: Bool = false) async {
-        // Short-circuit for file playback — no offline transcription, no audio path
-        if isFilePlayback {
-            guard var session = try? await databaseClient.fetchSession(sessionId) else {
-                eventContinuation?.yield(.didFail("Failed to fetch session for finalization"))
-                return
-            }
-            session.processingState = .processed
-            session.audioPath = nil
-            session.updatedAt = date.now
-            try? await databaseClient.updateSession(session)
-            eventContinuation?.yield(.didFinish(sessionId))
-            return
-        }
-
         let now = date.now
 
         // Fetch current session
