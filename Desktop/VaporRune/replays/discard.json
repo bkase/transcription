@@ -1,0 +1,11 @@
+{
+  "events": [
+    {"t": 0.1, "type": "tap", "key": "startRecordingButton"},
+    {"t": 0.75, "type": "tap", "key": "backButton"},
+    {"t": 1.15, "type": "tap", "key": "cancelModal"},
+    {"t": 1.65, "type": "mark", "name": "still-recording"},
+    {"t": 1.80, "type": "tap", "key": "backButton"},
+    {"t": 2.30, "type": "tap", "key": "discardRecording"},
+    {"t": 2.90, "type": "mark", "name": "end"}
+  ]
+}
