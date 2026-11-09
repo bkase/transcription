@@ -1,12 +1,38 @@
 # Vapor on Rune
 
-A macOS desktop slice of Vapor's audio recording flow. Start from the Timeline, pause or resume the recording, choose a speaker count, optionally name the speakers, and stop and save. A saved recording can be found by title or speaker name and played from its detail screen. Back asks before discarding a take.
+A macOS and iOS slice of Vapor's audio recording flow. Start from the Timeline, pause or resume the recording, choose a speaker count, optionally name the speakers, and stop and save. A saved recording can be found by title or speaker name and played from its detail screen. Back asks before discarding a take.
 
-The port reads the shared [Vapor tokens](../../tokens.json) and uses San Francisco and SF Symbols from the running Mac. The recording header and speaker card follow the SwiftUI layouts. The native window replaces the iPhone safe areas. Recording uses Rune's AVFoundation backend. Speaker names are local recording metadata. This slice records audio only.
+The port reads the shared [Vapor tokens](../../tokens.json) and uses San Francisco and SF Symbols from the host OS. The recording header and speaker card follow the SwiftUI layouts. The iOS host honors the safe areas and keyboard insets. Recording uses Rune's AVFoundation backend. Speaker names are local recording metadata. This slice records audio only.
 
 ## Run on macOS
 
 From this directory, run `cargo run --locked`. To build a Finder-launchable app with its own microphone usage description, run `./bundle.sh` and open the printed app path. Recordings are stored in `~/Library/Application Support/Vapor Rune`.
+
+## Run on iOS
+
+The app embeds Rune's `LayerHost` in a UIKit view backed by `CAMetalLayer`. Rune draws the shared views and handles touch and motion. UIKit hosts the keyboard fields, presents Rune controls to accessibility, and configures the audio session. The [Rune fork](https://github.com/bkase/rune) enables native AVFoundation capture and playback for embedded iOS apps.
+
+On Apple silicon, install the pinned Rust toolchain and its two iOS targets, then generate the Xcode project.
+
+```sh
+rustup target add aarch64-apple-ios-sim aarch64-apple-ios
+xcodegen generate --spec ios/project.yml
+```
+
+For a headless simulator run, set `SIMULATOR_ID` to the desired device UDID and run the following from this directory. The permission grant applies to the simulator test app. A normal device launch asks for permission when recording starts.
+
+```sh
+xcrun simctl bootstatus "$SIMULATOR_ID" -b
+xcodebuild build-for-testing -project ios/VaporRune.xcodeproj -scheme VaporRune \
+  -derivedDataPath target/ios -destination "id=$SIMULATOR_ID" CODE_SIGNING_ALLOWED=NO
+xcrun simctl install "$SIMULATOR_ID" target/ios/Build/Products/Debug-iphonesimulator/Vapor.app
+xcrun simctl privacy "$SIMULATOR_ID" grant microphone com.vapor.rune-ios
+xcodebuild test-without-building -project ios/VaporRune.xcodeproj -scheme VaporRune \
+  -derivedDataPath target/ios -destination "id=$SIMULATOR_ID" \
+  -parallel-testing-enabled NO -collect-test-diagnostics never
+```
+
+For a physical iPhone, select a signing team for the VaporRune app target in the generated Xcode project.
 
 ## Replay offscreen
 

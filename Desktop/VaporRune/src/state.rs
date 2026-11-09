@@ -82,6 +82,15 @@ impl State {
         let (folder, error) = storage_folder(scratch)
             .map(|folder| (folder, None))
             .unwrap_or_else(|error| (PathBuf::new(), Some(error.to_string())));
+        Self::from_folder(folder, error, scratch)
+    }
+
+    #[cfg(target_os = "ios")]
+    pub fn in_folder(folder: PathBuf) -> Self {
+        Self::from_folder(folder, None, false)
+    }
+
+    fn from_folder(folder: PathBuf, error: Option<String>, scratch: bool) -> Self {
         let mut sessions = Vec::new();
         if let Ok(entries) = fs::read_dir(&folder) {
             for entry in entries.flatten() {

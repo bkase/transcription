@@ -20,7 +20,7 @@ impl Symbol {
     }
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 pub fn symbol(spec: Symbol, ink: &'static str) -> El {
     use std::{cell::RefCell, collections::HashMap};
 
@@ -95,7 +95,7 @@ fn load(spec: Symbol, ink: &str) -> Option<(rune::Image, f32, f32)> {
     })
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
 pub fn symbol(spec: Symbol, ink: &'static str) -> El {
     let glyph = match spec.name {
         "chevron.left" => "‹",
@@ -115,4 +115,56 @@ pub fn symbol(spec: Symbol, ink: &'static str) -> El {
         Weight::Medium => 500.0,
     };
     crate::design::label(glyph, f32::from(spec.size), weight, 0.0, ink)
+}
+
+#[cfg(target_os = "ios")]
+fn load(spec: Symbol, ink: &str) -> Option<(rune::Image, f32, f32)> {
+    use objc2::rc::Retained;
+    use objc2_foundation::NSData;
+    use rune::color::srgb_encode;
+    use std::{
+        ffi::{CString, c_char},
+        sync::{Arc, LazyLock},
+    };
+
+    unsafe extern "C" {
+        fn vapor_symbol(
+            name: *const c_char,
+            point_size: f32,
+            weight: i32,
+            red: f32,
+            green: f32,
+            blue: f32,
+            width: *mut f32,
+            height: *mut f32,
+        ) -> *mut NSData;
+    }
+
+    static IMAGES: LazyLock<rune::ImageCache> =
+        LazyLock::new(|| rune::ImageCache::new(Arc::new(|| {})));
+    let name = CString::new(spec.name).ok()?;
+    let color = crate::design::color(ink);
+    let weight = match spec.weight {
+        Weight::Light => 0,
+        Weight::Regular => 1,
+        Weight::Medium => 2,
+    };
+    let (mut width, mut height) = (0.0, 0.0);
+    // The UIKit host calls the view on the main thread. The callback copies the name
+    // immediately and gives Rust one retained NSData containing the symbol's PNG.
+    let png = unsafe {
+        Retained::from_raw(vapor_symbol(
+            name.as_ptr(),
+            f32::from(spec.size),
+            weight,
+            srgb_encode(color.r),
+            srgb_encode(color.g),
+            srgb_encode(color.b),
+            &mut width,
+            &mut height,
+        ))
+    }?;
+    let image = IMAGES.load(png.to_vec());
+    image.wait().ok()?;
+    Some((image, width, height))
 }

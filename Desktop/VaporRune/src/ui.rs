@@ -138,8 +138,8 @@ fn timeline(s: &State) -> El {
                 .key("search")
                 .label("Search recordings")
                 .grow(1.0)
-                .placeholder("Search recordings...", color("textTertiary"))
-                .color(color("textPrimary"))
+                .placeholder("Search recordings...", input_ink("textTertiary"))
+                .color(input_ink("textPrimary"))
                 .on_edit(|s: &mut State| &mut s.search),
         );
     let record = button(
@@ -272,7 +272,9 @@ fn recording(s: &State, draft: &Draft) -> El {
 }
 
 fn recording_header(s: &State, draft: &Draft, paused: bool) -> El {
-    let (status, ink, glyph, key, action, opacity) = if paused {
+    let (status, ink, glyph, key, action, opacity) = if draft.status == RecorderState::Stopped {
+        ("STOPPED", "sky", PLAY, "resumeButton", "Resume", 0.5)
+    } else if paused {
         ("PAUSED", "sky", PLAY, "resumeButton", "Resume", 0.5)
     } else {
         ("RECORDING", "recording", PAUSE, "pauseButton", "Pause", 0.8)
@@ -533,8 +535,8 @@ fn recording_modal(draft: &Draft, modal: RecordingModal) -> El {
                 .px(sp.sm)
                 .radius(12.0)
                 .fill(color("haze"))
-                .color(color("textPrimary"))
-                .placeholder("Speaker name", color("textTertiary"))
+                .color(input_ink("textPrimary"))
+                .placeholder("Speaker name", input_ink("textTertiary"))
                 .on_edit(|s: &mut State| match &mut s.page {
                     Page::Recording(draft) => &mut draft.name_edit,
                     _ => unreachable!("name field is only mounted on the recording screen"),
@@ -596,7 +598,7 @@ pub fn close_modal(s: &mut State) {
     }
 }
 
-fn apply_name(s: &mut State) {
+pub(crate) fn apply_name(s: &mut State) {
     if let Page::Recording(draft) = &mut s.page {
         draft.save_name();
     }
@@ -738,5 +740,13 @@ fn clock(seconds: u64, pad_minutes: bool) -> String {
         format!("{:02}:{:02}", seconds / 60, seconds % 60)
     } else {
         format!("{}:{:02}", seconds / 60, seconds % 60)
+    }
+}
+
+fn input_ink(name: &str) -> Color {
+    if cfg!(target_os = "ios") {
+        Color::TRANSPARENT
+    } else {
+        color(name)
     }
 }

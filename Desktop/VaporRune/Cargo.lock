@@ -2781,7 +2781,7 @@ dependencies = [
 [[package]]
 name = "rune"
 version = "0.0.1"
-source = "git+https://github.com/anomalyco/rune?rev=f3160022ede63bca8354c1c85e5e4d3ab54937cb#f3160022ede63bca8354c1c85e5e4d3ab54937cb"
+source = "git+https://github.com/bkase/rune?rev=17b51e5a22dca39992ffdc9261829e263e7c6d7e#17b51e5a22dca39992ffdc9261829e263e7c6d7e"
 dependencies = [
  "accesskit",
  "accesskit_macos",
@@ -2861,12 +2861,12 @@ dependencies = [
 [[package]]
 name = "rune-motion"
 version = "0.1.0"
-source = "git+https://github.com/anomalyco/rune?rev=f3160022ede63bca8354c1c85e5e4d3ab54937cb#f3160022ede63bca8354c1c85e5e4d3ab54937cb"
+source = "git+https://github.com/bkase/rune?rev=17b51e5a22dca39992ffdc9261829e263e7c6d7e#17b51e5a22dca39992ffdc9261829e263e7c6d7e"
 
 [[package]]
 name = "rune-staging"
 version = "0.0.1"
-source = "git+https://github.com/anomalyco/rune?rev=f3160022ede63bca8354c1c85e5e4d3ab54937cb#f3160022ede63bca8354c1c85e5e4d3ab54937cb"
+source = "git+https://github.com/bkase/rune?rev=17b51e5a22dca39992ffdc9261829e263e7c6d7e#17b51e5a22dca39992ffdc9261829e263e7c6d7e"
 dependencies = [
  "wgpu",
 ]
@@ -2874,7 +2874,7 @@ dependencies = [
 [[package]]
 name = "rune-taffy"
 version = "0.0.1"
-source = "git+https://github.com/anomalyco/rune?rev=f3160022ede63bca8354c1c85e5e4d3ab54937cb#f3160022ede63bca8354c1c85e5e4d3ab54937cb"
+source = "git+https://github.com/bkase/rune?rev=17b51e5a22dca39992ffdc9261829e263e7c6d7e#17b51e5a22dca39992ffdc9261829e263e7c6d7e"
 dependencies = [
  "taffy",
 ]
@@ -3706,6 +3706,7 @@ dependencies = [
 name = "vapor-rune"
 version = "0.1.0"
 dependencies = [
+ "accesskit",
  "objc2 0.6.5",
  "objc2-app-kit 0.3.2",
  "objc2-foundation 0.3.2",
