@@ -111,6 +111,48 @@ final class RecordingTests: XCTestCase {
     }
 
     @MainActor
+    func testSimulatorHotReloadKeepsRecordingAndRebuildsHandlers() throws {
+        let app = XCUIApplication(bundleIdentifier: "com.vapor.rune-ios.hot")
+        guard app.state != .notRunning && app.state != .unknown else {
+            throw XCTSkip("Start the simulator hot-reload launcher before running this test")
+        }
+        app.activate()
+        let start = app.buttons["startRecordingButton"]
+        XCTAssertTrue(start.waitForExistence(timeout: 12))
+        start.tap()
+        let pause = app.buttons["pauseButton"]
+        XCTAssertTrue(pause.waitForExistence(timeout: 12))
+        let timer = app.staticTexts["recordingTimer"]
+        waitForLabel(timer, toChangeFrom: "00:00")
+        pause.tap()
+        let resume = app.buttons["resumeButton"]
+        XCTAssertTrue(resume.waitForExistence(timeout: 5))
+        let recordedTime = timer.label
+
+        XCTAssertTrue(app.staticTexts["Paused after patch"].waitForExistence(timeout: 45))
+        XCTAssertTrue(app.staticTexts["Live Rust patch"].exists)
+        XCTAssertEqual(timer.label, recordedTime)
+        capture("Paused after native patch", in: app)
+        resume.tap()
+        XCTAssertTrue(pause.waitForExistence(timeout: 5))
+        waitForLabel(timer, toChangeFrom: recordedTime)
+
+        app.buttons["speakerSetupToggle"].tap()
+        let two = app.buttons["speakerCount2"]
+        XCTAssertTrue(two.waitForExistence(timeout: 5))
+        two.tap()
+        app.buttons["stopAndSaveButton"].tap()
+        XCTAssertTrue(app.buttons["Untitled Recording"].waitForExistence(timeout: 8))
+
+        let search = app.textFields["search"]
+        search.tap()
+        search.typeText("Hot speaker\n")
+        XCTAssertTrue(app.staticTexts["RESULTS"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Untitled Recording"].exists)
+        capture("Hot-reloaded simulator", in: app)
+    }
+
+    @MainActor
     private func launch(reset: Bool) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing"]

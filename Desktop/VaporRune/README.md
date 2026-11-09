@@ -34,6 +34,31 @@ xcodebuild test-without-building -project ios/VaporRune.xcodeproj -scheme VaporR
 
 For a physical iPhone, select a signing team for the VaporRune app target in the generated Xcode project.
 
+## Hot reload on the iOS Simulator
+
+Use the pinned Rune fork checkout, Dioxus CLI 0.7.10, and Python 3.13 or later.
+From this directory, start a native simulator dev session. The launcher boots
+the selected simulator headlessly and installs a separate `com.vapor.rune-ios.hot`
+bundle. Save a Rust view or handler body edit in `src/ui.rs` to patch the running app.
+The launcher reports when the first patched frame is presented. Model layout,
+Swift shell, and other incompatible changes rebuild and relaunch.
+
+```sh
+/path/to/rune/scripts/rune-hot --manifest "$PWD/Cargo.toml" --patch src/ui.rs \
+  --ios-simulator "$SIMULATOR_ID" --prepare ios/prepare-hot.sh --features ios-hot
+```
+
+The repeatable check uses a disposable source copy and XCUITest. It pauses a
+recording, exercises rejection of an incomplete edit, patches the view and Save
+handler, resumes and saves the recording, then reverts the patch in the same process.
+
+```sh
+python3 ios/check-hot.py /path/to/rune/scripts/rune-hot "$SIMULATOR_ID"
+```
+
+The test launcher grants microphone permission to the simulator dev bundle.
+Physical iPhones use the normal native build.
+
 ## Replay offscreen
 
 ```sh

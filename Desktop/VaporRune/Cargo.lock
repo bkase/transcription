@@ -2781,7 +2781,7 @@ dependencies = [
 [[package]]
 name = "rune"
 version = "0.0.1"
-source = "git+https://github.com/bkase/rune?rev=17b51e5a22dca39992ffdc9261829e263e7c6d7e#17b51e5a22dca39992ffdc9261829e263e7c6d7e"
+source = "git+https://github.com/bkase/rune?rev=394428df307394f61bd3e9eed2e8a8c9b0a28cf9#394428df307394f61bd3e9eed2e8a8c9b0a28cf9"
 dependencies = [
  "accesskit",
  "accesskit_macos",
@@ -2861,12 +2861,12 @@ dependencies = [
 [[package]]
 name = "rune-motion"
 version = "0.1.0"
-source = "git+https://github.com/bkase/rune?rev=17b51e5a22dca39992ffdc9261829e263e7c6d7e#17b51e5a22dca39992ffdc9261829e263e7c6d7e"
+source = "git+https://github.com/bkase/rune?rev=394428df307394f61bd3e9eed2e8a8c9b0a28cf9#394428df307394f61bd3e9eed2e8a8c9b0a28cf9"
 
 [[package]]
 name = "rune-staging"
 version = "0.0.1"
-source = "git+https://github.com/bkase/rune?rev=17b51e5a22dca39992ffdc9261829e263e7c6d7e#17b51e5a22dca39992ffdc9261829e263e7c6d7e"
+source = "git+https://github.com/bkase/rune?rev=394428df307394f61bd3e9eed2e8a8c9b0a28cf9#394428df307394f61bd3e9eed2e8a8c9b0a28cf9"
 dependencies = [
  "wgpu",
 ]
@@ -2874,7 +2874,7 @@ dependencies = [
 [[package]]
 name = "rune-taffy"
 version = "0.0.1"
-source = "git+https://github.com/bkase/rune?rev=17b51e5a22dca39992ffdc9261829e263e7c6d7e#17b51e5a22dca39992ffdc9261829e263e7c6d7e"
+source = "git+https://github.com/bkase/rune?rev=394428df307394f61bd3e9eed2e8a8c9b0a28cf9#394428df307394f61bd3e9eed2e8a8c9b0a28cf9"
 dependencies = [
  "taffy",
 ]

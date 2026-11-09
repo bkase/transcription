@@ -2,7 +2,9 @@ import AVFoundation
 import CoreText
 import UIKit
 
+#if !RUNE_HOT_HOST
 @main
+#endif
 final class VaporApp: UIResponder, UIApplicationDelegate {
     func application(
         _ application: UIApplication,
@@ -96,3 +98,11 @@ func vaporSymbol(
     height.pointee = Float(symbol.size.height)
     return Unmanaged.passRetained(bitmap as NSData).toOpaque()
 }
+
+
+#if RUNE_HOT_HOST
+@_cdecl("vapor_launch")
+func vaporLaunch() -> Int32 {
+    UIApplicationMain(CommandLine.argc, CommandLine.unsafeArgv, nil, NSStringFromClass(VaporApp.self))
+}
+#endif

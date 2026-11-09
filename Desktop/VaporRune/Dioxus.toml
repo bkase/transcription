@@ -1,0 +1,8 @@
+[bundle]
+identifier = "com.vapor.rune-ios.hot"
+
+[ios.plist]
+NSMicrophoneUsageDescription = "Vapor uses your microphone to capture audio recordings."
+UIApplicationSceneManifest = { UIApplicationSupportsMultipleScenes = false }
+UILaunchScreen = {}
+UISupportedInterfaceOrientations = ["UIInterfaceOrientationPortrait"]
