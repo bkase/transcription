@@ -1,0 +1,186 @@
+diff --git a/host/apple/Sources/ExactKit/IOS/ArrangementIOS.swift b/host/apple/Sources/ExactKit/IOS/ArrangementIOS.swift
+index 5cbdcfa1..15560070 100644
+--- a/host/apple/Sources/ExactKit/IOS/ArrangementIOS.swift
++++ b/host/apple/Sources/ExactKit/IOS/ArrangementIOS.swift
+@@ -1,6 +1,7 @@
+ #if os(iOS)
+ import UIKit
+
++#if !EXACT_NO_IOS_ARRANGEMENT
+ /// UIKit containment for two retained authored panes
+ @available(iOS 27.1, *)
+ final class ArrangementHost {
+@@ -344,6 +345,22 @@ final class ArrangementHost {
+         syncInsets()
+     }
+ }
++#else
++@available(iOS 27.1, *)
++final class ArrangementHost {
++    init(_ presenter: Presenter) {}
++    func record(_ node: NodeView, children: [UInt32]) {}
++    func owns(_ node: NodeView, under parent: NodeView) -> Bool { false }
++    func sync() {}
++    func panes(in node: NodeView) -> [NodeView]? { nil }
++    func scrollers(in route: NodeView, top: Bool) -> [NodeView] { [] }
++    func cancelScrollHandoff(_ id: UInt32) {}
++    var hiddenPanes: [UInt32] { [] }
++    var blocks: [UInt32: (block: HostBlock, placement: BlockPlacement?)] { [:] }
++    func remove(_ id: UInt32) {}
++    func reset() {}
++}
++#endif
+ #endif
+
+ #if os(iOS) || os(tvOS)
+diff --git a/host/apple/Sources/ExactKit/NativeHatches.swift b/host/apple/Sources/ExactKit/NativeHatches.swift
+index 65a6bdf7..353b07fd 100644
+--- a/host/apple/Sources/ExactKit/NativeHatches.swift
++++ b/host/apple/Sources/ExactKit/NativeHatches.swift
+@@ -129,7 +129,7 @@ private let hatchAfter: HatchAfterFn = { host, token, ms in hatchSession(host)?.
+
+ private typealias HatchArrangementFn = @convention(c) (UnsafeMutableRawPointer?, UInt32, UnsafeMutableRawPointer?) -> Int32
+ private let hatchArrangement: HatchArrangementFn = { host, node, object in
+-    #if os(iOS)
++    #if os(iOS) && !EXACT_NO_IOS_ARRANGEMENT
+     if #available(iOS 27.1, *), let presenter = hatchSession(host)?.presenter {
+         let controller = object.map { Unmanaged<AnyObject>.fromOpaque($0).takeUnretainedValue() }
+         guard object == nil || controller is UIArrangementViewController else { return 1 }
+diff --git a/host/apple/Sources/ExactKit/NativeModule.swift b/host/apple/Sources/ExactKit/NativeModule.swift
+index c8543706..eb98cdb6 100644
+--- a/host/apple/Sources/ExactKit/NativeModule.swift
++++ b/host/apple/Sources/ExactKit/NativeModule.swift
+@@ -679,6 +679,7 @@ final class NativeViews {
+     }
+
+     var hasAppModule = false
++    private var boundGeneration: Int?
+
+     /// After first pixel, before data activates: load the artifact and make
+     /// the session's instance, so the first `native.call` pays for neither.
+@@ -687,8 +688,10 @@ final class NativeViews {
+     func prepareAppModule() {
+         activateHatches()
+         defer { if !hatchesConnected, pendingHatches == nil { session?.presenter.elements.releaseFrames() } } // they never will
+-        guard hasAppModule, instance == nil, case .success(let table) = self.table() else { return }
+-        _ = module(table)
++        guard hasAppModule, let session, boundGeneration != session.generation,
++              case .success(let table) = self.table(), case .success = module(table) else { return }
++        // A live plan gets a new runner while the session's native package instances survive.
++        boundGeneration = session.generation
+         // Its extensions answer their names from now on, outside the agent.
+         // Under the agent those the drive binds (`--bind`) answer as in
+         // production, and the rest are told they run under the agent: they
+@@ -696,7 +699,7 @@ final class NativeViews {
+         // substitute every other (LLP 1124 D7, LLP 1133.006 D8).
+         let real = ExactEnv.agentMode ? table.extensions.filter(ExactEnv.agentBind.contains) : table.extensions
+         let agent = ExactEnv.agentMode ? table.extensions.filter { !ExactEnv.agentBind.contains($0) } : []
+-        if !(real.isEmpty && agent.isEmpty), let session {
++        if !(real.isEmpty && agent.isEmpty) {
+             session.runtime.bindExtensions(real + agent.map { "agent " + $0 })
+         }
+     }
+@@ -800,6 +803,7 @@ final class NativeViews {
+         pendingHatches = nil
+         guard let instance, case .success(let table)? = NativeProcess.table else { return }
+         self.instance = nil
++        boundGeneration = nil
+         hatchesConnected = false
+         quitWork = nil
+         table.moduleDestroy(instance)
+diff --git a/host/apple/build.mjs b/host/apple/build.mjs
+index ec733a54..ccdf723d 100644
+--- a/host/apple/build.mjs
++++ b/host/apple/build.mjs
+@@ -765,7 +765,12 @@ async function main(args, lockHeld = false) {
+   // builds only the last; the second build is incremental and quick.
+   const swiftArgs = ['build', '-c', swiftWhole ? 'release' : 'debug', '--scratch-path', swiftBuildRoot, ...(swiftWhole ? [] : ['-Xswiftc', '-O']),
+     ...(production && optimize === 'size' ? ['-Xswiftc', '-Osize', '-Xswiftc', '-Xfrontend', '-Xswiftc', '-internalize-at-link'] : [])];
++  const arrangementFlags = ios && !tv && (() => {
++    const [major, minor = 0] = read('xcrun', ['--sdk', sdkName, '--show-sdk-version']).stdout.trim().split('.').map(Number);
++    return major < 27 || (major === 27 && minor < 1);
++  })() ? ['-DEXACT_NO_IOS_ARRANGEMENT'] : [];
+   if (ios) {
++    for (const flag of arrangementFlags) swiftArgs.push('-Xswiftc', flag);
+     swiftArgs.push(
+       '--triple', iosTripleFor(app, device, tv),
+       '--sdk', sdk,
+@@ -1150,7 +1155,7 @@ async function main(args, lockHeld = false) {
+   const frameworkStamp = (forIos, simulator, arch) => JSON.stringify([linkArgs(forIos), ...(modules.frameworks ?? []).flatMap(fw => frameworkSlice(fw, forIos, simulator, arch).stamped).map(f => { const st = statSync(f); return [f, st.size, st.mtimeMs]; })]);
+   const macArch = process.arch === 'arm64' ? 'arm64' : 'x86_64';
+   const iosArch = device ? 'arm64' : (iosTriple.startsWith('arm64') ? 'arm64' : 'x86_64');
+-  const moduleArgs = (sdkFor, targetArgs, out, forIos = false, simulator = false, arch = macArch) => ['--sdk', sdkFor, 'swiftc', '-module-cache-path', resolve(swiftBuildRoot, 'modules-module-cache'), '-parse-as-library', '-emit-library', '-O', '-swift-version', '5', '-module-name', 'ExactAppModules', ...moduleSources, ...(packages.length ? ['-I', packageDir, ...packageObjects] : []), ...frameworkArgs(forIos, simulator, arch), ...linkArgs(forIos), '-o', out, ...targetArgs];
++  const moduleArgs = (sdkFor, targetArgs, out, forIos = false, simulator = false, arch = macArch) => ['--sdk', sdkFor, 'swiftc', '-module-cache-path', resolve(swiftBuildRoot, 'modules-module-cache'), '-parse-as-library', '-emit-library', '-O', '-swift-version', '5', '-module-name', 'ExactAppModules', ...arrangementFlags, ...moduleSources, ...(packages.length ? ['-I', packageDir, ...packageObjects] : []), ...frameworkArgs(forIos, simulator, arch), ...linkArgs(forIos), '-o', out, ...targetArgs];
+   const macTarget = ['-target', moduleTripleFor(app, false)];
+   // Each package's Swift module for this target, before the app's module links it: once, and only when an arm
+   // linking it is compiled anew (its copied sources and `packageStamp` are that arm's key; its objects' paths this
+diff --git a/host/apple/modules/ExactNativeModule.swift b/host/apple/modules/ExactNativeModule.swift
+index 6e367cde..28e719aa 100644
+--- a/host/apple/modules/ExactNativeModule.swift
++++ b/host/apple/modules/ExactNativeModule.swift
+@@ -910,7 +910,7 @@ public final class ExactElement {
+         if isLive { hatches?.owns(scope: scopeName, node: node, kind: 1, object: recognizer, what, surface: surface) }
+     }
+
+-    #if os(iOS)
++    #if os(iOS) && !EXACT_NO_IOS_ARRANGEMENT
+     /// Lay out this element's two authored children with UIKit, preserving their content.
+     /// The first child is primary and the second secondary. Exact manages their child controllers
+     /// and containment; supply a detached controller with empty content slots. The app configures
+diff --git a/host/apple/src/abi.rs b/host/apple/src/abi.rs
+index 2dc01e0a..4c714999 100644
+--- a/host/apple/src/abi.rs
++++ b/host/apple/src/abi.rs
+@@ -718,13 +718,16 @@ impl<D: DataSource> Bridge<D> {
+             // Validate carried-state answers and layout, without endowing real
+             // storage or releasing candidate effects. A refusal keeps the live
+             // host. The accepted validation runner is disposable, too.
+-            let length = self.prepare_plan_with_delivery(
++            let length = self.prepare_plan_carried(
+                 plan_len,
+                 validation,
+                 hooks,
+                 width,
+                 height,
+                 delivery.clone(),
++                None,
++                None,
++                true,
+             );
+             if self.prepared.is_none() {
+                 return length;
+@@ -742,7 +745,7 @@ impl<D: DataSource> Bridge<D> {
+         // After commit, its paint receipt configures storage before activation
+         // and data_ready refreshes its baked/kept external-reading resources.
+         let length = self.prepare_plan_carried(
+-            plan_len, data, hooks, width, height, delivery, validated, None,
++            plan_len, data, hooks, width, height, delivery, validated, None, false,
+         );
+         if let Some(prepared) = &mut self.prepared {
+             prepared.module = true;
+@@ -774,7 +777,7 @@ impl<D: DataSource> Bridge<D> {
+         height: f32,
+         delivery: Option<exact_runner::Delivery>,
+     ) -> u32 {
+-        self.prepare_plan_carried(len, data, hooks, width, height, delivery, None, None)
++        self.prepare_plan_carried(len, data, hooks, width, height, delivery, None, None, false)
+     }
+
+     #[allow(clippy::too_many_arguments)]
+@@ -788,6 +791,7 @@ impl<D: DataSource> Bridge<D> {
+         delivery: Option<exact_runner::Delivery>,
+         carried: Option<exact_runner::Carried>,
+         entry: Option<&str>,
++        validation: bool,
+     ) -> u32 {
+         if let Some(refusal) = self.refuse_analysis() {
+             return refusal;
+@@ -820,7 +824,7 @@ impl<D: DataSource> Bridge<D> {
+             secrets,
+             unbound,
+             presence,
+-        } = match self.links.io {
++        } = match self.links.io.filter(|_| !validation) {
+             Some(io) => (io.endow)(data.grants(), data.app_id(), carried.is_none()),
+             None => crate::store::Endowed::none(),
+         };

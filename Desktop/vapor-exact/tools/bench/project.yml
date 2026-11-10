@@ -1,0 +1,25 @@
+name: VaporComparison
+options:
+  deploymentTarget:
+    iOS: "17.0"
+targets:
+  VaporComparisonIOS:
+    platform: iOS
+    type: bundle.ui-testing
+    sources: [ComparisonTests.swift]
+    settings:
+      base:
+        PRODUCT_NAME: VaporComparisonIOS
+        SDKROOT: iphoneos
+        SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        PRODUCT_BUNDLE_IDENTIFIER: com.vapor.comparison.ios
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.0"
+schemes:
+  VaporComparisonIOS:
+    build:
+      targets:
+        VaporComparisonIOS: [test]
+    test:
+      targets: [VaporComparisonIOS]

@@ -1,0 +1,17 @@
+tamber vapor
+
+theme
+  vapor.cloud = #ffffff  scheme=fixed
+  vapor.mist = #f7fafc  scheme=fixed
+  vapor.haze = #edf2f7  scheme=fixed
+  vapor.fog = #e2e8f0  scheme=fixed
+  vapor.overcast = #cbd5e0  scheme=fixed
+  vapor.sky = #a0c4e8  scheme=fixed
+  vapor.dusk = #b8c4d8  scheme=fixed
+  vapor.lavender = #c9b8d8  scheme=fixed
+  vapor.deep = #4a90a4  scheme=fixed
+  vapor.recording = #e88b8b  scheme=fixed
+  vapor.success = #90c4a8  scheme=fixed
+  vapor.textPrimary = #2d3748  scheme=fixed
+  vapor.textSecondary = #718096  scheme=fixed
+  vapor.textTertiary = #a0aec0  scheme=fixed

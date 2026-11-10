@@ -1,0 +1,334 @@
+use getUserMedia, stopTrack, microphoneStatus, MediaStream, MediaStreamTrack, MicrophoneStatus from "@exact/media-capture"
+use startMediaRecorder, stopMediaRecorder, pauseMediaRecorder, resumeMediaRecorder, mediaRecorderState, MediaRecorderInfo, RecordedMedia from "@exact/recording"
+use spacingXs, spacingSm, spacingMd, spacingLg, spacingXl, radiiMd, durationNormal, durationPage, curveAppear from "./tokens.contract"
+
+shape Take
+  id: string
+  title: string
+  path: string
+  duration: number
+  speakers: string[]
+
+shape Library
+  sessions: Take[]
+  next: number
+
+shape Reply
+  ok: bool
+
+shape MotionPreference
+  prefersReducedMotion: bool
+
+keyframes raiseSheet
+  from translate="0px 48px" opacity=0
+
+keyframes pushPage
+  from translate="50px 0px" opacity=0
+
+keyframes appear
+  from scale=0.98 opacity=0
+
+keyframes pulse
+  50% scale=1.25 opacity=0.65
+
+fn pad(n: number): string = n < 10 ? `0${n}` : `${n}`
+fn elapsed(ms: number, fixed: bool): string = (fixed ? pad(floor(ms / 60000)) : `${floor(ms / 60000)}`) + ":" + pad(floor(ms / 1000) % 60)
+fn nameFor(name: string, index: number): string = name.trim() == "" ? `Speaker ${index + 1}` : name.trim()
+
+component Vapor
+  state page = "timeline"
+  state search = ""
+  state trackId = ""
+  state recorderId = ""
+  state takeId = ""
+  state expanded = false
+  state count = 0
+  state names = ["", "", "", ""]
+  state editIndex = -1
+  state nameDraft = ""
+  state confirmDiscard = false
+  state discarding = false
+  state selected = ""
+  state playbackPaused = true
+  state playbackAt = 0
+  state error = ""
+  state stoppedPath = ""
+  state stoppedDuration = 0
+
+  resource mic = microphoneStatus() as shape MicrophoneStatus else empty()
+  resource library = library() as shape Library else empty()
+  resource recorder = mediaRecorderState(recorder=recorderId, interval=100) as shape MediaRecorderInfo else empty()
+  resource viewport = exactViewport() as shape MotionPreference else empty()
+  mutation opened as shape MediaStream then arm
+  mutation started as shape MediaRecorderInfo then begun
+  mutation paused as shape MediaRecorderInfo
+  mutation finished as shape RecordedMedia then fileTake
+  mutation closed as shape MediaStreamTrack
+  mutation kept as shape Reply refreshes library then afterKeep
+  mutation removed as shape Reply then afterRemove
+
+  derive query = search.trim().toLowerCase()
+  derive matches = library.sessions.filter(take => query == "" or take.title.toLowerCase().includes(query) or take.speakers.join(", ").toLowerCase().includes(query))
+  derive activeTake = first(library.sessions.filter(take => take.id == selected))
+  derive isPaused = recorder.state == "paused"
+  derive isLive = recorder.state == "recording"
+  derive busy = pending(opened) or pending(started) or pending(finished) or pending(kept) or pending(removed)
+  derive saveEnabled = expanded and count > 0 and (recorderId != "" or stoppedPath != "") and not busy
+  derive still = viewport.prefersReducedMotion
+
+  action searchFor(value: string)
+    search = value
+
+  action start
+    if not busy
+      error = ""
+      expanded = false
+      count = 0
+      names = ["", "", "", ""]
+      stoppedPath = ""
+      stoppedDuration = 0
+      discarding = false
+      takeId = `${max(1, library.next)}`
+      page = "recording"
+      send opened = getUserMedia(audio=true)
+
+  action arm
+    match opened
+      case some(stream)
+        trackId = match stream.tracks.at(0) { case some(track) => track.id, case none => "" }
+        send started = startMediaRecorder(stream=stream.id, path=`app:/data/takes/take-${takeId}`)
+      case none
+        error = "The microphone could not be opened."
+        page = "timeline"
+
+  action begun
+    match started
+      case some(value)
+        recorderId = value.id
+      case none
+        send closed = stopTrack(track=trackId)
+        trackId = ""
+        page = "timeline"
+        error = "The recording could not be started."
+
+  action togglePause
+    if isPaused
+      send paused = resumeMediaRecorder(recorder=recorderId)
+    else
+      send paused = pauseMediaRecorder(recorder=recorderId)
+
+  action toggleSpeakers
+    expanded = not expanded
+
+  action choose(value: number)
+    count = value
+
+  action editName(index: number, current: string)
+    editIndex = index
+    nameDraft = current
+
+  action setName(value: string)
+    nameDraft = value
+
+  action acceptName
+    names = names.map((name, index) => index == editIndex ? nameDraft.trim() : name)
+    editIndex = -1
+
+  action cancelModal
+    editIndex = -1
+    confirmDiscard = false
+
+  action back
+    if page == "recording" and not busy and recorderId != ""
+      confirmDiscard = true
+    else
+      if page == "detail"
+        page = "timeline"
+
+  action discard
+    discarding = true
+    confirmDiscard = false
+    if stoppedPath == ""
+      send finished = stopMediaRecorder(recorder=recorderId)
+    else
+      send removed = removeTake(stoppedPath)
+
+  action save
+    if saveEnabled
+      if stoppedPath == ""
+        send finished = stopMediaRecorder(recorder=recorderId)
+      else
+        send kept = keepTake(takeId, stoppedPath, stoppedDuration, names.slice(0, count))
+
+  action fileTake
+    match finished
+      case some(media)
+        send closed = stopTrack(track=trackId)
+        trackId = ""
+        stoppedPath = media.path
+        stoppedDuration = media.duration
+        if discarding
+          send removed = removeTake(media.path)
+        else
+          send kept = keepTake(takeId, media.path, media.duration, names.slice(0, count))
+      case none
+        error = "The recording could not be stopped. Try again."
+
+  action afterKeep
+    match kept
+      case some(reply)
+        returnToTimeline()
+      case none
+        error = "The recording could not be saved. Try again."
+
+  action afterRemove
+    match removed
+      case some(reply)
+        returnToTimeline()
+      case none
+        error = "The recording could not be discarded. Try again."
+
+  action returnToTimeline
+    page = "timeline"
+    recorderId = ""
+    search = ""
+    error = ""
+
+  action openTake(id: string)
+    selected = id
+    playbackPaused = true
+    playbackAt = 0
+    page = "detail"
+
+  action togglePlayback
+    playbackPaused = not playbackPaused
+
+  action playbackTime(at: number)
+    playbackAt = at
+
+  action playbackFinished
+    playbackPaused = true
+    playbackAt = 0
+    fastSeek("takeAudio", 0)
+
+  view
+    column testId="vapor" width="100%" height="100%" min-height=0 box-sizing="border-box" position="relative" background-color="vapor.mist" color="vapor.textPrimary" color-scheme="light" font-family="system-ui"
+      if page == "timeline"
+        column width="100%" flex=1 min-height=0 animation=(still ? "none" : `pushPage ${durationPage()}ms ${curveAppear()} both`)
+          column padding=spacingLg() padding-top=56 padding-bottom=spacingMd() gap=spacingXs()
+            text "ARCHIVE" font-size=11 font-weight=300 letter-spacing=2 color="vapor.textTertiary"
+            text "Timeline" font-size=28 font-weight=200 letter-spacing=-0.5 testId="timelineTitle"
+          row margin-left=spacingLg() margin-right=spacingLg() padding-left=spacingMd() padding-right=spacingMd() gap=spacingSm() height=40 flex-shrink=0 align-items="center" border="1px solid vapor.haze" border-radius=12 background-color="vapor.cloud"
+            image "symbol:search" width=16 height=16 color="vapor.textTertiary" aria-hidden=true
+            input value=search input=searchFor placeholder="Search recordings..." aria-label="Search recordings" testId="search" flex=1 min-width=0 font-size=14 font-weight=300 border="0" background-color="transparent"
+          if error != ""
+            text error color="vapor.recording" font-size=14 margin=spacingLg() testId="error"
+          scroll flex=1 min-height=0
+            column padding=spacingLg() gap=spacingSm()
+              if matches.length == 0
+                if query == ""
+                  column width="100%" align-items="center" gap=spacingMd()
+                    image "symbol:microphone" width=48 height=48 color="vapor.sky" aria-hidden=true
+                    text "Ready to record" font-size=20 font-weight=300 testId="emptyTimeline"
+                    text "Tap the button below to start your first recording." text-align="center" max-width=220 font-size=14 font-weight=300 color="vapor.textTertiary"
+                else
+                  text "No results found" text-align="center" font-size=16 font-weight=300 color="vapor.textSecondary"
+              else
+                text (query == "" ? "RECORDINGS" : "RESULTS") font-size=12 font-weight=500 letter-spacing=2 color="vapor.textTertiary"
+                for take, i in matches key=take.id
+                  button press=openTake(take.id) aria-label=take.title testId=`session-${take.id}` display="flex" flex-direction="column" align-items="stretch" gap=spacingSm() padding="20px 16px" border-radius=radiiMd() border="0" background-color="transparent" animation=(still ? "none" : `appear ${durationNormal()}ms ${curveAppear()} ${i * 50}ms both`)
+                    row justify-content="space-between" gap=spacingSm()
+                      text take.title font-size=18 font-weight=300 letter-spacing=-0.2
+                      text elapsed(take.duration, false) font-size=10 letter-spacing=0.5 color="vapor.textTertiary" font-variant-numeric="tabular-nums"
+                    text take.speakers.join(", ") font-size=14 font-weight=300 color="vapor.textSecondary"
+          row justify-content="center" padding=spacingLg()
+            button press=start aria-label="Start Recording" testId="startRecordingButton" disabled=(not mic.available or pending(library)) display="flex" align-items="center" justify-content="center" width=72 height=72 padding=0 border-radius=36 border="1px solid vapor.fog" background-color="vapor.cloud" box-shadow="0 4px 32px #0000000f"
+              box width=12 height=12 border-radius=6 background-color="vapor.recording" opacity=0.6
+      if page == "recording"
+        column width="100%" flex=1 min-height=0 animation=(still ? "none" : `raiseSheet ${durationPage()}ms ${curveAppear()} both`)
+          row padding=spacingLg() padding-top=56 padding-bottom=spacingMd() justify-content="space-between" align-items="center"
+            Back(press=back)
+            box width=44 height=44 border-radius=22 background-color="vapor.haze" border="1px solid vapor.fog"
+          row height=64 padding-left=spacingLg() padding-right=spacingLg() flex-shrink=0 align-items="center" justify-content="space-between" border-bottom="1px solid vapor.fog"
+            row align-items="center" gap=12
+              box width=8 height=8 border-radius=4 background-color=(isLive ? "vapor.recording" : "vapor.sky") animation=(isLive and not still ? "pulse 1700ms ease-in-out infinite" : "none")
+              text (isPaused ? "PAUSED" : isLive ? "RECORDING" : recorderId == "" ? "STARTING" : "STOPPED") testId="recordingStatus" font-size=14 font-weight=300 letter-spacing=2 color=(isLive ? "vapor.recording" : "vapor.sky")
+            row gap=12 align-items="center"
+              if isLive or isPaused
+                button press=togglePause disabled=pending(paused) aria-label=(isPaused ? "Resume" : "Pause") testId=(isPaused ? "resumeButton" : "pauseButton") width=32 height=32 display="flex" align-items="center" justify-content="center" padding=0 border-radius=16 border="1px solid vapor.fog" background-color="vapor.haze"
+                  image (isPaused ? "symbol:play-fill" : "symbol:pause") width=14 height=14 color="vapor.textSecondary" aria-hidden=true
+              text elapsed(recorder.duration, true) testId="recordingTimer" font-size=20 font-weight=300 letter-spacing=2 font-variant-numeric="tabular-nums" opacity=(isPaused ? 0.5 : 0.8)
+          if error != ""
+            text error color="vapor.recording" font-size=14 margin=spacingLg() testId="error"
+          column flex=1 min-height=0 justify-content="center" align-items="center"
+            text (isPaused ? "Paused" : isLive ? "Recording audio..." : recorderId == "" ? "Starting..." : "Recording stopped") testId="recordingMessage" font-size=(isLive ? 20 : 24) font-weight=200 letter-spacing=1 color=(isLive ? "vapor.textSecondary" : "vapor.textTertiary")
+          column padding=spacingLg() padding-top=(expanded ? spacingLg() : spacingMd()) gap=(expanded ? spacingMd() : 12) border-top="1px solid vapor.fog" background-color="vapor.cloud" -exact-layout-transition=(still ? "none" : "250ms ease-out")
+            button press=toggleSpeakers testId="speakerSetupToggle" aria-expanded=expanded display="flex" align-items="center" gap=spacingSm() border="0" padding=0 background-color="transparent"
+              if not expanded
+                image "symbol:people" width=16 height=16 color="vapor.textSecondary" aria-hidden=true
+              text (expanded ? "Who's speaking?" : "Assign speakers & finish") font-size=(expanded ? 18 : 15) text-align="left" flex=1
+              image (expanded ? "symbol:sf/chevron.down" : "symbol:sf/chevron.up") width=14 height=14 color="vapor.textTertiary" aria-hidden=true
+            if expanded
+              text "Pick a count, then tap to name them." color="vapor.textSecondary" font-size=13 font-weight=300
+              row gap=spacingSm()
+                for value in [1, 2, 3, 4] key=value
+                  button press=choose(value) testId=`speakerCount${value}` aria-pressed=(count == value) flex=1 height=40 padding=0 border-radius=12 border="1px solid vapor.fog" background-color=(count == value ? "vapor.sky" : "vapor.haze")
+                    text (value == 4 ? "4+" : `${value}`) color=(count == value ? "vapor.cloud" : "vapor.textSecondary") font-size=15
+              if count > 0
+                column padding-top=spacingSm() gap=10 border-top="1px solid vapor.fog"
+                  text "Speakers" font-size=12 color="vapor.textSecondary"
+                  for name, i in names.slice(0, count) key=i
+                    button press=editName(i, name) aria-label=nameFor(name, i) testId=`speakerRow${i}` display="flex" gap=spacingSm() align-items="center" height=38 padding="0 12px" border-radius=10 background-color="vapor.haze" border="1px solid vapor.fog"
+                      box width=8 height=8 border-radius=4 background-color=(i == 0 ? "vapor.sky" : i == 1 ? "vapor.lavender" : i == 2 ? "vapor.deep" : "vapor.dusk")
+                      text nameFor(name, i) flex=1 text-align="left" font-size=13 font-weight=300 color="vapor.textTertiary"
+                      image "symbol:forward-chevron" width=12 height=12 color="vapor.textTertiary" aria-hidden=true
+            button press=save disabled=(not saveEnabled) testId="stopAndSaveButton" display="flex" gap=spacingSm() align-items="center" justify-content="center" height=44 padding=0 border="0" border-radius=12 background-color=(saveEnabled ? "vapor.recording" : "vapor.fog") opacity=(saveEnabled ? 1 : 0.5)
+              box width=12 height=12 border-radius=2 background-color=(saveEnabled ? "vapor.cloud" : "vapor.textTertiary")
+              text "Stop & Save" font-size=14 font-weight=500 color=(saveEnabled ? "vapor.cloud" : "vapor.textTertiary")
+          if editIndex >= 0 or confirmDiscard
+            column position="absolute" inset=0 background-color="#00000040" justify-content="center" align-items="center" padding=spacingLg() box-sizing="border-box"
+              column role="dialog" aria-modal=true aria-label=(confirmDiscard ? "Discard recording?" : "Name speaker") width="100%" max-width=340 padding=spacingLg() gap=spacingMd() border-radius=radiiMd() background-color="vapor.cloud"
+                if confirmDiscard
+                  text "Discard recording?" font-size=18
+                  text "This recording will be lost." color="vapor.textSecondary" font-size=14
+                else
+                  text "Name speaker" font-size=18
+                  input value=nameDraft input=setName submit=acceptName aria-label="Speaker name" placeholder=`Speaker ${editIndex + 1}` testId="speakerName" width="100%" box-sizing="border-box"
+                row gap=spacingSm() justify-content="flex-end"
+                  button press=cancelModal testId="cancelModal"
+                    text "Cancel"
+                  if confirmDiscard
+                    button press=discard testId="discardRecording"
+                      text "Discard"
+                  else
+                    button press=acceptName testId="saveName"
+                      text "Done"
+      if page == "detail"
+        match activeTake
+          case some(take)
+            column width="100%" flex=1 min-height=0 padding=spacingLg() padding-top=56 gap=spacingMd() box-sizing="border-box" animation=(still ? "none" : `pushPage ${durationPage()}ms ${curveAppear()} both`)
+              Back(press=back)
+              column gap=spacingXs()
+                text take.title font-size=28 font-weight=200 letter-spacing=-0.5
+                text elapsed(take.duration, false) font-size=14 font-weight=300 color="vapor.textSecondary"
+              text "No transcript available" text-align="center" margin-top=spacingXl() font-size=14 font-weight=300 color="vapor.textTertiary"
+              box flex=1
+              audio id="takeAudio" src=take.path paused=playbackPaused timeupdate=playbackTime ended=playbackFinished controls=false preload="metadata" width=0 height=0 aria-hidden=true
+              row padding="10px 16px 10px 12px" align-items="center" gap=spacingMd() border-radius=radiiMd() background-color="vapor.cloud" animation=(still ? "none" : `appear ${durationNormal()}ms ${curveAppear()} both`)
+                button press=togglePlayback aria-label=(playbackPaused ? "Play recording" : "Pause playback") testId="playbackButton" width=36 height=36 display="flex" align-items="center" justify-content="center" padding=0 border-radius=18 border="0" background-color="vapor.haze"
+                  image (playbackPaused ? "symbol:play-fill" : "symbol:pause") width=14 height=14 color="vapor.textSecondary" aria-hidden=true
+                column flex=1 min-width=0 gap=6
+                  text take.title font-size=13 font-weight=300
+                  box height=3 border-radius=2 background-color="vapor.fog"
+                    box height=3 width=`${min(100, playbackAt * 100000 / max(1, take.duration))}%` border-radius=2 background-color="vapor.sky"
+                text elapsed(playbackAt * 1000, false) testId="playbackTime" font-size=10 font-weight=300 letter-spacing=0.5 color="vapor.textTertiary" font-variant-numeric="tabular-nums"
+          case none
+            Back(press=back)
+
+component Back
+  props
+    press: action
+  view
+    button press=press aria-label="Back" testId="backButton" align-self="flex-start" display="flex" align-items="center" gap=spacingXs() padding="8px 8px 8px 0" border="0" background-color="transparent"
+      image "symbol:back" width=12 height=20 color="vapor.textSecondary" aria-hidden=true
+      text "Back" font-size=14 font-weight=300 color="vapor.textSecondary"

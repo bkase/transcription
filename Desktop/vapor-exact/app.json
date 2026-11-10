@@ -1,0 +1,41 @@
+{
+  "name": "Vapor",
+  "short_name": "Vapor",
+  "id": "com.vapor.exact",
+  "start_url": "/",
+  "display": "standalone",
+  "app": {
+    "id": "com.vapor.exact",
+    "name": "Vapor"
+  },
+  "host": {
+    "web": {},
+    "ios": {
+      "minimumOS": "17.0",
+      "deviceFamily": [
+        "iphone",
+        "ipad"
+      ]
+    },
+    "macos": {
+      "minimumOS": "14.0",
+      "window": {
+        "width": 390,
+        "height": 844,
+        "minWidth": 360,
+        "minHeight": 580
+      }
+    }
+  },
+  "deploy": {
+    "store": {
+      "web": "0",
+      "ios": "0",
+      "macos": "0"
+    }
+  },
+  "audio_session": "playback",
+  "theme_color": "#f7fafc",
+  "background_color": "#f7fafc",
+  "background_color_dark": "#f7fafc"
+}
