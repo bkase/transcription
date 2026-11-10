@@ -1,5 +1,7 @@
 # Vapor on Exact and Rune
 
+For development-build latency after a source save, see the [matched hot reload benchmark](HOT-RELOAD-BENCHMARK.md).
+
 Both ports exercise the same audio-only recording slice. The measurements are from an Apple M4 Max MacBook Pro with 128 GB of RAM, macOS 26.6.2, Xcode 27.0, and the iOS 26.2 simulator. Both apps use optimized release builds. The comparison uses the Rune fork at `394428df` and Exact at `956ae33a` with [the native patch](tools/exact-native.patch).
 
 ## Results

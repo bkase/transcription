@@ -1,6 +1,15 @@
-#[cfg(not(target_os = "ios"))]
+#[cfg(all(not(target_os = "ios"), not(feature = "hot")))]
 fn main() {
     vapor_rune::desktop_main();
+}
+
+// Keep the view functions in the hot-patch binary, as on the simulator.
+#[cfg(all(not(target_os = "ios"), feature = "hot"))]
+include!("lib.rs");
+
+#[cfg(all(not(target_os = "ios"), feature = "hot"))]
+fn main() {
+    desktop_main();
 }
 
 #[cfg(all(target_os = "ios", not(all(target_abi = "sim", feature = "ios-hot"))))]
